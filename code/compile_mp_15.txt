@@ -1,0 +1,21 @@
+echo "Compiling MP_TOOLS v. 1.53"
+alias ff='gfortran  -ffixed-form -ffixed-line-length-132 -fimplicit-none -O'
+ff src/mp_bin53.f -o /usr/local/bin/mp_bin
+echo "mp_bin     DL_POLY input file conversion"
+ff src/mp_dbin53.f -o /usr/local/bin/mp_dbin
+echo "mp_dbin    DISCUS input file conversion"
+ff src/mp_lbin53.f -o /usr/local/bin/mp_lbin
+echo "mp_lbin    LAMMPS input file conversion"
+ff src/mp_insp53.f -o /usr/local/bin/mp_insp
+echo "mp_insp    BINARY data file inspection"
+ff src/mp_pdf53.f -o /usr/local/bin/mp_pdf -L/usr/local/lib -lm -fopenmp  -L/usr/local/pgplot -lpgplot -L/usr/X11R6/lib -lX11
+echo "mp_pdf     PDF calculation and plotting"
+ff src/mp_dos53.f src/singleton.f -o /usr/local/bin/mp_dos   -L/usr/local/lib -lm -fopenmp  -L/usr/local/pgplot -lpgplot -L/usr/X11R6/lib -lX11
+echo "mp_dos     DOS calculation and plotting"
+ff src/mp_sqom53.f src/singleton.f -o /usr/local/bin/mp_sqom -L/usr/local/lib -lfinufft  -lstdc++ -lfftw3 -lfftw3_omp -lm -fopenmp -L/usr/local/pgplot -lpgplot -L/usr/X11R6/lib -lX11
+echo "mp_sqom    S(Q,w) calculation and plotting"
+if ! [ -e /usr/local/mp_tools ]; then sudo mkdir /usr/local/mp_tools; fi
+sudo cp -R * /usr/local/mp_tools
+
+#in case of SEGMENTATION ERRORS use: -fbounds-check which slows down the code by 10-20% but permits to localise the problem
+#in case of need insert -L/usr/X11R6/lib in lines containing -lX11 

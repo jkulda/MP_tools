@@ -1,0 +1,96 @@
+MP_DBIN
+
+- this tool serves to convert ASCII data in the DISCUS format to the MD_TOOLS binary format
+
+- within MP_TOOLS the DISCUS is synonymum for minimalist static data sets containing in the BULK case only atom species and position info with the atom positions in the CELL being in one-to-one correspondence with regular lattice sites (i.e. the BULK case can handle interstitial atoms)
+
+**************************************************************
+	DISCUS header convention (minimum):
+		1/ the 1st line keyword is TITLE 
+		2/ the last line keyword is ATOMS
+		3/ the keyword lines CELL (unit cell parameters and angles) and SPCGR (spacegroup)
+			have to be present in between 
+		4/ there may be comment lines starting with # in between the 1st and last line
+**************************************************************
+
+	MP_TOOLS extensions/limitations
+
+		1/ the keywords may be lower case, upper case or capitalised: 
+			keyword, KEYWORD or Keyword (this liberty does not apply to the atom labels cf. 5/)
+
+		2/ the TITLE is limited to a 16 character contiguous string (use _ instead of spaces)
+		  in MP_TOOLS
+		  
+		3/ it is recommended to place after the TITLE a comment line with a CHARACTER(10)
+			string indicating the data origin (e.g. #DISCUS or #PhaseField) to indicate the
+			the origin of the data
+			
+		4/ the optional DISCUS keyword line NCELLS is mandatory with MP_TOOLS in the form
+			NCELLS n_row_x, n_row_y, n_row_z, n_atom, n_tot, n_at_type
+			where
+			n_row_x, n_row_y, n_row_z   supercell dimensions
+			n_atom											number of atoms in the unit cell (4 in fcc Cu)
+			n_tot											  number of atoms in the supercell 
+			n_at_type										number of atom species
+			
+			IMPORTANT:
+				- the datatype CELL/BULK is chosen by the presence/absence of the string 'bulk' in
+				 the sim_type string within the GENERAL section of the .PAR file (CELL is default)
+				- for the BULK only N_TOT is significant, n_at_type is checked against .PAR
+				- for the CELL datatype N_ROW_X ... N_ATOM are checked against the .PAR input 
+				
+		5/ it is the users' responsibility to report the atom labels in the 1st column of the
+		  .PAR file in exactly the same style as they are given through the input data file,
+		  including their possible charge state, otherwise the MP_TOOLS won't be able to
+		  identify the atoms; if the charge state is specified report it once again the 8th
+		  column (after the neutron b_coh)
+
+				
+- if the charge state is to be used for calculation of the Xray structure factors, the corresponding charges have to be specified in the .PAR file in the last column of atom information - the atom names are not decoded to extract this information
+
+- the CELL keyword is followed by 3 values of lattice parameters and 3 unit cell angles
+
+- intrinsically DISCUS uses reduced lattice coordinates, so the lattice parameter is used just to multiply the positions to convert them into length units, hence a check of lattice parameter is neither needed nor possible
+
+- the NCELLS keyword is followed by the three supercell dimensions (in unit cell numbers) and by the number of atoms in a unit cell (eg. 5 in the PbTiO3 perovskite or 8 in the case of silicon or GaAs)
+
+
+- on the lines immediately following the ATOMS keyword come the input data records, which in the DISCUS case contain the atom name (4 char, possibly including the charge state), position and isotropic thermal factor
+
+	ZR    0.00 0.00 0.00  0.5
+	O2-   0.00 0.50 0.00  1.0
+
+put into .PAR: - in the PHASEFIELD case an integer identifier of the atom position within the unit cell is added
+	Zr    0.00 0.00 0.00  0.5 1
+
+OUTPUT
+- the header record of the binary .DAT files has the same structure for both the BULK and CELL datatypes
+- the first 4 characters of the header (sim_type) determine the origin of the data 
+		time 		MD timestep sequences (DL_POLY, LAMMPS)
+		DISCUS	DISCUS and phasefield data without time structure
+- the presence of the the 'bulk' string starting from the 5th character indicates the BULK
+	data type, otherwise CELL is assumed (default)
+- follow record sequences with the atom indices (AT_IND) followed by atom positions (AT_POS), the sequence length (number of records) is specified by the N_SIZE value in the header
+
+- the BULK data sequences contain all the values for the 1st atom type, followed by the 2nd one etc., for each atom type the data follow in the order in which they were recorded in the input ASCII file, the 1st column of AT_IND contains the position index from the ASCII file, the 4th column the atom type number, the 2nd and 3rd column are 0
+
+- the CELL data are again recorded in the atom order, but here the different unit cell positions are distinguished: first come all the atoms of the 1st position,etc. for each of the atom positions the regular supercell lattice is scanned in the order of the indices [i,j,k] with i going fastest - this permits to address and read selectively individual atoms of the binary file (as done eg. by the MP_INSP utility)
+
+******************************************************************************************
+
+MP_TOOLS vers DISCUS structure files
+
+- both ways compatibility at the level of the DISCUS structure files (complete supercell positions listing) in the minimalist version of the keyword-based (pre-5.18) format, as given in the following example (without secondary comments %)
+- MP_TOOLS will ignore the SPCGR line as well as the three angle values in the CELL line
+- MP_TOOLS will launch an enquiry dialogue in case of absence of the NCELLS line 
+- MP_TOOLS preferred way is to indicate the atom identification number at the end of the line in place of the PROPERTY_FLAG in DISCUS, in its absence ???
+
+title String_16_charac	%compact 16 character string, use _ instead of blank space
+#DISCUS  			%use the comment to indicate to MP_TOOLS the data type: phasefield or discus
+spcgr P1			%spacegroup info is ignored by MP_TOOLS but obligatory in DISCUS, put P1 ... 
+cell  5.14,5.14,5.14,90.,90.,90.		%all the 6 parameters are obligatory in DISCUS
+ncells 128, 128, 128, 5 			%this one is obligatory in MP_TOOLS, but not in DISCUS
+atoms
+ZR    0.00 0.00 0.00  0.5		1
+O     0.25 0.25 0.25  1.0		
+

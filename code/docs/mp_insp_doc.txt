@@ -1,0 +1,86 @@
+20220520_111200 copied as MP_INSP_DOC
+20220609_093500 copied as MP_INSP_DOC
+
+
+******************************************************************************************
+MP_INSP
+
+displays the header and single atom info contents from an MP_TOOLS binary data file.
+
+This is a simple utility giving access to contents of the binary data files used by 
+diverse MP_TOOLS, especially valuable in any case of doubt. Deliberately, this tool 
+does not provide any means of editing the contents of the input files.
+
+For the CELL and QUICK data types the atoms are specified by their atom_type number 
+and the 3 cell indices as in the following example, displaying the 1st (Ba) and 5th (O3) 
+atoms from the (1 1 1) cell
+
+*********************************************************************
+MacBook-Pro:BZO$ md_insp53
+ *** Program MD_INSP 1.53 ** Copyright (C) Jiri Kulda (2022) ***
+ Master filename:
+BZO200d
+ snapshot file number (0 for no number):
+1
+ reading ./data/BZO200d_n0001.dat
+
+ Simulation & data type:              timestep            cell
+ Time structure t_ms,t_step:          3.99999990E-04   64.0400009
+ Supercell & temperature:              32          32          32   198.984192
+ Unit cell parameter(3), angle(3):    4.19393730       4.19393730       4.19393730       90.0000000       90.0000000       90.0000000
+ Atom numbers:                         5       32768       32768       32768       32768       32768      163840
+ Atoms & occupancies:                 Ba  Zr  O1  O2  O3     1.00000000       1.00000000       1.00000000       1.00000000       1.00000000
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+1 1 1 1
+ Ba             1   124.320000       5.61999989
+ Cell index               1           1           1
+ Atom position   -16.0303669      -16.0000095      -16.0043278
+ Atom velocity    1.99678099      0.213972330      -2.74756885
+ Atom force       4713.75977       3077.75708       3986.38721
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+5 1 1 1
+ O3             5   14.4994001      0.910000026
+ Cell index               1           1           1
+ Atom position   -15.5447092      -16.0293999      -15.4981203
+ Atom velocity   0.315082103       2.82844400      -2.36962032
+ Atom force       562.252625       10687.8594       802.752136
+*********************************************************************
+
+For the BULK data type the atoms are specified by their identification number (chemical 
+species only) and by the index in the input sequence for the given atom, as in the following 
+example, displaying the 1st atoms info for the Pb (1) and Sr (2) atoms occupying the same
+unit cell position in different cells/layers; here the occupancies are related to whole 
+ensemble of atoms (N_TOT)
+
+*********************************************************************
+MacBook-Pro:BZO$ md_insp53
+ *** Program MD_INSP 1.53 ** Copyright (C) Jiri Kulda (2022) ***
+PT13ST05_p1_d1_b
+ snapshot file number (0 for no number):
+0
+ Reading ./data/PT13ST05_p1_d1_b.dat
+
+ Simulation & data type:              discus_bulk         bulk
+ Time structure t_ms,t_step:          0.00000000       0.00000000
+ Supercell & temperature:             256         256          18   0.00000000
+ Unit cell parameter(3), angle(3):    4.00000000       4.00000000       4.00000000       90.0000000       90.0000000       90.0000000
+ Atom numbers:                         4      851968      327680     1179648     3538944     5898240
+ Atoms & occupancies:                 Pb  Sr  Ti  O     0.144444451       5.55555560E-02  0.200000003      0.600000024
+
+ jat, relative record_index (0 = new file number, -1 = END):
+1 1 1 1
+ Pb             1   0.00000000       0.00000000
+ Atom index               1
+ Atom position   -127.366295      -127.350227      -8.31912136
+
+ jat, relative record_index (0 = new file number, -1 = END):
+2 1 1 1
+ Sr             2   0.00000000       0.00000000
+ Atom index         1966081
+ Atom position   -127.360130      -127.351135      -2.32302618
+
+ jat, relative record_index (0 = new file number, -1 = END):
+

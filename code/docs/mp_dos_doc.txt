@@ -1,0 +1,13 @@
+MP_DOS
+
+calculates the phonon density of states (DOS) from the velocity-velocity autocorrelation function. The total phonon DOS is an incoherent sum of contributions of individual atoms forming the system under study and is related by the time-frequency FT to its spherically integrated (averaged) inelastic scattering cross-section. For this reason it is often put into connection with incoherent neutron scattering, but this property applies indifferently even to a perfectly coherent scatterer.
+
+On input any data type (CELL, QUICK, BULK) is eligible. 
+
+The outcome of this program critically depends on adequate time structure of input data, which on its turn depends on the right choice of the MD simulation strategy (particularly concerning the trajectory length and the dump frequency). The time- to frequency-domain FT calls for a contiguous snapshot sequence. As follows from the FT properties the maximum accessible frequency is related the reciprocal value of the MD trajectory time step, it should be kept in mind that only half of the apparent range is really effective (the other half is a symmetric image of the first one). In case of an insufficient frequency range (time step too large) the S(w) function will fold over and bring up unexpected artefacts. The frequency resolution is related to the reciprocal of the MD simulation duration, again the technicalities of the implemented FT algorithm reduce the effective resolution 4x with respect to the exact reciprocal value of the trajectory length. 
+
+In most cases the phonon DOS does not exhibit details of energy dependence as sharp as the Q-resolved S(Q,w) scattering functions. As a consequence MD trajectories of a few hundred snapshots may prove sufficient to obtain useful information. Typical substances with optic phonon frequencies not extending beyond 25THz (≈ 100meV) need for a DOS plot with a step of 0.2THz a snapshot sequence with a 0.02ps time step (time tag difference between two snaphots) and 5ps (250 snapshot) length.
+
+The resulting DOS can be either weighted by the neutron scattering lengths (squared, b_coh^2, for comparison with neutron data) or by unit (for comparison with other theoretical model results). The total DOS is plotted together with selected partials,
+file output (.PS and .TXT) is available upon request.
+

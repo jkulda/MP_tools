@@ -1,0 +1,12 @@
+! Multivariate Fast Fourier Transform
+!
+! Fortran 90 (ELF90) Implementation of Singleton's mixed-radix algorithm,
+! RC Singleton, Stanford Research Institute, Sept. 1968.
+!
+! Adapted from fftn.c, translated from Fortran 66 to C by Mark Olesen and
+! John Beale.
+
+Richard C. Singleton
+On computing the fast Fourier transform
+Communications of the ACM 10 (1967) 647–654
+https://doi.org/10.1145/363717.363771

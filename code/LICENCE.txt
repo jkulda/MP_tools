@@ -1,0 +1,32 @@
+
+												MP_TOOLS v.1.53 (June_2022)
+												 
+Computing tools for visualisation and analysis of atomic scale models of crystalline solids.
+Ultra-fast generation of elastic and inelastic neutron and Xray diffuse scattering intensity  
+maps in the momentum-energy space (Q,w) employing the non-uniform fast Fourier transform.
+
+								Copyright (C) 2019,2021,2022  Jiri Kulda, Grenoble/Prague
+	
+This file is part MP_TOOLS package developed and maintained by Jiri Kulda <jkulda@free.fr>
+Be encouraged to report bugs, comments and suggestions to the author at the above address.
+
+MP_TOOLS are a free software: feel free to use it, redistribute it and/or modify it 
+under the terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later version, 
+for details see <https://www.gnu.org/licenses/>
+
+This program is expected to conform to a public-beta stage of maturity and is distributed in  
+the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License  
+for more details.
+
+This package is partly based on the work of others. For their licence info see the 
+/contrib directory.
+
+If you find this library useful, or it helps you in creating software or publications, 
+please let me know and acknowledge this by citing my repository:
+
+  https://github.com/**********
+  
+and the corresponding journal articles (to come).
+

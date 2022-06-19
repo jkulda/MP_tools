@@ -1,0 +1,100 @@
+
+ 2022/06/11 09:01:01  mp_lbin53  /Users/jiri/Documents/Work/Science/MD/MP_tools/examples/lammps
+
+ Read parameter file:  cu_48.par
+ Read snapshots number: min, step, max        6000          50        6200
+ Saved snapshot numbers start:         120
+
+ 1st snapshot file to read:data/cu_48.6000                                                                                                                 
+ sim_type = timestep        
+ nominal temperature [K]    0.00000000    
+ substance:Cu        n_atom, n_eq,nrow:           4           1          48
+ a_par:   3.63269901       3.63252735       3.63288212    
+
+ Trajectory time start, step [ps]:   1.20000005       1.99999995E-04
+ Occupancies: nominal 		real
+ Cu1    1.00000000       1.00000000    
+ Cu2    1.00000000       1.00000000    
+ Cu3    1.00000000       1.00000000    
+ Cu4    1.00000000       1.00000000    
+ ./data/cu_48_n0120.dat  T_tot =    299.588806    
+ Correcting t_ms(PAR)   1.99999995E-04  to   1.99999806E-04  from the snapshot data
+ ./data/cu_48_n0121.dat  T_tot =    300.805084    
+ ./data/cu_48_n0122.dat  T_tot =    301.604584    
+ ./data/cu_48_n0123.dat  T_tot =    301.430023    
+ last snapshot file to read:data/cu_48.6200                                                                                                                 
+ ./data/cu_48_n0124.dat  T_tot =    300.593079    
+ Trajectory finished:            5  .dat files written in SYS time   22.9430008      sec
+
+
+ 2022/06/11 09:03:54  MP_DOSP53  /Users/jiri/Documents/Work/Science/MD/MP_tools/examples/lammps
+
+ Read parameter file:  cu_48.par
+ OMP threads max    =            4
+ OMP processes requested 	=            2
+
+     Cu1   0.0000  0.0000  0.0000    1.0000  0.7720
+     Cu2   0.5000  0.5000  0.0000    1.0000  0.7720
+     Cu3   0.5000  0.0000  0.5000    1.0000  0.7720
+     Cu4   0.0000  0.5000  0.5000    1.0000  0.7720
+
+ Input files:           1  starting from ./data/cu_48_n0121.dat
+   t0,t_step,n_row,n_atom:   1.21000004       9.99999046E-03          48          48          48           4
+   temperature [K]   301.604584    
+ Atoms:        Cu1    Cu2    Cu3    Cu4 
+ Occupations:  1.000  1.000  1.000  1.000
+ b_coh:        0.772  0.772  0.772  0.772
+
+
+ Atoms:             Cu1     Cu2     Cu3     Cu4 
+ Atoms no.:         1       2       3       4
+ Uniform weights at_weights:   1.0000  1.0000  1.0000  1.0000
+
+
+ 2022/06/11 09:05:19  mp_pdf53  /Users/jiri/Documents/Work/Science/MD/MP_tools/examples/lammps
+
+ Read parameter file:  cu_48.par
+ OpenMP not in use
+
+     Cu1   0.0000  0.0000  0.0000    1.0000  0.7720
+     Cu2   0.5000  0.5000  0.0000    1.0000  0.7720
+     Cu3   0.5000  0.0000  0.5000    1.0000  0.7720
+     Cu4   0.0000  0.5000  0.5000    1.0000  0.7720
+
+ Atoms:             Cu1     Cu2     Cu3     Cu4 
+ Atoms no.:         1       2       3       4
+ Uniform at_weights:   1.0000  1.0000  1.0000  1.0000
+ input: ./data/cu_48_n0121.dat                                      
+
+   Monte Carlo integration    20000000  pairs
+   Masks:           1           1           1           1
+  Postscript output written to: cu_48_0121_rdfm_01.ps                                       
+  Text output written to: cu_48_0121_rdfm_01.txt                                      
+
+
+ 2022/06/11 09:09:18  MP_SQOM 1.53  /Users/jiri/Documents/Work/Science/MD/MP_tools/examples/lammps
+
+ Read parameter file:  cu_48.par
+ OMP threads maximum =            4
+ OMP processes requested 	=            2
+
+     Cu1   0.0000  0.0000  0.0000    1.0000  0.7720
+     Cu2   0.5000  0.5000  0.0000    1.0000  0.7720
+     Cu3   0.5000  0.0000  0.5000    1.0000  0.7720
+     Cu4   0.0000  0.5000  0.5000    1.0000  0.7720
+
+ Input files:  ./data/cu_48_n0120.dat to ./data/cu_48_n0124.dat
+   t0,t_step,n_row(3),n_atom:   1.20000005       9.99999046E-03          48          48          48           4
+   temperature [K]   300.805084    
+ Atoms:        Cu1    Cu2    Cu3    Cu4 
+ Occupations:  1.000  1.000  1.000  1.000
+Neutron weights b_coh:        0.772  0.772  0.772  0.772
+ Atom masks:   1      1      1      1
+ Atom pair correlation:   0  0
+ n_bz:           6
+ Q-plane: e1 = [ 1 0 0], e2 = [ 0 1 0]
+ Q center, Energy transfer [THz]:   0.00000000       0.00000000       0.00000000       0.00000000    
+ Total scattering
+ Energy resolution [THz]     INF
+ Output files:  cu_48_sq_0120_0005_01.ps   cu_48_sq_0120_0005_01.txt
+

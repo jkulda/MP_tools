@@ -1,0 +1,354 @@
+JKs-MacBook-Pro:dl_poly jiri$ mp_bin53
+ *** Program MP_BIN 1.53 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***
+
+ Parameter file name (.par will be added)
+BTO500
+ Data type: cell
+ Atom labels            3
+           1 Ba             1
+           1 Ti             2
+           3 O              3           4           5
+ BTO structure info (atoms):
+           1 Ba     0.00000000       0.00000000       0.00000000
+           2 Ti    0.500000000      0.500000000      0.500000000
+           3 O1    0.500000000      0.500000000       0.00000000
+           4 O2     0.00000000      0.500000000      0.500000000
+           5 O3    0.500000000       0.00000000      0.500000000
+ Input data path:  data/
+ Read snapshots number: min, step, max
+1 1 5
+ Saved snapshot numbers start:
+1
+ Master for MD trajectory filename:
+h1
+ Input trajectory file:  data/h1.txt
+ No shells
+ j_shell =           0
+ sim_type = timestep
+ trajectory recording mode =           1
+ boundary conditions            3
+ Trajectory time start, step [ps]:   340.019989       1.99999995E-04
+ a_par estimate =   4.00939989       4.00939989       4.00939989
+ OK? (1/0)
+1
+ reading the 1st snapshot (takes a few seconds) ...
+ 1st snapshot: total of      625000  atoms read in   3.34261107      sec
+
+ Cores E_kin(jat,:)   425.411682       423.121338       424.924164       424.447784       427.622925       422.645233       426.873352       424.728394       421.458923       422.608582       426.816895       424.476227       424.960938       426.060638       423.978088
+ Real temperature: cores only    510.768799
+ Occupancies: nominal 		real
+      Ba     1.00000000       1.00000000
+      Ti     1.00000000       1.00000000
+      O1     1.00000000       1.00000000
+      O2     1.00000000       1.00000000
+      O3     1.00000000       1.00000000
+ ./data/BTO500_n0001.dat
+ ./data/BTO500_n0002.dat
+ ./data/BTO500_n0003.dat
+ ./data/BTO500_n0004.dat
+ ./data/BTO500_n0005.dat
+ Trajectory files finished:            5  .dat files written in   54.6739998      sec (SYS)
+JKs-MacBook-Pro:dl_poly jiri$
+
+
+
+
+
+
+
+
+JKs-MacBook-Pro:dl_poly jiri$ mp_insp53
+ *** Program MP_INSP 1.53 ** Copyright (C) Jiri Kulda (2022) ***
+ Master filename:
+BTO500
+ snapshot file number (0 for no number):
+1
+ Reading ./data/BTO500_n0001.dat
+
+ Simulation & data type:              timestep            cell
+ Time structure t_ms,t_step:          1.99999995E-04   340.019989
+ Supercell & temperature:              50          50          50   510.768799
+ Unit cell parameter(3), angle(3):    4.00939989       4.00939989       4.00939989       90.0000000       90.0000000       90.0000000
+ Atom numbers:                         5      125000      125000      125000      125000      125000      625000
+ Atoms & occupancies:                 Ba  Ti  O1  O2  O3     1.00000000       1.00000000       1.00000000       1.00000000       1.00000000
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+1 1 1 1
+ Atom, type, mass, charge    Ba             1   124.320000       5.61999989
+ Cell index                       1           1           1
+ Atom position              -24.9636478      -24.9701824      -24.9872055
+ Atom velocity                1.00473869      -2.09704852       5.16198158
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+5 1 1 1
+ Atom, type, mass, charge    O3             5   14.4994001      0.910000026
+ Cell index                       1           1           1
+ Atom position              -24.4848194      -25.0100918      -24.4761105
+ Atom velocity                9.37452698      -1.66118717      -10.9438610
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+0 0 0 0
+ snapshot file number (0 for no number):
+3
+ Reading ./data/BTO500_n0003.dat
+
+ Simulation & data type:              timestep            cell
+ Time structure t_ms,t_step:          1.99999995E-04   340.059998
+ Supercell & temperature:              50          50          50   510.673431
+ Unit cell parameter(3), angle(3):    4.00939989       4.00939989       4.00939989       90.0000000       90.0000000       90.0000000
+ Atom numbers:                         5      125000      125000      125000      125000      125000      625000
+ Atoms & occupancies:                 Ba  Ti  O1  O2  O3     1.00000000       1.00000000       1.00000000       1.00000000       1.00000000
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+1 1 1 1
+ Atom, type, mass, charge    Ba             1   124.320000       5.61999989
+ Cell index                       1           1           1
+ Atom position              -24.9552422      -24.9959412      -24.9643879
+ Atom velocity               0.597144783      -3.26374269       1.32114422
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+5 1
+1 1
+ Atom, type, mass, charge    O3             5   14.4994001      0.910000026
+ Cell index                       1           1           1
+ Atom position              -24.4419422      -25.0216312      -24.5598450
+ Atom velocity               -1.37887621      0.618985593       2.79430509
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+5 50 50 50
+ Atom, type, mass, charge    O3             5   14.4994001      0.910000026
+ Cell index                      50          50          50
+ Atom position               24.5148430       23.9657402       24.4804077
+ Atom velocity              -0.534910738      -6.10759640       5.17635250
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+9 9 9 9
+JKs-MacBook-Pro:dl_poly jiri$
+
+
+
+
+
+
+
+JKs-MacBook-Pro:dl_poly jiri$
+JKs-MacBook-Pro:dl_poly jiri$ mp_pdf53
+ *** Program MP_PDF 1.53 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***
+ 			*** for the moment only MonteCarlo integration is available ***
+
+ Parameter file name (.par will be added)
+ Check partial occupation factors - if relevant!
+BTO500
+ PAR proc_num_in          =            1
+ OMP threads max          =            4
+ OMP processes requested  =            1
+ OpenMP not in use
+
+ Substance name: BTO
+ Atoms from BTO500.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Ti    0.5000  0.5000  0.5000    1.0000 -0.3370
+     O1    0.5000  0.5000  0.0000    1.0000  0.5805
+     O2    0.0000  0.5000  0.5000    1.0000  0.5805
+     O3    0.5000  0.0000  0.5000    1.0000  0.5805
+ partial correlations
+        1     Ba_Ba     1   1   1
+        2     Ti_Ti     2   2   1
+        3     O1_O1     3   3   1
+        4     O2_O2     4   4   1
+        5     O3_O3     5   5   1
+        6     Ba_Ti     1   2   1
+        7     Ba_Ox     1   3   3
+        8     Ti_Ox     2   3   3
+        9     Ox_Oy     3   4   3
+ Input data filename master (w/o _n):
+BTO500
+ Read data files number min,step,max (0 0 0 no numbers):
+1 1 1
+ Data type: cell
+ n_h (5 opt) MC sampling events, units of 10^7 rand cycles, 0=exit)
+2
+ Monte Carlo integration over    20000000 cell pairs
+ Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT, negative = EDIT
+1
+ Atoms:             Ba      Ti      O1      O2      O3
+ Atoms no.:         1       2       3       4       5
+ Uniform at_weights:   1.0000  1.0000  1.0000  1.0000  1.0000
+ Actual masks:
+  1  1  1  1  1
+
+ input: ./data/BTO500_n0001.dat
+ Accumulating the PDFs ...
+
+   9.48600006        10000000
+   18.9780006        20000000
+ Plot range r_1, r_2, max =   20.4799995      r_2=0 END
+1.5 7.5
+
+ Plotting BTO:  1/0 for PDF_tot & 4 indices of partial PDFs to be added (0 = skip, -1 = end)
+1 1 7 8 9
+ Modify vertical scale (min,max; 0,0 EXIT)
+0 3
+ Modify vertical scale (min,max; 0,0 EXIT)
+0 0
+  1   edit partials
+  2   save graph (.PS) & edit partials
+  3   save graph (.PS) & PDF (.TXT)
+  4   change plot range
+  5   edit at_weights (restart integration)
+  0   EXIT
+3
+  Postscript output written to: BTO500_0001_rdfm_01.ps
+  Text output written to: BTO500_0001_rdfm_01.txt
+
+  0   EXIT
+  1   edit at_weights (restart integration)
+1
+ Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT, negative = EDIT
+2
+ Atoms:             Ba      Ti      O1      O2      O3
+ Atoms no.:         1       2       3       4       5
+ Neutron at_weights:   0.5070 -0.3370  0.5805  0.5805  0.5805
+ Actual masks:
+  1  1  1  1  1
+
+ input: ./data/BTO500_n0001.dat
+ Accumulating the PDFs ...
+
+   9.61100006        10000000
+   19.0830002        20000000
+ Plot range r_1, r_2, max =   20.4799995      r_2=0 END
+1.5 7.5
+
+ Plotting BTO:  1/0 for PDF_tot & 4 indices of partial PDFs to be added (0 = skip, -1 = end)
+1 1 7 8 9
+ Modify vertical scale (min,max; 0,0 EXIT)
+-2 7
+ Modify vertical scale (min,max; 0,0 EXIT)
+0 0
+  1   edit partials
+  2   save graph (.PS) & edit partials
+  3   save graph (.PS) & PDF (.TXT)
+  4   change plot range
+  5   edit at_weights (restart integration)
+  0   EXIT
+2
+  Postscript output written to: BTO500_0001_rdfm_02.ps
+
+ Plotting BTO:  1/0 for PDF_tot & 4 indices of partial PDFs to be added (0 = skip, -1 = end)
+1 1 3 5 7
+ Modify vertical scale (min,max; 0,0 EXIT)
+0 0
+  1   edit partials
+  2   save graph (.PS) & edit partials
+  3   save graph (.PS) & PDF (.TXT)
+  4   change plot range
+  5   edit at_weights (restart integration)
+  0   EXIT
+0
+JKs-MacBook-Pro:dl_poly jiri$
+
+
+
+
+
+
+JKs-MacBook-Pro:dl_poly jiri$
+JKs-MacBook-Pro:dl_poly jiri$ mp_sqom53
+ *** Program MP_SQOM 1.53 ** Copyright (C) Jiri Kulda (2022) ***
+
+ parameter file name (.par will be added)
+ Check partial occupation factors - if relevant!
+BTO500
+ PAR proc_num_in          =            0
+ OMP processes available  =            4
+ OMP threads maximum      =            4
+ OMP processes requested  =            2
+
+ Substance name: BTO
+ Atoms from BTO500.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Ti    0.5000  0.5000  0.5000    1.0000 -0.3370
+     O1    0.5000  0.5000  0.0000    1.0000  0.5805
+     O2    0.0000  0.5000  0.5000    1.0000  0.5805
+     O3    0.5000  0.0000  0.5000    1.0000  0.5805
+ Input data file_master:
+BTO500
+ Read data files number min, max (0 0 no numbers, single file):
+1 5
+ Data type: cell
+ Input files:
+ ./data/BTO500_n0001.dat
+           5  files read in   0.122000009      sec SYS time
+ Time integration window set to nfile/2:           3
+ MD time sequence:  t_total [ps]   8.00781250E-02 t_step [ps]   2.00195312E-02
+Maximum energy [THz]             24.98      energy step [THz] 24.98
+Time-integration (BN) window FWHM [ps]    0.02
+Energy resolution FWHM [THz]               49.95
+
+ Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))
+6 1
+ Vertical axis:           0           0           1
+ Q_center [hkl] (9 9 9 END):
+0 0 0
+ FINUFFT start
+ FINUFFT on           5 snapshots CPU_TIME   1.12848699       SYS_TIME  0.720000029
+Atom masks reset:  1  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -5.00000000       7.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -5.0     7.0
+-3 3
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.0     3.0
+0 0
+ Choose a plot option (PS/TXT file output is OFF):
+        0  EXIT
+        1  explore total scattering (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the PS/TXT output ON (mind the TXT switch in PAR)
+        9  change the time integration window width, weighting etc.
+8
+ Choose a plot option (PS/TXT file output is ON):
+        0  EXIT
+        1  explore total scattering (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the PS/TXT output OFF (mind the TXT switch in PAR)
+        9  change the time integration window width, weighting etc.
+1
+Actual atom masks:  1  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -3.00000000       3.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.0     3.0
+0 0
+ BTO500_sq_0001_0005_01.txt
+ BTO500_sq_0001_0005_01.ps
+ Choose a plot option (PS/TXT file output is ON):
+        0  EXIT
+        1  explore total scattering (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the PS/TXT output OFF (mind the TXT switch in PAR)
+        9  change the time integration window width, weighting etc.
+0
+JKs-MacBook-Pro:dl_poly jiri$

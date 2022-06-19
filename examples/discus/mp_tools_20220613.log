@@ -1,0 +1,61 @@
+
+
+
+ 2022/06/13 18:31:47  mp_dbin53  /Users/jiri/Documents/Work/Science/MD/MP_tools/examples/discus
+
+ Read parameter file:  PTOpf.par
+ Input data file:  data/PTOpf.txt
+ Reading input file:  data/PTOpf.txt
+ Trajectory files finished:            1  .dat files written
+
+
+
+ 2022/06/13 18:38:40  mp_pdf53  /Users/jiri/Documents/Work/Science/MD/MP_tools/examples/discus
+
+ Read parameter file:  PTOpf.par
+ OpenMP not in use
+
+     Pb    0.5000  0.5000  0.5000    1.0000  0.8532
+     Ti    0.0000  0.0000  0.0000    1.0000 -0.3370
+     O1    0.5000  0.0000  0.0000    1.0000  0.5805
+     O2    0.0000  0.5000  0.0000    1.0000  0.5805
+     O3    0.0000  0.0000  0.5000    1.0000  0.5805
+
+ Atoms:             Pb      Ti      O1      O2      O3  
+ Atoms no.:         1       2       3       4       5
+ Uniform at_weights:   1.0000  1.0000  1.0000  1.0000  1.0000
+ input: ./data/PTOpf.dat                                            
+
+   Monte Carlo integration    20000000  pairs
+   Masks:           1           1           1           1           1
+  Postscript output written to: PTOpf_rdfm_01.ps                                            
+  Text output written to: PTOpf_rdfm_01.txt                                           
+
+
+ 2022/06/13 18:40:38  MP_SQOM 1.53  /Users/jiri/Documents/Work/Science/MD/MP_tools/examples/discus
+
+ Read parameter file:  PTOpf.par
+ OMP threads maximum =            4
+ OMP processes requested 	=            2
+
+     Pb    0.5000  0.5000  0.5000    1.0000  0.8532
+     Ti    0.0000  0.0000  0.0000    1.0000 -0.3370
+     O1    0.5000  0.0000  0.0000    1.0000  0.5805
+     O2    0.0000  0.5000  0.0000    1.0000  0.5805
+     O3    0.0000  0.0000  0.5000    1.0000  0.5805
+
+ Input files:  ./data/PTOpf.dat to ./data/PTOpf.dat
+   t0,t_step,n_row(3),n_atom:   0.00000000       0.00000000             128         128         128           5
+   temperature [K]   0.00000000    
+ Atoms:        Pb     Ti     O1     O2     O3  
+ Occupations:  1.000  1.000  1.000  1.000  1.000
+Unit weights b_coh:        0.853 -0.337  0.581  0.581  0.581
+ Atom masks:   1      1      1      1      1
+ Atom pair correlation:   0  0
+ n_bz:           6
+ Q-plane: e1 = [ 1 0 0], e2 = [ 0 1 0]
+ Q center, Energy transfer [THz]:   0.00000000       0.00000000       0.00000000       0.00000000    
+ Total scattering
+ Energy resolution [THz]     INF
+ Output files:  PTOpf_sq_01.ps   PTOpf_sq_01.txt
+
