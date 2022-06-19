@@ -24,9 +24,9 @@ This package is partly based on the work of others. For their licence info see t
 /contrib directory.
 
 If you find this library useful, or it helps you in creating software or publications, 
-please let me know and acknowledge this by citing my repository:
+please let me know and acknowledge this by citing this repository:
 
-  https://github.com/**********
+  https://github.com/jkulda/MP_tools
   
 and the corresponding journal articles (to come).
 
