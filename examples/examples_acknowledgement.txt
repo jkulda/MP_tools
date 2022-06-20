@@ -1,0 +1,6 @@
+The examples are partly based on the simulations done by my colleagues:
+ 
+dl_poly - Marek Pasciak (Institute of Physics, AS CR)
+discus  - Petr Ondrejkovic (Institute of Physics, AS CR)
+
+I am grateful for their help and for their part in motivation of this work.
