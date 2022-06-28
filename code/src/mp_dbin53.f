@@ -513,8 +513,12 @@ CC            jat = mod((i_atom-1),n_atom)+1 !jat comes on input
 						jrec = nsuper*(jat-1)+nlayer*(at_ind_in(3)-1)+n_row(1)*(at_ind_in(2)-1)+at_ind_in(1) 	
 						at_ind(1:3,jrec) = at_ind_in
 						at_ind(4,jrec) = jat
-						at_pos_in = at_pos_in-n_row/2						!now the supercell will be centred as from DL_POLY
-						at_pos_c(1:3,jrec) = at_pos_in
+
+						do k=1,3
+							if(at_pos_in(k)<0.) at_pos_in(k) = at_pos_in(k)+n_row(k)					!bring the position into the box
+							if(at_pos_in(k)>real(n_row(k))) at_pos_in(k) = at_pos_in(k)-n_row(k)							
+						enddo
+						at_pos_c(1:3,jrec) = at_pos_in-n_row/2   !now the supercell will be centred as from DL_POLY
 						at_pos_c(4,jrec) = .0
  					endif		!data_type
 
@@ -526,7 +530,8 @@ CC            jat = mod((i_atom-1),n_atom)+1 !jat comes on input
 CC				write(*,*) 'i_atom,jat,ii,at_ind_in',i_atom,jat,ii,at_ind_in
 CC				write(*,*) at_pos_c(:,1)
 				
-C *** for 'BULK' centre the atom cloud, produce virtual n_row and order the AT_IND and AT_POS arrays by atoms
+C *** for 'BULK' the atom cloud is centred in the supercell box defined by n_row 
+C *** now order the AT_IND and AT_POS arrays by atoms
 				allocate(at_name_out(n_atom),ind_at(n_atom))
 
 
