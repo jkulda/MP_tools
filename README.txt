@@ -11,7 +11,7 @@ Complementary pair distribution function (PDF) and vibrational density of states
 Disclaimer:
   The MP_TOOLS code is (and probably remains forever) at a public_beta level of maturity,
   most probably containing bugs - please contribute to its development by (possibly) fixing
-  them yourself and (anyways) reporting them to the author at mp_tools(at)free.fr.
+  them yourself and (anyways) reporting them to the author at jkulda (at) free.fr.
 
 Code specifications:
   Fortran code in fixed form (F77) with extensive use of F95 evolutions (pointers, dynamical 
