@@ -459,10 +459,12 @@ CC					if(i_atom==10000*(i_atom/10000)) write(*,*) i_atom
 						do k=1,3
 							if(at_pos_in(k)<at_pos_min(k)) at_pos_min(k) = at_pos_in(k)
 							if(at_pos_in(k)>at_pos_max(k)) at_pos_max(k) = at_pos_in(k)
+							if(at_pos_in(k)<.0) at_pos_in(k) = at_pos_in(k)+n_row(k)					!bring the position into the box
+							if(at_pos_in(k)>real(n_row(k))) at_pos_in(k) = at_pos_in(k)-n_row(k)							
 						enddo
 						jrec = i_atom
-						at_pos_c(1:3,jrec) = at_pos_in
-						at_pos_c(4,jrec) = .0							!could be charge if individualised
+						at_pos_c(1:3,jrec) = at_pos_in-n_row/2
+						at_pos_c(4,jrec) = .0							!could be atom charge if individualised
 
 						at_ind(1,jrec) = jrec
 						at_ind(2:3,jrec) = 0
@@ -479,8 +481,8 @@ CC					if(i_atom==10000*(i_atom/10000)) write(*,*) i_atom
 							enddo
 						endif
 
-						at_ind_in = anint(at_pos_in-x_pos(jat,:))+1						!+at_ind_base		!they will serve as pointers to the right order of atom records
-						at_pos_in = at_pos_in-n_row/2+1						!now the supercell will be centred as from DL_POLY
+						at_ind_in = anint(at_pos_in-x_pos(jat,:))+1				!they will serve as pointers to the right order of atom records
+						at_pos_in = at_pos_in-n_row/2						        !now the supercell will be centred as from DL_POLY
 
 						do k=1,3
 							if(at_ind_in(k).eq.0) then
@@ -516,27 +518,27 @@ CC            jat = mod((i_atom-1),n_atom)+1 !jat comes on input
 						at_pos_c(4,jrec) = .0
  					endif		!data_type
 
-        	nsuper_r(jat) = nsuper_r(jat)+1
-         
+        	nsuper_r(jat) = nsuper_r(jat)+1        
 				enddo read_loop
+
 				n_tot = jrec
 				j_read = j_read+1
-						write(*,*) 'i_atom,jat,ii,at_ind_in',i_atom,jat,ii,at_ind_in
-						write(*,*) at_pos_c(:,1)
+CC				write(*,*) 'i_atom,jat,ii,at_ind_in',i_atom,jat,ii,at_ind_in
+CC				write(*,*) at_pos_c(:,1)
 				
 C *** for 'BULK' centre the atom cloud, produce virtual n_row and order the AT_IND and AT_POS arrays by atoms
 				allocate(at_name_out(n_atom),ind_at(n_atom))
 
 
 				if(data_type=='bulk') then
-					do i=1,n_tot
-						at_pos_c(1:3,i) =	at_pos_c(1:3,i) - .5*(at_pos_max-at_pos_min)
-					enddo
-					n_row_eff = int(at_pos_max-at_pos_min)+1
+CC					do i=1,n_tot
+CC						at_pos_c(1:3,i) =	at_pos_c(1:3,i) - .5*(at_pos_max-at_pos_min)
+CC					enddo
+CC					n_row_eff = int(at_pos_max-at_pos_min)+1
 				
 					write(*,*) 'Position min',at_pos_min			
 					write(*,*) 'Position max',at_pos_max			
-					write(*,*) 'Effective n_row',n_row_eff			
+CC					write(*,*) 'Effective n_row',n_row_eff			
 					write(*,*) 'Nominal n_row  ',n_row
 
 					ind_at(1) = 0
