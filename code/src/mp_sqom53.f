@@ -66,7 +66,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       character(1)   :: xyz(3)=(/'X','Y','Z'/)
       character(4)   :: atom,ps_out(2)
       character(5)   :: c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
-      character(10)  :: subst_name,string,ax_label,c_date,c_time,c_zone,mode,data_type
+      character(10)  :: subst_name,string,section,ax_label,c_date,c_time,c_zone,mode,data_type
       character(40)  :: file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
       character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name
       character(128) :: header_record,plot_title1,plot_title2,plot_title,scan_title,cwd_path
@@ -176,9 +176,14 @@ C **** read auxiliary file <file_title.par> with structure parameters, atom name
 
       write(9,*) 'Read parameter file:  ',trim(file_inp)
 
+      section = 'mp_gen'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_gen') exit	!find the mp_gen part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
       enddo
 			read(4,*) 		j_verb		! (0/1) verbose command line output
 			read(4,*) 		j_proc		!j_proc requested number of OpenMP parallel processes, 0 = automatic maximum
@@ -187,9 +192,14 @@ C **** read auxiliary file <file_title.par> with structure parameters, atom name
 			read(4,'(a)') sim_type	!'timestep' for MD, 'static' for DISCUS, phase field etc.
 			rewind(4)
 			
+      section = 'mp_bin'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_bin') exit	
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
       enddo
       
 			read(4,*) subst_name
@@ -205,9 +215,14 @@ C **** read auxiliary file <file_title.par> with structure parameters, atom name
 			b_coh_save = b_coh						!keep the original b_coh values for reference
 			rewind(4)
 
+      section = 'mp_sqom'
       do
-        read(4,'(a)') string
-        if(string(1:7).eq.'mp_sqom') exit	
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:7).eq.section) exit	!find the mp_gen part of the .par file
       enddo
 			read(4,*) n_int					!n_int time-integration range (number of snapshots): 0 = automatic choice of Nfile/2
 			read(4,*) j_zero				!j_zero=1 eliminate points with an exactly zero coordinate (0=OFF) [in SQOM521] otherwise s_trig=2  the triger level of the speckle filter

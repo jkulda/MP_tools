@@ -60,7 +60,7 @@ C *****
 			logical :: found
       character(4) :: at_name_inp,col(32)
       character(10) :: sim_style,subst_name,c_date,c_time,c_zone,ext,number,data_type,items(4)
-      character(16) :: string,string2
+      character(16) :: string,string2,section
       character(128) :: line,cwd_path,data_path,time_stamp
       character(128) :: file_dat,file_trajectory,file_master,file_inp,file_log
       
@@ -139,9 +139,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
       write(9,*) 'Read parameter file:  ',trim(file_inp)
       write(*,*) 'Read parameter file:  ',trim(file_inp)
 
+      section = 'mp_gen'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_gen') exit	!find the mp_gen part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
       enddo
 			read(4,*) 		j_verb		! (0/1) verbose command line output
 			read(4,*) 		!j_proc		!j_proc requested number of OpenMP parallel processes, 0 = automatic maximum
@@ -158,9 +163,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 			endif
 			write(*,*) 'Data type: ',data_type
 
+      section = 'mp_bin'
       do
-        read(4,102) string
-        if(string(1:6).eq.'mp_bin') exit	!find the mp_bin part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_bin part of the .par file
       enddo
 102   format(a)
 
@@ -239,9 +249,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 			endif
 
 			rewind(4)
+      section = 'mp_lammps'
       do
-        read(4,102) string
-        if(string(1:9).eq.'mp_lammps') exit	!find the mp_lammps part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:9).eq.section) exit	!find the mp_lammps part of the .par file
       enddo
 			read(4,*) j_basis  	!atom type numbers (2nd column in data) corr. to  0 = chemical species, 1 = basis positions (PREFERABLE!
 			read(4,*) t_ms			!MD microstep in time
@@ -589,9 +604,22 @@ c   				write(*,*) data_line
 						do k=1,3
 							if(at_pos_in(k)<at_pos_min(k)) at_pos_min(k) = at_pos_in(k)
 							if(at_pos_in(k)>at_pos_max(k)) at_pos_max(k) = at_pos_in(k)
+							if(at_pos_in(k)<.0) at_pos_in(k) = at_pos_in(k)+n_row(k)					!bring the position into the box
+							if(at_pos_in(k)>real(n_row(k))) at_pos_in(k) = at_pos_in(k)-n_row(k)							
 						enddo
 						jrec = i
+						at_pos_c(1:3,jrec) = at_pos_in-n_row/2
+						at_pos_c(4,jrec) = .0							!could be atom charge if individualised
 
+						if(j_shell_out==1) then
+							do k=1,3
+								if(at_pos_in2(k)<0.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)					!bring the position into the box
+								if(at_pos_in2(k)>real(n_row(k))) at_pos_in2(k) = at_pos_in2(k)-n_row(k)							
+							enddo
+							at_pos_s(1:3,jrec) = at_pos_in2-n_row/2
+							at_pos_s(4,jrec) = .0							!could be atom charge if individualised
+						endif
+						
 						at_ind(1,jrec) = jrec
 						at_ind(2:3,jrec) = 0
 						at_ind(4,jrec) = jat
@@ -665,21 +693,21 @@ C *** for 'BULK' centre the atom cloud, produce virtual n_row and order the AT_I
 
 
 				if(data_type=='bulk') then
-					do i=1,n_tot
-						at_pos_c(1:3,i) =	at_pos_c(1:3,i) - .5*(at_pos_max-at_pos_min)
-					enddo
+CC					do i=1,n_tot
+CC						at_pos_c(1:3,i) =	at_pos_c(1:3,i) - .5*(at_pos_max-at_pos_min)
+CC					enddo
+CC
+CC        	if(j_shell_out.eq.1) then
+CC						do i=1,n_tot
+CC							at_pos_s(1:3,i) =	at_pos_s(1:3,i) - .5*(at_pos_max-at_pos_min)
+CC						enddo
+CC        	endif
 
-        	if(j_shell_out.eq.1) then
-						do i=1,n_tot
-							at_pos_s(1:3,i) =	at_pos_s(1:3,i) - .5*(at_pos_max-at_pos_min)
-						enddo
-        	endif
-
-					n_row_eff = int(at_pos_max-at_pos_min)+1
+CC					n_row_eff = int(at_pos_max-at_pos_min)+1
 				
 					write(*,*) 'Position min',at_pos_min			
 					write(*,*) 'Position max',at_pos_max			
-					write(*,*) 'Effective n_row',n_row_eff			
+CC					write(*,*) 'Effective n_row',n_row_eff			
 					write(*,*) 'Nominal n_row  ',n_row
 
 					ind_at(1) = 0

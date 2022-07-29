@@ -92,7 +92,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       real 		:: 			 c_min,c_max,c_max2,c1,c2,r_start,r_end,rdf_step,c_smooth,f_smooth(51)
       
       character(4)   :: at_name,c_int(2),c_fil(2),method
-      character(10)  :: at_weight_scheme(2),string,c_date,c_time,c_zone
+      character(10)  :: at_weight_scheme(2),string,section,c_date,c_time,c_zone
       character(16)  :: sim_type_par,data_type
       character(40)  :: file_master,file_inp,file_out,time_stamp,int_mode,subst_name
       character(60)  :: file_dat,file_dat_1,file_res,file_ps,file_log,plot_title,plot_header,line
@@ -167,9 +167,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 
       write(9,*) 'Read parameter file:  ',trim(file_inp)
 
+      section = 'mp_gen'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_gen') exit	!find the mp_gen part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
       enddo
 			read(4,*) 		j_verb		! (0/1) verbose command line output
 			read(4,*) 		j_proc		!j_proc requested number of OpenMP parallel processes, 0 = automatic maximum
@@ -177,9 +182,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 			read(4,*) 		j_grid		! (0/1) grid overlay on PG_PLOT graphs 
 			rewind(4)
 
+      section = 'mp_bin'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_bin') exit	!find the mp_bin part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_bin part of the .par file
       enddo
 			read(4,*) 	subst_name
 			read(4,*) 	n_atom
@@ -195,9 +205,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 C *** find the mp_pdf part of the .par file
 
       rewind(4)
+      section = 'mp_pdf'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_pdf') exit	
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_pdf part of the .par file
       enddo           
 			read(4,*) n_rdf				!dimension of the PDF array (2**N best for FFT)
 			read(4,*) rdf_step		![Angstrom]		useful choice: n_rdf=1024, rdf_step=.02

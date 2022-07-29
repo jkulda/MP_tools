@@ -63,7 +63,7 @@ C *****
 			
 			logical        :: found_txt,found_ps	
       character(4),allocatable   :: at_label(:),at_name_par(:)
-      character(10)  :: subst_name,string,ax_label,c_date,c_time,c_zone
+      character(10)  :: subst_name,string,section,ax_label,c_date,c_time,c_zone
       character(16)  :: sim_type_par,data_type
       character(40)  :: file_master,file_inp,time_stamp,x_title,y_title,at_weight_scheme(2)
       character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log
@@ -149,9 +149,14 @@ C **** read auxiliary file <file_title.par> with structure parameters, atom name
 			endif
 
       write(9,*) 'Read parameter file:  ',trim(file_inp)
+      section = 'mp_gen'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_gen') exit	!find the mp_gen part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
       enddo
 			read(4,*) 		j_verb		! (0/1) verbose command line output
 			read(4,*) 		j_proc		!j_proc requested number of OpenMP parallel processes, 0 = automatic maximum
@@ -160,9 +165,14 @@ C **** read auxiliary file <file_title.par> with structure parameters, atom name
 			read(4,*) sim_type_par	!'timestep' for MD, 'static' for DISCUS, phase field
 			rewind(4)
 
+      section = 'mp_bin'
       do
-        read(4,100) string
-        if(string(1:6).eq.'mp_bin') exit	
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_bin part of the .par file
       enddo
 			read(4,*) subst_name
 			read(4,*) n_atom

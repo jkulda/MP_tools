@@ -56,7 +56,7 @@ C *****
 			logical :: found,found_txt,t_single,fixed_form,short_form
       character(4) :: at_name_in,at_name_in2,at_name_in3
       character(10) :: struct_name,c_date,c_time,c_zone,ext,number,data_type
-      character(16) :: string
+      character(16) :: string,section
       character(128) :: line,cwd_path,data_path,file_dat_c,file_dat_s,file_trajectory,f_master,file_inp,file_log,time_stamp
       character(4),allocatable :: at_label(:)
 
@@ -129,9 +129,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
       write(9,*) 'Read parameter file:  ',trim(file_inp)
       write(*,*) 'Read parameter file:  ',trim(file_inp)
 
+      section = 'mp_gen'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_gen') exit	!find the mp_gen part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
       enddo
 			read(4,*) 		j_verb		! (0/1) verbose command line output
 			read(4,*) 		!j_proc		!j_proc requested number of OpenMP parallel processes, 0 = automatic maximum
@@ -145,9 +150,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 			if(index(sim_type,'quick')/=0) data_type = 'quick'
 			write(*,*) 'Data type: ',data_type
 
+      section = 'mp_bin'
       do
-        read(4,102) string
-        if(string(1:6).eq.'mp_bin') exit	!find the mp_bin part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_bin part of the .par file
       enddo
 102   format(a)
 
@@ -452,7 +462,6 @@ CC					if(i_atom==10000*(i_atom/10000)) write(*,*) i_atom
 						write(*,*) 'atom ',at_name_in,' not found in .PAR'
 						stop
 					endif
-
 
 					if(data_type=='bulk') then
 						jat = jl				

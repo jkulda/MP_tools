@@ -89,7 +89,7 @@ C *****
 			logical :: found,found_txt,t_single
       character(4)   :: at_name_in,at_name_in2,at_name_in3
       character(10)  :: struct_name,c_date,c_time,c_zone,ext,number,data_type
-      character(16)  :: string
+      character(16)  :: string,section
       character(128) :: line,cwd_path,data_path,file_dat_c,file_dat_s,file_trajectory,file_inp,file_log,time_stamp
       character(128) :: file_dat_new,file_master,file_master_out
 
@@ -162,9 +162,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 
       write(9,*) 'Read parameter file:  ',trim(file_inp)
 
+      section = 'mp_gen'
       do
-        read(4,'(a)') string
-        if(string(1:6).eq.'mp_gen') exit	!find the mp_gen part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
       enddo
 			read(4,*) 		j_verb		! (0/1) verbose command line output
 			read(4,*) 		!j_proc		!j_proc requested number of OpenMP parallel processes, 0 = automatic maximum
@@ -178,9 +183,14 @@ C *** read auxiliary file <file_title.par> with structure parameters, atom names
 CC			if(index(sim_type,'quick')/=0) data_type = 'quick'
 			write(*,*) 'Data type: ',data_type
  
+      section = 'mp_bin'
       do
-        read(4,102) string
-        if(string(1:6).eq.'mp_bin') exit	!find the mp_bin part of the .par file
+        read(4,'(a)',iostat=ios) string
+        if(ios/=0) then
+          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+          stop
+        endif
+        if(string(1:6).eq.section) exit	!find the mp_bin part of the .par file
       enddo
 102   format(a)
 
@@ -596,6 +606,12 @@ C ***  treat the CORE data and get the right labels & positions
 						do k=1,3
 							if(at_pos_in(k)<at_pos_min(k)) at_pos_min(k) = at_pos_in(k)
 							if(at_pos_in(k)>at_pos_max(k)) at_pos_max(k) = at_pos_in(k)
+							if(at_pos_in(k)<.0) at_pos_in(k) = at_pos_in(k)+n_row(k)					!bring the position into the box
+							if(at_pos_in(k)>real(n_row(k))) at_pos_in(k) = at_pos_in(k)-n_row(k)
+							if(j_shell_out==1) then
+								if(at_pos_in2(k)<.0) at_pos_in2(k) = at_pos_in2(k)+n_row(k)					!bring the position into the box
+								if(at_pos_in2(k)>real(n_row(k))) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+							endif						
 						enddo
 						jrec = i_atom
 
@@ -671,12 +687,12 @@ C *** accumulate the occupation number and the kinetic energy to refine the real
 				allocate(at_ind_out(n_tot),at_name_out(n_atom),ind_at(n_atom))
 			
 				if(data_type=='bulk') then
-					n_row_eff = int(at_pos_max-at_pos_min)+1
+CC					n_row_eff = int(at_pos_max-at_pos_min)+1
 				
 					if(i_traj==nt_min.and.ifile==nfile_min) then												!analyze in detail the 1st snapshot
 						write(*,*) 'Position min',at_pos_min			
 						write(*,*) 'Position max',at_pos_max			
-						write(*,*) 'Effective n_row',n_row_eff			
+CC						write(*,*) 'Effective n_row',n_row_eff			
 						write(*,*) 'Nominal n_row  ',n_row
 					endif
 CC					write(*,*) 'n_atom,n_tot',n_atom,n_tot
@@ -685,7 +701,6 @@ CC					write(*,*) 'n_atom,n_tot',n_atom,n_tot
 					do jat = 2,n_atom
 						ind_at(jat) = ind_at(jat-1)+nsuper_r(jat-1)
 					enddo
-CC				write(*,*) 'ind_at',ind_at
 				
 					do i=1,n_tot
 						jat = at_ind(4,i)
