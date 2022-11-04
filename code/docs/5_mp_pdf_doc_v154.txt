@@ -1,0 +1,22 @@
+MP_PDF: ACCUMULATION OF PAIR DISTRIBUTION FUNCTIONS (PDF)
+
+calculates the total and partial pair distribution functions (PDF) by direct sampling and binning atom distances between pairs of unit cells in the simulation box. The present version employs solely the Monte-Carlo pseudo-random sampling using the new RANDOM_NUMBER intrinsic generator of GFORTRAN. 
+
+On input only binary data imported by the CELL method are eligible. The BULK input method does not relate atom positions to their unit cells and does not index them in a systematic order, as a consequence it is not possible to find pairs of atoms in a deterministic way (without searching the whole box). 
+
+The behaviour of MP_PDF can be adjusted by setting parameter values of the &MP_PDF namelist in the .PAR file. Uniform (unit) or neutron weights can be choosen for the PDF presentation. Proper inclusion of Xray formfactors calls for calculation of the structure factors (Fourier transform) and so far is not implemented. The resulting PDF distributions can be smoothed/broadened to emulate the resolution broadening of experimental data. These options are to be specified in the corresponding section of the .PAR file together with the PDF step and range and with the partial correlation atom pairs.
+
+  &MP_PDF
+    N_PDF = 1024   		    ! dimension of the PDF array (2**N best for FFT)
+    PDF_STEP = .02		    ! PDF step [Å]		useful choice: n_pdf=1024, pdf_step=.02
+    J_ACC = 2      	      ! accumulation algorithm: 2 Monte Carlo sampling
+    N_H = 20     		      ! x10^6 MC sampling events (optimum ≥20)
+    J_SMOOTH = 1					! smoothing the PDF: 1 none (2-8 useful, 0 interactive mode)
+    N_CORR = 1					  ! number of partial correlation pairs to be accumulated
+
+The number of Monte-Carlo events to be generated is specified in units of 10^6 cell pairs. Ten or a few tens are sufficient for most purposes. Hence a medium sized supercell (> 10^4 atoms) provides enough data to generate a usable PDF set; in case of fractional occupancies the supercell size may need to be increased accordingly. The input dialogue permits to define partial sampling of a larger number of snapshots (supercells), which is necessary for small snapshots and may be advisable case of unstable atomic structures. 
+
+In addition to the total PDF also N_CORR partial PDFs corresponding to atom pairs indicated in the PDF_PAIRS list can be accumulated and displayed. 
+
+Output files in the .PS (graphics) and .TXT (PDF tables) formats can be generated upon request.
+

@@ -1,0 +1,92 @@
+MP_LBIN: CONVERTING LAMMPS AND OTHER ASCII SIMULATION DATA TO THE MP_TOOLS BINARY FORM
+
+
+1/ GENERAL ASPECTS
+
+Before going into the details of the input methods described below, please read carefully the general introduction to data conversion given in the file  MP_DATA_DOC_V154.TXT
+ 
+This tool converts a wide spectrum of ASCCI data types identified in the .PAR file as LAMMPS or GENERAL (with the option of a more specific label). Their common denominator is that after the file header (length to be indicated in the .PAR file) there follow position data in the form of 1 single line (record) per atom. The list and exact positions of the data items to be read from each line 9(record) are are parsed from the REC_STR string specified in the .PAR file. 
+
+The LAMMPS dump data are expected to come as a succession of numbered (filename extension) snapshot files. In this case MP_LBIN will decode their header contents, reducing (but not eliminating) the need of additional information from the .PAR file. 
+
+Otherwise MP_LBIN can read a contiguous succession of numbered snapshot files, a concatenated trajectory, containing all snapshots in a single file, or a combination of both. The corresponding information is specified in the .PAR file and in the input dialogue. It is the user's responsibility to transfer carefully all the pertinent information (available in the data file header or elsewhere) into the corresponding fields in the .PAR file manually. 
+
+Consult the related log file in the EXAMPLES folder for a more detailed idea on how to run this tool.
+
+
+2/ COMMON FEATURES
+
+The data records may contain information identifying individual atoms (ID, TYPE, ELEMENT) or may rely on the order and number of records, containing just (eg.) the position data. 
+
+In the latter case all the atoms in the simulation box of a given type are listed before passing to next atom type. The order of atoms must correspond exactly to the ATOMS list in .PAR  
+    Mo Mo  .0  .0  .0  24  !chem. element, atom name, position, occupancy
+the corresponding number of records (24 in this example) must be specified in the OCCUPANCY field of the list (just following the fractional coordinates).
+
+The ASCII record structure is parsed from a string (case-insensitive) contained either in the .PAR file for the GENERAL data type (REC_STR in section &MP_BIN) 
+	REC_STR = 'id type element mass x y z vx vy vz'
+
+or in the file header for the LAMMPS data type (ITEM: ATOMS)
+	ITEM: ATOMS id type element mass x y z vx vy vz
+
+in both cases corresponding to an input record structure like	
+	1 1 Cu1 63.55 0.00919 -0.368474 -0.425633 0.47397 -0.215569 4.752
+	2 2 Cu2 63.55 1.51811 1.4525 -0.425971 -1.96235 -3.07269 1.73004
+
+At present the following variables (based on the LAMMPS syntax) are recognised:
+	ID = atom ID
+	TYPE = atom type
+	ELEMENT = name of atom element (as defined eg. in LAMMPS by the DUMP_MODIFY command)
+	MASS = atom mass
+	X,Y,Z = atom coordinates
+	VX,VY,VZ = atom velocities
+	FX,FY,FZ = forces on atoms
+	Q = atom charge
+	NN = position to be skipped
+and transferred into the binary file. Any other variables present in the dump will be ignored upon reading as dummy fields, for clarity they can be specified by the unique symbol NN. The specification of all the symbols is case-insensitive.
+
+The presence of the keys X,Y,Z is obligatory.
+
+In general the meaning of atom TYPE is ambiguous (in particular in LAMMPS it is a matter of definition, depending on the way, how the simulation box was constructed and how the dump is defined/modified). Thus it is important to clarify via the J_BASIS parameter whether it represents the chemical atom species (J_BASIS=0) or whether it identifies an atom in a specific position in the unit cell (J_BASIS=1).
+
+In general the recommended input method is CELL; in cases where the one-to-one assignment of atoms to lattice positions is impossible or unreliable the dump data can be read in the BULK mode. More details on the input methods are given in  MP_DATA_DOC_V154.TXT
+
+
+
+3/ LAMMPS-SPECIFIC FEATURES
+
+In general the LAMMPS output refers to the time variable in terms of number of timesteps, which appears in the DUMP command as well as in the filename extensions for the individual dump files. The only way to access the timestep length, and hence the real time scale, is to impose by the DUMP_MODIFY directive the time values to be recorded in the dump file headers (cf. below). If the corresponding tag is absent in the file header, MP_LBIN will ask for the value in the dialogue.
+
+The standard LAMMPS DUMP directive (within its in.* input file)	specifies the output style, for the purpose of MP_TOOLS the ATOM style or its modifications (CUSTOM) are relevant. The style defines the output file structure (single snapshots vers. concatenated trajectory) and the contents output records, eg. 			
+
+	dump 1 all atom 50 ${fil_nam}.*  															  
+or
+	dump 1 all custom 50 ${fil_nam}.* id type element mass x y z vx vy vz 															  
+																
+Here the ${fil_nam} with .* will create separate files for each snapshot. Alternatively a concatenated output can be obtained by omitting the '.*' characters and adding the directive	
+	dump_modify 	1 append yes			
+
+after the output file specification may follow a list of standard variable names, which specifies their order in each atom record. This information is then contained in the ITEM: ATOMS header line of the snapshot file preceding the atom records, eg.
+The Y,Y,Z atom positions in the LAMMPS dump files are given in a coordinate system having origin in one of the corners of the simulation box and using the angstrom (Å) as length unit. These coordinates have to be transformed to a system having origin in the centre of the simulation box and to be reduced to the reciprocal lattice units (r.l.u.) . MP_LBIN derives the lattice parameter from the supercell dimensions and from the corresponding cell numbers.
+
+
+NOTES: 
+
+1/ when setting up the MD simulation with LAMMPS, it is useful to modify the corresponding DUMP directive in the input file section dealing with the 'production' runs , eg.
+
+	dump 1 all custom 50 ${fil_nam}.* id type element mass x y z vx vy vz 															  
+
+by the following DUMP_MODIFY directives (1 is the number of the directive to be modified) 
+
+	dump_modify 	1 time yes				#the dump time is included in the snapshot header 
+	dump_modify 	1 pbc yes					#remap atoms via periodic boundary conditions
+	dump_modify 	1 sort id					#sort the output according to atom ID
+	dump_modify 	1 element Cu1 Cu2 Cu3 Cu4 			# element names are related to atom types
+
+While the dump time is only important when simulating dynamical processes (S(Q,w) and/or phonon DOS to be extracted), the periodic boundary conditions are an important ingredient for any form of Fourier transform between the direct and reciprocal space.												
+
+2/it is crucial to bear in mind that in LAMMPS, whenever it runs under MPI paralelisation, the supercell is ad-hoc separated into blocks attributed to each process, the communication between the blocks operates only from time to time and, unless the contrary is specifically requested, the dump of the snapshots occurs in the order of the processes being ready - hence the output data blocks DO NOT NECESSARILY FOLLOW THE ORDER OF THE SITE INDEXATION!   
+
+
+
+************************
+ In case of need, they can be added by modifying the MP_LBIN source code. Arrays containing additional variables should always be appended at the end of the binary output file to preserve compatibility with MP_TOOLS data standard (cf. MP_BIN_DOC.TXT for the binary file structure description).

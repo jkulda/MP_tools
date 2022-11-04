@@ -1,9 +1,9 @@
 
-      program mp_sqom53
+      program mp_sqom54
 
 C *************************************************************************************
 C *****
-C *****  %%%%%%%%%%%%%%%%   		 program MP_SQOM 1.53   		 %%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%   		 program MP_SQOM 1.54   		 %%%%%%%%%%%%%%%%%%%%%%
 C *****
 C *****   calculates and plots scattering functions (S(Q), S(Q,w)) from simulated data
 C *****
@@ -20,7 +20,7 @@ C**	This program is distributed in the hope that it will be useful, but WITHOUT 
 C**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 C**	See the GNU General Public License for more details.
 C**
-C *****  %%%%%%%%%%%%%%%%       program MP_SQOM 1.53      %%%%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%       program MP_SQOM 1.54      %%%%%%%%%%%%%%%%%%%%%%%%
 C ***** 
 C ***** Ver 1.51  - originates from mp_sqom49.f of 2022-01-16 16:57 
 C ***** 					- optimized algorithm using coherence profile integration w/o OMP 
@@ -38,7 +38,12 @@ C ***** Ver 1.53  - introduces semi-sequential binary data format
 C *****						- record length 4096, all data 32bit length
 C *****						- at_mass is saved as at_veloc(4,j,k)
 C *****						- at_charge is saved as at_pos(4,j,k)
-C *****           - CELL, QUICK and BULK data type
+C *****           - CELL, fast and BULK data type
+C ***** 
+C ***** Ver 1.54  - improved handling of the BULK type: avoid the BZ concept 
+C *****           - J_QSQ option to divide S(Q,w) by Q^2 to improve clarity of color maps
+C *****           - PNG driver for PGPLOT included
+C *****           - NAMELIST I/O for .PAR files and .DAT headers implemented
 C ***** 
 C ***** indexing convention: supercell(u,v,w) = at_ind(j,k,l) = supercell(j_pos,j_row,j_layer)
 C ***** record numbers are directly related to cell positions and atom types
@@ -62,15 +67,15 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
    		real, parameter   :: h_daps = 39.9031	!DAPS*ps=DAPS/THz  
    		real, parameter   :: n_mass = 1.008665	!atomic units  
 			
-			logical        :: found_txt,found_ps,t_single,inv,read_ind,non_zero,inside
+			logical        :: found_txt,found_ps,t_single,nml_in,inv,read_ind,non_zero,inside
       character(1)   :: xyz(3)=(/'X','Y','Z'/)
-      character(4)   :: atom,ps_out(2)
+      character(4)   :: atom,ps_out(2),version,head
       character(5)   :: c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
-      character(10)  :: subst_name,string,section,ax_label,c_date,c_time,c_zone,mode,data_type
-      character(40)  :: file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
-      character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name
-      character(128) :: header_record,plot_title1,plot_title2,plot_title,scan_title,cwd_path
-      character(256) :: header_record_2
+      character(10)  :: string,section,ax_label,c_date,c_time,c_zone,mode,ext,pg_out
+      character(40)  :: file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
+      character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in
+      character(128) :: line,plot_title1,plot_title2,plot_title,scan_title,data_path,cwd_path,rec_str
+      character(l_rec):: header_record
 
       character(4),allocatable   :: at_label(:),at_name_par(:),at_name_ext(:)
       character(10),allocatable ::	corr_name(:)
@@ -78,56 +83,69 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       integer, allocatable :: i_site(:)		!index attributing site number to atom number
       integer,allocatable ::  ind_at(:),at_mask(:),map_unit(:) 
  
-      real, allocatable :: at_base(:,:),conc(:),b_coh(:),b_coh_save(:),x_ffpar(:,:),x_ffq(:,:,:)			!s_base(:,:),q(:,:,:),at_vel_file(:,:)		!atom basis, site basis fractional coordinates
+      real, allocatable :: at_base(:,:),conc(:),b_coh(:),x_ffpar(:,:),x_ffq(:,:,:),q2_norm(:,:)			!s_base(:,:),q(:,:,:),at_vel_file(:,:)		!atom basis, site basis fractional coordinates
  			real, allocatable :: cs_plot(:,:),cs_out(:,:),csp(:),qq(:),ff(:),t_wind(:) 								!q_at_pos(:),q_at_vel(:),at_pos_perp(:),rq_fft(:)
 			complex, allocatable :: u_x(:,:),u_y(:,:),u_qx(:,:),u_qy(:,:)
 			 			
  			real(8), allocatable :: xf(:),yf(:)			
-      real(8) ::     eps,twopi_nr(3)
+      real(8) ::     eps_fft,twopi_nr(3)
       integer(8) ::  n_tot,nsuper8,n_qx8,n_qy8,n_fft
       integer(8), allocatable :: nul_opt,n_sup(:)		!nul_opt (since unallocated) used to pass a null pointer to FINUFFT...
       complex(8), allocatable :: cf(:),ampl_tot(:),ampl_tot_2d(:,:)												! this is equivalent to complex*16
 
-      complex :: 			bragg,cs1,cs2_mean,c_f,phase_bz
+      complex :: 			cs1,cs2_mean,c_f,phase_bz
       complex, allocatable :: om_phase(:),cs2(:),cs3(:),cs_mean(:,:,:),cs5(:,:),cs6(:,:),cs7(:,:),cs4(:,:)
       complex, allocatable, target :: cs_atom(:,:,:,:),cs(:,:,:)
       complex, pointer     :: cs_p1(:),cs_p2(:)
 
-      integer ::  j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,jm,j1m,j2m,j_bc,j_exit,j_xray
-      integer ::  i,ii,iii,j,jj,i1,i2,i3,k,kk,l,ll,ios,ier,iflag,j_at,j_rec,nrec,nsuper,nrow,nlayer,n_r1,n_r2,n_row_save(3)
-      integer ::  nfile,nfile_0,nfile_min,nfile_max,ifile,jfile,nfile_step,nqx_min,nqy_min
-      integer ::  n_site,j_dir,i_shift,i_time(8),j_weight
+      integer :: j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,jm,j1m,j2m,j_bc,j_exit
+      integer :: i,ii,iii,j,jj,i1,i2,i3,k,kk,l,ll,ios,ier,iflag,j_at,i_rec,nrec,nsuper,nrow,nlayer,n_r1,n_r2,n_row_save(3)
+      integer :: j_basis,j_centred,j_test,j_mult,nfile,nfile_0,nfile_min,nfile_max,ifile,jfile,nfile_step,nqx_min,nqy_min
+      integer :: n_site,j_dir,i_shift,i_time(8),j_weight,j_wind,j_qsq
       integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max
       integer :: e1(3),e2(3),ev(3),j_scan,j_freq,i_plot,j_plot,n_plot,i_step
       integer :: sc_c1,sc_c2,sc_m,j_proc,proc_num,proc_num_in,thread_num,thread_num_max
-      integer :: ind,j_site,j_q,n_int,n_frame,j_disp,j_mask,j_logscale,j_grid,j_txt,j_ps
-      integer :: j_name,j_atom,n_atom,at_no,j_atc1,j_atc2,j_ft,j_coh,j_zero,j_oneph,j_fft
+      integer :: ind,j_site,j_q,n_int,n_frame,j_disp,j_mask,j_logsc,j_grid,j_txt,j_ps
+      integer :: j_shrec,j_atom,n_atom,at_no,j_atc1,j_atc2,j_ft,j_coh,j_zero,j_oneph,j_fft,n_head
 
-      real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn
-      real :: at_displ,at_pos(3),at_veloc(3),at_pos_min(3),at_pos_max(3),at_pos_centre(3)
-      real :: t2,t3,t4,t_sum,t_step,t_step0,t_tot,tt0,tt,temp,xx,f_width,t_width
+      real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn,bz_n,eps_x,box_volume
+      real :: at_displ,at_pos(3),at_veloc(3),at_pos_min(3),at_pos_max(3),at_pos_centre(3),a_cell_par(3)
+      real :: t2,t3,t4,t_sum,t_dump,t_step,t_dump0,t_tot,tt0,tt,xx,f_width,t_width,temp_par
       real :: f_plot,ff_plot,f_max_plot,freq_step,f_min,ff_min,f_max,ff_max,f_map_min,f_map_max,f_map_step,f_phase
       real :: arg,q1_x,q1_y,q2_x,q2_y,qx_min,qx_max,qy_min,qy_max,q_min,q_max,qq_min,qq_max,qq_plot,dq(3),dq_p(3),q_step
       real :: tr_shift_x,tr_shift_y,d_x,d_y,q_x,q_y
-      real :: e1_norm,e2_norm,ev_norm,tpq_center(3),tpe1,tpe2,tpev
+      real :: e1_norm,e2_norm,ev_norm,tpq_center(3),tpe1,tpe2,tpev,tpe1_shift,tpe2_shift
       real :: q1(3),q2(3),q1_3d(3),q2_3d(3),q_v(3),q_center(3),q_nx,q_ny,wtime
       real :: c_min,c_max,c_min_save,c_max_save,sc_r		!,tau(3),c_vert(3),b_perp(3),q_tot(3),q_unit(3),q_norm
 
 C **** the following variables MUST have the following type(4) or multiples because of alignement in the binary output file
 C
-      character(4),allocatable :: at_name_inp(:)
+      character(4),allocatable :: at_name_out(:)
       integer(4),allocatable ::   nsuper_r(:)
       integer(4),allocatable,target   :: at_ind_in(:)
       integer(4),pointer :: at_ind(:,:,:)
       
-      real(4),allocatable ::	at_occup(:)
+      real(4),allocatable ::	at_occup_r(:)
       real(4),allocatable,target ::	at_pos_in(:,:)
  			real(4), pointer :: at_pos_file(:,:,:,:)
  			real(4), pointer :: at_pos_file_bulk(:,:,:)
 
-      character(16)  :: sim_type,file_title
-      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell,n_traj,n_cond,n_rec,n_tot_in,idum
-      real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp_r
+      character(16)  :: sim_type,dat_type,input_method,file_par,subst_name,dat_source,string16
+      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
+      real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp
+
+
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
+     
+      namelist /mp_gen/ j_verb,j_proc       
+      namelist /mp_out/ j_weight,j_logsc,j_txt,j_grid,pg_out       
+      										!general rule: namelists of tools should only contain their local parameters
+                          !what is of global interest they should pass into data_header
+CC      namelist /mp_bin/ sim_type,dat_type,input_method,subst_name,data_path,ext,eps_x,n_atom,n_row,
+CC     1      j_basis,j_centred,j_test,j_mult,j_shrec,  n_tot_in,a_cell_par,temp_par,rec_str
+      namelist /mp_sqom/ n_int,s_trig,j_oneph,j_qsq,j_wind
 
 C *** PGPLOT stuff
 			integer :: PGOPEN,C1,C2,NC,plot_unit,map_unit_1,map_unit_2
@@ -139,7 +157,7 @@ C *** PGPLOT stuff
 C
 C ********************* Initialization *******************************      
 
-			write(*,*) '*** Program MP_SQOM 1.53 ** Copyright (C) Jiri Kulda (2022) ***'
+			write(*,*) '*** Program MP_SQOM 1.54 ** Copyright (C) Jiri Kulda (2022) ***'
 			write(*,*)
 
 C ********************* Get a time stamp and open a .LOG file *******************************
@@ -158,15 +176,111 @@ C ********************* Get a time stamp and open a .LOG file ******************
 
 			write(9,*) 
 			write(9,*) 
-			write(9,*) trim(time_stamp),'  MP_SQOM 1.53  ',trim(cwd_path)
+			write(9,*) trim(time_stamp),'  MP_SQOM 1.54  ',trim(cwd_path)
 			write(9,*) 
 
-C **** read auxiliary file <file_title.par> with structure parameters, atom names and further info
-      write(*,*) 'parameter file name (.par will be added)'
-      write(*,*) 'Check partial occupation factors - if relevant!'
-      read(*,*) file_title
-      write(file_inp,101) trim(file_title)
-101   format(a,'.par')
+C *** other initialisations
+			ps_out = (/'OFF ','ON  '/)			!PGPLOT
+			plot_unit = 0
+			map_unit_1 = -1	
+			map_unit_2 = -1
+			p_size = 7.											!PGPLOT
+			eps_fft = 1.e-6						!finufft
+			iflag = -1						!finufft			
+      j_head_in = 0		! if header found will become 1
+			at_weight_scheme(1) = 'Unit weights '
+			at_weight_scheme(2) = 'Neutron weights'
+			at_weight_scheme(3) = 'Xray weights'
+			f_max = .0
+			j_coh = 1
+			j_wind = 0			!no FT window in space by default
+			eps_x = .05
+
+C *** Generate data file access
+			write(*,*) 'Input data file_master: '
+			read(*,*) file_master 
+						
+      write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
+      read(*,*)   nfile_min,nfile_max
+      nfile_step = 1
+			t_single = nfile_min==0.and.nfile_max==0
+
+			if(t_single)then
+				nfile_min = 1		!for conformity with loop control conventions
+				nfile_max = 1
+			endif
+			
+      nfile = ((nfile_max-nfile_min)/nfile_step)+1
+      
+			if(t_single)then
+				write(file_dat_t0,'("./data/",a,".dat")') trim(file_master)
+			else
+				write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
+			endif
+
+	    open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
+			if(ios.ne.0) then
+				write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
+				stop
+			endif
+			
+C *** Read the header record 
+
+      i_rec = 1   			
+			read(1,rec=i_rec) string_in
+				if(string_in(1:8)=='MP_TOOLS') then      !new structure with namelist
+          nml_in = .true.
+					read(1,rec=i_rec) dat_source,version,string16
+					read(string16,*) n_head
+				write(*,*)		'Input data:  ',dat_source,version,n_head
+				i_rec = i_rec+1   							
+				read(1,rec=i_rec) header_record
+				read(header_record,nml=data_header_1)	
+				t0 = t_dump
+CC        write(*,nml=data_header_1)
+			elseif(head.eq.'TIME'.or.head.eq.'STAT') then                                  !old w/o structure
+				write(*,*)		'Input data:  ','old header format'
+				nml_in = .false.
+			  read(1,rec=1) 
+     1		  sim_type,file_par,t_ms,t0,temp,a_par,angle,n_row,n_atom,n_eq,j_force,j_shell_out,n_cond,n_rec					
+			  n_head = 1
+			  call up_case(sim_type)
+			  input_method = 'CELL'
+			  if(index(sim_type,'BULK')/=0) input_method = 'BULK'
+      else
+      	write(*,*) 'header record wrong or missing'
+      	write(*,*) trim(header_record)
+      	stop
+      endif 
+
+
+      allocate(at_name_out(n_atom),at_occup_r(n_atom),nsuper_r(n_atom),n_sup(n_atom),ind_at(n_atom))
+			allocate(at_label(n_atom),at_name_par(n_atom),at_name_ext(n_atom),at_base(n_atom,3),at_mask(n_atom))
+			allocate(conc(n_atom),b_coh(n_atom),x_ffpar(n_atom,9),SOURCE=.0)												!we need this to read .par
+      at_mask = 1
+
+      if(nml_in) then      !new structure with namelist
+        i_rec = i_rec+1   							
+        read(1,rec=i_rec) header_record
+        read(header_record,nml=data_header_2)			
+      else                                  !old w/o structure
+			  read(1,rec=1) 
+     1		sim_type,file_par,t_ms,t0,temp,a_par,angle,n_row,n_at,n_eq,j_force,j_shell_out,n_cond,n_rec,n_tot,			
+     2    at_name_out,at_occup_r,nsuper_r																		!char(16): sim_type,file_par, char(4): at_name
+     		if(head.eq.'TIME') sim_type = 'TIMESTEP'
+     		if (head.eq.'STAT') sim_type = 'STATIC'
+      endif 
+      close(1)
+ 
+      nlayer = n_row(1)*n_row(2) 
+      nsuper = n_row(1)*n_row(2)*n_row(3) 
+			n_sup(:) = nsuper_r(:)					!n_sup is a 64bit copy needed for FINUFFT, while storage is 32bit for space economy
+      box_volume = nsuper*a_par(1)*a_par(2)*a_par(3)		!normalisation constant
+
+C **** Read the auxiliary file <file_title.par> with structure parameters, atom names and further info
+      write(*,*) 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
+      read(*,*) file_par
+      file_inp = trim(file_par)//'.par'
 
       open(4,file=file_inp,action='read',status ='old',iostat=ios)
 			if(ios.ne.0) then
@@ -174,68 +288,149 @@ C **** read auxiliary file <file_title.par> with structure parameters, atom name
 				stop
 			endif
 
-      write(9,*) 'Read parameter file:  ',trim(file_inp)
+      write(9,*) 'Read the parameter file:  ',trim(file_inp)
 
-      section = 'mp_gen'
+      read(4,nml=mp_gen)
+      rewind(4)
+      read(4,nml=mp_out)
+      rewind(4)
+      read(4,nml=mp_sqom) 
+CC      read(4,nml=mp_bin) 
+CC			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
+CC			write(*,*) 'namelist input: j_verb,j_proc,j_shrec,j_grid,sim_type,dat_type',j_verb,j_proc,j_shrec,j_grid,sim_type,dat_type
+
+C *** Read the atom positions       
+      rewind(4)
+      section = 'atoms'
       do
         read(4,'(a)',iostat=ios) string
         if(ios/=0) then
           write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
           stop
         endif
-        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
+        if(string(1:5).eq.section) exit	!find the mp_simple part of the .par file
       enddo
-			read(4,*) 		j_verb		! (0/1) verbose command line output
-			read(4,*) 		j_proc		!j_proc requested number of OpenMP parallel processes, 0 = automatic maximum
-			read(4,*) 		j_name		! j_name: 0 master_string (_ & 4 digits counter), 1 "old" way (_C_ & 4 digits counter, "cores" only)
-			read(4,*) 		j_grid		! (0/1) grid overlay on PG_PLOT graphs 
-			read(4,'(a)') sim_type	!'timestep' for MD, 'static' for DISCUS, phase field etc.
-			rewind(4)
-			
-      section = 'mp_bin'
-      do
-        read(4,'(a)',iostat=ios) string
-        if(ios/=0) then
-          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
-          stop
-        endif
-        if(string(1:6).eq.section) exit	!find the mp_gen part of the .par file
-      enddo
-      
-			read(4,*) subst_name
-			read(4,*) n_atom
-			read(4,*) n_row 
-			allocate(at_label(n_atom),at_name_ext(n_atom),at_name_par(n_atom),at_base(n_atom,3),at_mask(n_atom))
-			allocate(conc(n_atom),b_coh(n_atom),x_ffpar(n_atom,9),SOURCE=.0)												!we need this to read .par
 			do j=1,n_atom
-        read(4,*) at_label(j),at_name_par(j),at_base(j,:),conc(j),b_coh(j),at_name_ext(j)	!for BULK the at_base and conc are not significant
+        read(4,*) at_label(j),at_name_par(j),at_base(j,:),conc(j),at_name_ext(j)	!for BULK the at_base and conc are not significant
         if(at_name_ext(j)=='n'.or.at_name_ext(j)=='N') at_name_ext(j)=''
 			enddo
-			n_row_save = n_row
-			b_coh_save = b_coh						!keep the original b_coh values for reference
-			rewind(4)
-
-      section = 'mp_sqom'
-      do
-        read(4,'(a)',iostat=ios) string
-        if(ios/=0) then
-          write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
-          stop
-        endif
-        if(string(1:7).eq.section) exit	!find the mp_gen part of the .par file
-      enddo
-			read(4,*) n_int					!n_int time-integration range (number of snapshots): 0 = automatic choice of Nfile/2
-			read(4,*) j_zero				!j_zero=1 eliminate points with an exactly zero coordinate (0=OFF) [in SQOM521] otherwise s_trig=2  the triger level of the speckle filter
-			s_trig = .0
-			read(4,*) j_weight			!j_weight=1 uniform weighting, 2 neutron b_coh; 3 Xray form-factors 
-			read(4,*) 							!j_xray				!j_xray=1	load Xray formfactor table
-			read(4,*) j_logscale		!j_logscale=1  maps log scale
-			read(4,*) j_txt					!j_txt=1 	accompany PS maps output by intensities in .txt file
-			read(4,*) j_oneph				!start in NUFFT (0), 1phonon (1), runtime toggle 0,1
 			close(4)
 
-			j_xray = 0
-			j_coh = 1
+C *** read neutron scattering lengths
+      open(4,file='neutron_xs.txt',action='read',status ='old',iostat=ios)
+      if(ios.ne.0) then
+        open(4,file='/usr/local/mp_tools/ref/neutron_xs.txt',action='read',status ='old',iostat=ios)
+        if(ios.ne.0) then
+          do
+            write(*,*) 'File neutron_xs.txt not found, type in valid access path/filename'
+            read(*,'(a)') x_file_name
+            open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
+            if(ios==0) exit
+            write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+          enddo
+        endif
+      endif
+      search_loop: do j=1,n_atom
+        rewind(4)
+        do i=1,210
+          read(4,*) atom
+          if(atom==trim(at_label(j))) then
+            backspace(4)
+            read(4,*) atom,b_coh(j)
+            cycle search_loop
+          endif
+        enddo
+        write(*,*) 'b_coh for ',trim(at_label(j)),' not found,'
+        write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+      enddo search_loop
+      
+      b_coh = .1*b_coh  !convert b_coh from FM to 10^12 cm
+CC      write(*,*)
+CC      write(*,*) 'Neutron scattering lengths:'
+CC      do j=1,n_atom
+CC        write(*,*) at_label(j),b_coh(j)
+CC      enddo			
+
+C *** read Xray formfactor parameters 
+      open(4,file='xray_ff.txt',action='read',status ='old',iostat=ios)
+      if(ios.ne.0) then
+        open(4,file='/usr/local/mp_tools/ref/xray_ff.txt',action='read',status ='old',iostat=ios)
+        if(ios.ne.0) then
+          do
+            write(*,*) 'File xray_ff.txt not found, type valid access path/filename'
+            read(*,'(a)') x_file_name
+            open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
+            if(ios==0) exit
+            write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+          enddo
+        endif
+      endif
+      atom_loop: do j=1,n_atom
+        rewind(4)
+        do i=1,210
+          read(4,*) atom
+          if(atom==trim(at_label(j))//trim(at_name_ext(j))) then
+            backspace(4)
+            read(4,*) atom,x_ffpar(j,1:9)
+            cycle atom_loop
+          endif
+        enddo
+        write(*,*) 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
+        write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+      enddo atom_loop
+      close(4)
+
+C *** write overview of atom data
+			write(*,*)
+      write(*,*) 'Substance name: ',subst_name	  
+			write(*,*) 'Atoms from ',trim(file_inp)
+      do j=1,n_atom
+        write(*,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),conc(j),b_coh(j)
+        write(9,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),conc(j),b_coh(j)
+      enddo								
+
+      if(j_verb==1) then
+        write(*,*)
+        write(*,*) 'Xray form-factors'
+        do j=1,n_atom
+          write(*,*) at_label(j),x_ffpar(j,:)
+        enddo	
+      endif		
+ 
+C **** for an MD snapshot sequence open a second data file to see the time step between recorded snapshots
+			if(sim_type=='TIMESTEP') then
+				write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
+				open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
+				if(ios.ne.0) then
+					write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
+					stop
+				endif
+
+        if(nml_in) then      !new structure with namelist
+          read(1,rec=2) header_record
+          read(header_record,nml=data_header_1)	
+          t1 = t_dump
+        else                                  !old w/o structure
+          read(1,rec=1) string16,string16,t_ms,t1						!char(16): sim_type,file_par, char(4): at_name
+        endif 
+				close(1)
+
+				t_step = t1-t0						!this is the "macroscopic" time step between recorded snapshots
+				t_tot = (nfile-1)*t_step
+			else
+				t_step = .0						!for total scattering (unrelated snapshots)
+				t_tot = .0
+			endif
+
+			do j=1,n_atom
+				if(at_name_par(j)/=at_name_out(j)) then
+					write(*,*) 'Atom names in .PAR and .DAT do not match: ',j,at_name_par(j),at_name_out(j)
+					write(*,*) 'Prefer .DAT? (1/0)'
+					read(*,*) ii
+					if(ii==1) at_name_par(j) = at_name_out(j) 
+				endif
+			enddo			
+			
 
 C *********************  OpenMP initialization start  *******************************      
 C
@@ -265,141 +460,9 @@ CC			thread_num = omp_get_num_threads( )				!this gives threads available at thi
 C
 C ********************* OpenMP initialization end *******************************      
 
-C *** other initialisations
-			ps_out = (/'OFF ','ON  '/)			!PGPLOT
-			plot_unit = 0
-			map_unit_1 = -1	
-			map_unit_2 = -1
-			p_size = 7.											!PGPLOT
-			eps = 1.e-6						!finufft
-			iflag = -1						!finufft			
-      j_head_in = 0		! if header found will become 1
-			at_weight_scheme(1) = 'Unit weights '
-			at_weight_scheme(2) = 'Neutron weights'
-			at_weight_scheme(3) = 'Xray weights'
-			at_mask = 1
-			f_max = .0
-
-
-C *********************      Initial info output   ************************
-			write(*,*)
-      write(*,*) 'Substance name: ',subst_name	  
-			write(*,*) 'Atoms from ',trim(file_inp)
-      do j=1,n_atom
-        write(*,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),conc(j),b_coh(j)
-        write(9,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),conc(j),b_coh(j)
-      enddo
-
-C *** Generate data file access
-			if(j_name==0)then			!THE NEW WAY
-				write(*,*) 'Input data file_master: '
-			else
-				write(*,*) 'Input data file_master (_C_ will be added): '
-			endif
-			read(*,*) file_master 
-			if(j_name==1) file_master = trim(file_master)//'_c'
-						
-      write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
-      read(*,*)   nfile_min,nfile_max
-      nfile_step = 1
-			t_single = nfile_min==0.and.nfile_max==0
-
-			if(t_single)then
-				nfile_min = 1		!for conformity with loop control conventions
-				nfile_max = 1
-			endif
-			
-      nfile = ((nfile_max-nfile_min)/nfile_step)+1
-      
-			if(j_name==0.and.t_single)then
-				write(file_dat_t0,'("./data/",a,".dat")') trim(file_master)
-			else
-				write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
-			endif
-
-	    open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
-			if(ios.ne.0) then
-				write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
-				stop
-			endif
-			
-C *** check for header record      
-      read(1,rec=1) header_record
-      if(header_record(1:4).eq.sim_type(1:4)) then
-
-				read(1,rec=1) 
-     1		sim_type,file_title,t_ms,t0,temp,a_par,angle,n_row,n_at,n_eq,j_force,j_shell,n_cond,n_rec		
-				
-        j_head_in = 1
-      else
-      	write(*,*) 'header record wrong or missing'
-      	write(*,*) trim(header_record)
-      	stop
-      endif 
-      
-			data_type = 'cell'
-			if(index(sim_type,'bulk')/=0) data_type = 'bulk'
-			if(index(sim_type,'quick')/=0) data_type = 'quick'
-			write(*,*) 'Data type: ',data_type
-      
-      if(n_at/=n_atom.and.(data_type=='cell'.or.data_type=='quick')) then
-        write(*,*) sim_type,file_title,n_traj,n_cond,t0,t_step0,a_par,n_row,n_at,j_force,temp  
-      	write(*,*) 'Unit cell number of atoms in .PAR/.DAT not compatible:',n_atom,n_at
-      	stop
-      else
-        n_atom = n_at
-      endif
-      allocate(at_name_inp(n_atom),at_occup(n_atom),nsuper_r(n_atom),n_sup(n_atom),ind_at(n_atom))
-
-			read(1,rec=1) 
-     1		sim_type,file_title,t_ms,t0,temp,a_par,angle,n_row,n_at,n_eq,j_force,j_shell,n_cond,n_rec,n_tot_in,			
-     2    at_name_inp,at_occup,nsuper_r																		!char(16): sim_type,file_title, char(4): at_name
-      close(1) 
- 
-C **** for an MD snapshot sequence open a second data file to see the time step between recorded snapshots
-			if(sim_type(1:4).eq.'time'.and.(.not.t_single)) then
-				write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
-				open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
-				if(ios.ne.0) then
-					write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
-					stop
-				endif
-
-				read(1,rec=1) 
-     1		sim_type,file_title,t_ms,t1,temp,a_par,angle,n_row,n_at,n_eq,j_force,j_shell,n_cond,n_rec,jj,			
-     2    at_name_inp,at_occup,nsuper_r																		!char(16): sim_type,file_title, char(4): at_name
-				close(1)
-
-				t_step = t1-t0						!this is the "macroscopic" time step between recorded snapshots
-				t_tot = (nfile-1)*t_step
-			else
-				t_step = .0						!for total scattering (unrelated snapshots)
-				t_tot = .0
-			endif
-
-			do j=1,n_at
-				if(at_name_inp(j)/=at_name_par(j)) then
-					write(*,*) 'Atom names in .PAR and .DAT do not match: ',j,at_name_par(j),at_name_inp(j)
-					write(*,*) 'Prefer .DAT? (1/0)'
-					read(*,*) ii
-					if(ii==1) at_name_par(j) = at_name_inp(j) 
-				endif
-			enddo
-			
- 			nrow = n_row(1)
-      nlayer = n_row(1)*n_row(2) 
-      nsuper = n_row(1)*n_row(2)*n_row(3) 
-			n_sup(:) = nsuper_r(:)					!n_sup is a 64bit copy needed for FINUFFT, while storage is 32bit for space economy
-
-      if(data_type=='cell'.or.data_type=='quick') then
-				n_tot = n_atom*nsuper		! for allocation purposes, allowing for vacancies; the header contains counted n_tot_in
-			else
-				n_tot = n_tot_in			
-			endif
 
 C *** cycle over snapshot files to accumulate input data
 C
-
 			allocate(at_pos_in(4*n_tot,nfile),at_ind_in(4*n_tot))			
 
       write(*,*) 'Input files:'
@@ -411,7 +474,7 @@ C
       file_loop: do jfile=nfile_min,nfile_max,nfile_step
 
 C ***  open the binary MD snapshot file
-				if(j_name==0.and.t_single)then
+				if(t_single)then
 					write(file_dat,'("./data/",a,".dat")') trim(file_master)
 				else
 					write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
@@ -437,26 +500,24 @@ CC        endif
 					ind_at(j) = ind_at(j-1)+nsuper_r(j-1)
 				enddo
 
-
-				j_rec = 1	
+				i_rec = n_head	
 				do j=1,n_rec-1
-					j_rec = j_rec+1
-					if(jfile==nfile_min) read(1,rec=j_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			!only needed for 1_phonon with CELL and QUICK
+					i_rec = i_rec+1
+					if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			!only needed for 1_phonon with CELL 
 				enddo	
-				j_rec = j_rec+1
-				if(jfile==nfile_min) read(1,rec=j_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
-				
+				i_rec = i_rec+1
+				if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
+			
 				do j=1,n_rec-1
-					j_rec = j_rec+1
-					read(1,rec=j_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,ifile)			
+					i_rec = i_rec+1
+					read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,ifile)			
 				enddo	
-				j_rec = j_rec+1
-				read(1,rec=j_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,ifile)					
+				i_rec = i_rec+1
+				read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,ifile)					
 				close(1)
-						
 			enddo file_loop
-
-			if(data_type=='cell'.or.data_type=='quick') then
+     
+			if(input_method=='CELL'.or.input_method=='FAST') then
 				at_ind(1:4,1:nsuper,1:n_atom) => at_ind_in
 				at_pos_file(1:4,1:nsuper,1:n_atom,1:nfile) => at_pos_in
 			else
@@ -470,6 +531,13 @@ CC        endif
 			
 				CALL SYSTEM_CLOCK (COUNT = sc_c2)
 				write(*,*) nfile,' files read in ',(sc_c2-sc_c1)*sc_r, ' sec SYS time'
+
+CC      do
+CC        write(*,*) 'irec,ifil'
+CC        read(*,*) i,ifile
+CC        write(*,*) at_pos_file_bulk(1:3,i,ifile)
+CC        if(i==0) exit
+CC      enddo
 
 
 C *** set the time and frequency constants and the time-integration window
@@ -498,76 +566,68 @@ C *** set the time and frequency constants and the time-integration window
 				write(*,*) 
 			endif
 
-				allocate(t_wind(n_int),SOURCE=0.0)
-				allocate(om_phase(n_int),SOURCE=(.0,.0)) 
+      allocate(t_wind(n_int),SOURCE=0.0)
+      allocate(om_phase(n_int),SOURCE=(.0,.0)) 
 
-			at_pos_min = -n_row/2.
-			at_pos_max = n_row/2.-1.
-			at_pos_centre = .0
-			twopi_nr = twopi/(1.0d0*n_row)
-			 			
-			
+      if(nsuper==1) then
+        at_pos_min = -a_par/2.      !for aperiodic BULK a_par represents the whole box
+        at_pos_max = a_par/2.
+        at_pos_centre = .0
+      else
+        at_pos_min = -n_row/2.
+        at_pos_max = +n_row/2.         
+        at_pos_centre = .0
+			endif
+
+CC			twopi_nr = twopi/(1.0d0*n_row)
+			 						
 			j_fft = 1
 			jfile = 1				!now to be used as index for the successive output files			
 			j_plot = 0			!j_plot=0 is initialised and identifies 1st pass: we start with a total scattering map
 
 			map_loop: do
+
+C *** modify the active frame range
 				do
 					if(j_plot==-6)	then
-						do i=1,3
-							write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
-							read(*,*) at_pos_min(i),at_pos_max(i)
-							if(at_pos_min(i)<-n_row(i)/2.) at_pos_min(i) = -n_row(i)/2.
-							if(at_pos_max(i) > n_row(i)/2.) at_pos_max(i) = n_row(i)/2.
-							write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
-							write(9,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
-						enddo 
-						nrow = int(at_pos_max(1)-at_pos_min(1)+1)
-						at_pos_centre = ceiling(.5*(at_pos_max+at_pos_min))
+            if(input_method=='BULK') then
+             do i=1,3
+                write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
+                read(*,*) at_pos_min(i),at_pos_max(i)
+                if(at_pos_min(i)<-a_par(i)/2.) at_pos_min(i) = -a_par(i)/2.
+                if(at_pos_max(i) > a_par(i)/2.) at_pos_max(i) = a_par(i)/2.
+                write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
+                write(9,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
+              enddo 
+              at_pos_centre = .5*(at_pos_max+at_pos_min)
+            else
+             do i=1,3
+                write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
+                read(*,*) at_pos_min(i),at_pos_max(i)
+                if(at_pos_min(i)<-n_row(i)/2.) at_pos_min(i) = -n_row(i)/2.
+                if(at_pos_max(i) > n_row(i)/2.) at_pos_max(i) = n_row(i)/2.
+                write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
+                write(9,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
+              enddo 
+              nrow = int(at_pos_max(1)-at_pos_min(1)+1)
+              at_pos_centre = ceiling(.5*(at_pos_max+at_pos_min))
+            endif
 					endif			
 
-CC					write(*,*) 		'nrow,at_pos_centre',nrow,at_pos_centre		
 					j_plot = 0			!j_plot=0 back to ZERO: we start again with a total scattering map
 
-					write(*,*) 'Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
-					read(*,*) n_bz,j_dir
-					if(n_bz==0.) exit map_loop	
-					
-C *** read Xray formfactor parameters if needed (j_weight=3, x_ffpar(1,1)=.0 )
-					if((j_xray>=1.or.j_weight==3).and.x_ffpar(1,1)==.0) then
-						open(4,file='xray_ff.txt',action='read',status ='old',iostat=ios)
-						if(ios.ne.0) then
-							open(4,file='/usr/local/mp_tools/ref/xray_ff.txt',action='read',status ='old',iostat=ios)
-							if(ios.ne.0) then
-								do
-									write(*,*) 'File xray_ff.txt not found, type valid access path/filename'
-									read(*,'(a)') x_file_name
-									open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
-									if(ios==0) exit
-									write(*,*) 'File',trim(x_file_name),' not found, try again ...'
-								enddo
-							endif
-						endif
-						atom_loop: do j=1,n_atom
-							rewind(4)
-							do i=1,210
-								read(4,*) atom
-								if(atom==trim(at_label(j))//trim(at_name_ext(j))) then
-									backspace(4)
-									read(4,*) atom,x_ffpar(j,1:9)
-									cycle atom_loop
-								endif
-							enddo
-							write(*,*) 'not found'
-						enddo atom_loop
-						j_xray = 1
-						write(*,*)
-						write(*,*) 'Xray form-factors'
-						do j=1,n_atom
-							write(*,*) at_label(j),x_ffpar(j,:)
-						enddo			
+C *** define the momentum space range          
+          if(nsuper==1) then
+            write(*,*) 'Q-range [Å-1] (0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
+            read(*,*) bz_n,j_dir
+					else
+            write(*,*) 'Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
+            read(*,*) n_bz,j_dir
+            bz_n = real(n_bz)
 					endif
-
+		
+					if(bz_n==0.) exit map_loop	
+					
 					if(j_dir==1)then
 						e1 = (/1,0,0/)
 						e2 = (/0,1,0/)
@@ -595,19 +655,25 @@ C *** read Xray formfactor parameters if needed (j_weight=3, x_ffpar(1,1)=.0 )
 				e2_norm = sqrt(dot_product(1.*e2,1.*e2))
 				ev_norm = sqrt(dot_product(1.*ev,1.*ev))
 
-				tpe1 = twopi/dot_product(e1,anint(at_pos_max-at_pos_min+1)/e1_norm**2)
-				tpe2 = twopi/dot_product(e2,anint(at_pos_max-at_pos_min+1)/e2_norm**2)
-				tpev = twopi/dot_product(ev,(at_pos_max-at_pos_min+1)/ev_norm**2)
-				n_qx = sum(abs(e1)*(at_pos_max-at_pos_min+1))*n_bz/e1_norm**2			    
-				n_qy = sum(abs(e2)*(at_pos_max-at_pos_min+1))*n_bz/e2_norm**2
+CC				tpe1 = twopi/dot_product(e1,anint(at_pos_max-at_pos_min)/e1_norm**2)      
+CC				tpe2 = twopi/dot_product(e2,anint(at_pos_max-at_pos_min)/e2_norm**2)
+				tpe1 = twopi/dot_product(e1,(at_pos_max-at_pos_min)/e1_norm**2)      
+				tpe2 = twopi/dot_product(e2,(at_pos_max-at_pos_min)/e2_norm**2)
+				tpev = twopi/dot_product(ev,(at_pos_max-at_pos_min)/ev_norm**2)
+				n_qx = sum(abs(e1)*(at_pos_max-at_pos_min))*bz_n/e1_norm**2			    
+				n_qy = sum(abs(e2)*(at_pos_max-at_pos_min))*bz_n/e2_norm**2
 
+        if(2*(n_qx/2)/=n_qx) n_qx = n_qx+1
+        if(2*(n_qy/2)/=n_qy) n_qy = n_qy+1
+        
 				n_qx8 = n_qx
 				n_qy8 = n_qy
 				nsuper8 = nsuper
 
+				write(*,*) 'Q-pixels X,Y: ', n_qx,n_qy
 				write(*,*) 'Vertical axis:', ev
 
-				allocate(x_ffq(n_atom,n_qx,n_qy))
+				allocate(x_ffq(n_atom,n_qx,n_qy),q2_norm(n_qx,n_qy))
 
 				c_min_save = .0
 				c_max_save = .0
@@ -615,45 +681,69 @@ C *** read Xray formfactor parameters if needed (j_weight=3, x_ffpar(1,1)=.0 )
 C **** cycle over q_center(3)-values
 			
 			bz_loop: do				
-				write(*,*) 'Q_center [hkl] (9 9 9 END):'
-				read(*,*) q_center
 
-				if(q_center(1)==9.) exit bz_loop
-				
-				qx_min = dot_product(e1,q_center)/e1_norm**2-.5*n_bz
-				qx_max = dot_product(e1,q_center)/e1_norm**2+.5*n_bz
-				qy_min = dot_product(e2,q_center)/e2_norm**2-.5*n_bz
-				qy_max = dot_product(e2,q_center)/e2_norm**2+.5*n_bz
+        if(input_method=='BULK'.and.nsuper==1) then
+        	if(j_wind==1) then
+						write(*,*) 'Using FT window, set Q_center [Å-1]:'
+						read(*,*) q_center
+          else
+          	q_center = (/.0,.0,.0/)
+          	write(*,*) 'Q_center [Å-1]:',q_center
+          endif
+        else
+          write(*,*) 'Q_center [hkl]:'
+          read(*,*) q_center
+				endif
+
+				qx_min = dot_product(e1,q_center)/e1_norm**2-.5*bz_n
+				qx_max = dot_product(e1,q_center)/e1_norm**2+.5*bz_n
+				qy_min = dot_product(e2,q_center)/e2_norm**2-.5*bz_n
+				qy_max = dot_product(e2,q_center)/e2_norm**2+.5*bz_n
 				tpq_center = twopi_s*q_center
-				
 				q_v = (dot_product(ev,q_center)/ev_norm)*ev
 
+CC        write(*,*) 'qx_min,qx_max,qy_min,qy_max',qx_min,qx_max,qy_min,qy_max
+
 C *** generate the Xray form-factor tables
-			  if(j_weight==3) then
 					do i=1,n_qx
 						do j=1,n_qy
-							q1 = (qx_min+(i-1)/n_qx)*(e1/a_par)
-							q2 = (qy_min+(j-1)/n_qy)*(e2/a_par)
+							if(nsuper/=1) then
+								q1 = (qx_min+(i-1)*(bz_n/n_qx))*(e1/a_par)
+								q2 = (qy_min+(j-1)*(bz_n/n_qy))*(e2/a_par)
+				        q_step = (bz_n/(n_qx*a_par(1)))**2
+							else
+								q1 = (qx_min+(i-1)*(bz_n/n_qx))*e1		!here bz_n is in A^-1
+								q2 = (qy_min+(j-1)*(bz_n/n_qy))*e2
+				        q_step = (bz_n/n_qx)**2
+							endif
 							q_sq = dot_product(q1,q1)+dot_product(q2,q2)
-							do j_at=1,n_atom
-								x_ffq(j_at,i,j) = x_ffpar(j_at,9)
-								do ii=1,4
-									x_ffq(j_at,i,j) = x_ffq(j_at,i,j)+x_ffpar(j_at,2*ii-1)*exp(-.25*x_ffpar(j_at,2*ii)*q_sq)
-								enddo
-							enddo
+							if(q_sq>=(q_step-.000001)) then
+							  q2_norm(i,j) = 1./sqrt(q_sq)
+							else
+							  write(*,*) 'q1,q2,q_sq,q_step',q1,q2,q_sq,q_step
+							  q2_norm(i,j) = 1.
+							endif
+			        if(j_weight==3) then
+                do j_at=1,n_atom
+                  x_ffq(j_at,i,j) = x_ffpar(j_at,9)
+                  do ii=1,4
+                    x_ffq(j_at,i,j) = x_ffq(j_at,i,j)+x_ffpar(j_at,2*ii-1)*exp(-.25*x_ffpar(j_at,2*ii)*q_sq)
+                  enddo
+                enddo
+							endif
 						enddo
 					enddo
-			 endif
 
+ 
 C *** generate the Fourier time window table				
 			if(n_int<=1) then
 				t_wind = 1.
 			else
 				do i=1,n_int
-CC					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at n_int/2+1		Hann window
-					t_wind(i) = 0.355768-0.487396*cos(twopi*(i)/real(n_int+1))							!max is at n_int/2+1		Nuttall window
-					t_wind(i) = t_wind(i)+0.144232*cos(2.*twopi*(i)/real(n_int+1))						
-					t_wind(i) = t_wind(i)-0.012604*cos(3.*twopi*(i)/real(n_int+1))							
+					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at n_int/2+1		Hann window
+CC					t_wind(i) = 0.355768-0.487396*cos(twopi*(i)/real(n_int+1))							!max is at n_int/2+1		Nuttall window
+CC					t_wind(i) = t_wind(i)+0.144232*cos(2.*twopi*(i)/real(n_int+1))						
+CC					t_wind(i) = t_wind(i)-0.012604*cos(3.*twopi*(i)/real(n_int+1))							
 				enddo
 			endif
 			
@@ -666,7 +756,7 @@ CC					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at 
 				  
 				t_sum = .0
 				call cpu_time(t1)
-
+				
 				CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
 				sc_r = 1./sc_r
 
@@ -675,9 +765,10 @@ CC					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at 
 				frame_loop: do ifile=1,nfile
 				
 				  if(j_oneph==1) then      !do one-phonon approximation
-				    allocate(u_x(nrow,nrow),u_y(nrow,nrow),u_qx(nrow,nrow),u_qy(nrow,nrow))
-				    nqx_min = nrow*(qx_min-floor(qx_min))
-				    nqy_min = nrow*(qy_min-floor(qy_min))
+CC	  	  	nrow = n_row(1)					!!!!!!!!!!! modify to N_ROW
+				    allocate(u_x(n_row(1),n_row(2)),u_y(n_row(1),n_row(2)),u_qx(n_row(1),n_row(2)),u_qy(n_row(1),n_row(2)))
+				    nqx_min = n_row(1)*(qx_min-floor(qx_min))
+				    nqy_min = n_row(2)*(qy_min-floor(qy_min))
 
   					do j = 1,n_atom
   					  u_x = (.0,.0)
@@ -700,7 +791,8 @@ CC					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at 
 
               do i=1,nsuper
               	if(at_pos_file(1,i,j,ifile)/=.0.or.at_pos_file(2,i,j,ifile)/=.0.or.at_pos_file(3,i,j,ifile)/=.0) then
-                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
+CC                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
+                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,(n_row(1)+n_row(2))/2)+1
                   l = at_ind(3,i,j)
                   d_x = at_pos_file(1,i,j,ifile)-at_base(j,1)-at_ind(1,i,j)+n_row(1)/2+1
                   d_x = d_x+at_pos_file(2,i,j,ifile)-at_base(j,2)-at_ind(2,i,j)+n_row(2)/2+1
@@ -713,25 +805,25 @@ CC					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at 
 
             endif		!j_dir				
 
-              u_qx = fft(u_x,inv=.false.)/(1.*nrow)     !in fact 1/sqrt(nrow**2)
-              u_qy = fft(u_y,inv=.false.)/(1.*nrow)     !FT in 0th Bz possibly with a q_z component
+              u_qx = fft(u_x,inv=.false.)/(1.*n_row(1))     !in fact 1/sqrt(nrow**2)
+              u_qy = fft(u_y,inv=.false.)/(1.*n_row(2))     !FT in 0th Bz possibly with a q_z component
 
               do ii=1,n_bz      
                 do jj=1,n_bz              
-                   do l=1,nrow
-                    do k=1,nrow
+                   do l=1,n_row(1)
+                    do k=1,n_row(2)
                       q_x = (qx_min+(ii-1)+(k-1)/(n_row(1)*1.))            !*(e1/a_par)
                       q_y = (qy_min+(jj-1)+(l-1)/(n_row(2)*1.))            !*(e2/a_par)
-                      kk = modulo(nqx_min+k,nrow)
-                      ll = modulo(nqy_min+l,nrow)                 
-                      if(kk==0) kk = nrow                 
-                      if(ll==0) ll = nrow 
+                      kk = modulo(nqx_min+k,n_row(1))
+                      ll = modulo(nqy_min+l,n_row(2))                 
+                      if(kk==0) kk = n_row(1)                 
+                      if(ll==0) ll = n_row(2) 
                       if(j_dir==1) then               
                         phase_bz = cexp((0.,-1.)*twopi_s*(q_x*at_base(j,1)+q_y*at_base(j,2)))
                       elseif(j_dir==2) then               
                         phase_bz = cexp((0.,-1.)*twopi_s*(q_x*(at_base(j,1)+at_base(j,2))+q_y*at_base(j,3)))
                       endif
-                      cs_atom(ifile,j,(ii-1)*nrow+k,(jj-1)*nrow+l) = phase_bz*(q_x*u_qx(kk,ll)+q_y*u_qy(kk,ll))
+                      cs_atom(ifile,j,(ii-1)*n_row(1)+k,(jj-1)*n_row(2)+l) = phase_bz*(q_x*u_qx(kk,ll)+q_y*u_qy(kk,ll))
                     enddo
                   enddo
                 enddo
@@ -742,9 +834,8 @@ CC					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at 
 				  else                    !j_oneph/=1 do the complete NUFFT thing
  						do j = 1,n_atom
 							allocate(xf(n_sup(j)),yf(n_sup(j)),cf(n_sup(j)))																	
-							allocate(ampl_tot(n_qx*n_qy),ampl_tot_2d(n_qx,n_qy))
  
-   						if(data_type=='cell'.or.data_type=='quick') then
+   						if(input_method=='CELL'.or.input_method=='FAST') then
 								ii = 0
 								do i=1,nsuper
 									non_zero = (at_pos_file(1,i,j,ifile)/=.0.or.at_pos_file(2,i,j,ifile)/=.0.or.at_pos_file(3,i,j,ifile)/=.0)
@@ -759,41 +850,55 @@ CC					t_wind(i) = .5*(1.-cos(twopi*(i-1)/real(n_int-1)))												!max is at 
 										xf(ii) = dot_product(e1,(at_pos_file(1:3,i,j,ifile)-at_pos_centre))*tpe1
 										yf(ii) = dot_product(e2,(at_pos_file(1:3,i,j,ifile)-at_pos_centre))*tpe2
 										cf(ii) = cexp((0.,-1.)*dot_product(tpq_center,at_pos_file(1:3,i,j,ifile)))
+										if(j_wind==1) cf(ii) = cf(ii)*(1+cos(xf(ii)))*(1+cos(yf(ii)))     !apply Hann window in space, include phase shift into x,y directly
 									endif
 								enddo              
-							else					!bulk
+							else					!BULK
 								ii = 0
 								do i=1,n_sup(j)
 									inside = .true.
 									do iii=1,3
-										inside = inside.and.(at_pos_file_bulk(iii,ind_at(j)+i,ifile)>=at_pos_min(iii).and.
-     1										at_pos_file_bulk(iii,ind_at(j)+i,ifile)<=at_pos_max(iii)+1)
+									 if(nsuper==1) then
+										inside = inside.and.(at_pos_file_bulk(iii,ind_at(j)+i,ifile)>=(at_pos_min(iii)-eps_x).and.
+     1										at_pos_file_bulk(iii,ind_at(j)+i,ifile)<(at_pos_max(iii))+eps_x)     !!!+1
+     							 else
+										inside = inside.and.(at_pos_file_bulk(iii,ind_at(j)+i,ifile)>=(at_pos_min(iii)-1).and.
+     1										at_pos_file_bulk(iii,ind_at(j)+i,ifile)<(at_pos_max(iii))+1)     !!!+1
+     							 endif
 									enddo
 									if(inside)then
 										ii = ii+1
 										xf(ii) = dot_product(e1,(at_pos_file_bulk(1:3,ind_at(j)+i,ifile)-at_pos_centre))*tpe1
 										yf(ii) = dot_product(e2,(at_pos_file_bulk(1:3,ind_at(j)+i,ifile)-at_pos_centre))*tpe2
 										cf(ii) = cexp((0.,-1.)*dot_product(tpq_center,at_pos_file_bulk(1:3,ind_at(j)+i,ifile)))
+										if(j_wind==1) cf(ii) = cf(ii)*(1+cos(xf(ii)))*(1+cos(yf(ii)))     !apply Hann window in space, include phase shift into x,y directly
+									else
+                    write(*,*) ii,at_pos_file_bulk(1:3,ind_at(j)+i,ifile)
+                    read(*,*)								
                		endif
 								enddo							
-							endif		!data_type
+							endif		!input_method
+
+							allocate(ampl_tot(n_qx*n_qy),ampl_tot_2d(n_qx,n_qy))
+
               n_fft = ii			!we need n_fft 64bit
  						if(j_fft==1)then
-             	call finufft2d1(n_fft,xf,yf,cf,iflag,eps,n_qx8,n_qy8,ampl_tot,nul_opt,ier)
+             	call finufft2d1(n_fft,xf,yf,cf,iflag,eps_fft,n_qx8,n_qy8,ampl_tot,nul_opt,ier)
             else
             	write(*,*) 'Normal FT can be very loooong!'
 							call dirft2d1(n_fft,xf,yf,cf,iflag,n_qx8,n_qy8,ampl_tot)	
 						endif							!direct FT for check
-              ampl_tot_2d = reshape(source=ampl_tot,shape=[n_qx,n_qy])
-              cs_atom(ifile,j,:,:) = ampl_tot_2d/sqrt(real(n_sup(j)))
 
+              ampl_tot_2d = reshape(source=ampl_tot,shape=[n_qx,n_qy])
+CC              cs_atom(ifile,j,:,:) = ampl_tot_2d/sqrt(real(n_fft))
+              cs_atom(ifile,j,:,:) = ampl_tot_2d
  				 			deallocate(xf,yf,cf,ampl_tot_2d,ampl_tot)					!,om_phase(nfile))	
  						enddo  !j (n_atom)
          endif ! j_oneph
           if(mod(ifile,200)==0) write(*,*) 'FFT done frame',ifile
 				enddo frame_loop  !ifile		!finish all file_related normalisation here
 
-
+				if(j_wind==1) cs_atom = cs_atom*.25			! apply the Hann window norm
 
 				call cpu_time(t2)
 				CALL SYSTEM_CLOCK (COUNT = sc_c2)
@@ -806,10 +911,11 @@ CC				cs_mean = (.0,.0)
 				do j=1,n_atom
 					do ii=1,n_qx
 						do jj=1,n_qy
-							cs_mean(j,ii,jj) = sum(cs_atom(:,j,ii,jj))/real(nfile)
+							cs_mean(j,ii,jj) = sum(cs_atom(1:nfile,j,ii,jj))/real(nfile)
 						enddo
 					enddo
 				enddo
+				
 
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 CCC *** Frequency loop
@@ -824,14 +930,17 @@ CC							write(*,*) '       5  make a stack of E(Q) maps    (-5 reset atom masks
 CC						endif
 CC							write(*,*) '       6  change the HKL plane, range and centre (BZ)'
 CC							write(*,*) '                                       (-6 change the real space range)'
-CC							if(data_type=='cell'.or.data_type=='quick') then
+CC							if(input_method=='CELL') then
 CC								if(j_oneph==0) write(*,*) '       7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
 CC								if(j_oneph==1) write(*,*) '       7  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
 CC							endif
 CC							if(j_ps==0) write(*,*) '       8  toggle the PS/TXT output ON (mind the TXT switch in PAR)'
 CC							if(j_ps==1) write(*,*) '       8  toggle the PS/TXT output OFF (mind the TXT switch in PAR)'
-CC							write(*,*) '       9  change the time integration window width, weighting etc.'		!include here the straight FT option
+CC							if(j_qsq==0) write(*,*) '       9  toggle the S(Q)/Q^2 scaling to S(Q) (go on via 6)'
+CC							if(j_qsq==1) write(*,*) '       9  toggle the S(Q) scaling to S(Q)/Q^2 (go on via 6)'
+CC							write(*,*) '      10  Options: the time integration window width, FT window, weighting etc.'		
 CC							read(*,*) j_plot
+CC					endif
 
 
 CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total scattering map
@@ -963,6 +1072,7 @@ C **** now AT_MASK are (re)set, we can make the right replica of CS_ATOM
 								endif
 							endif
 						enddo
+						if(j_qsq/=1) cs(ifile,:,:) = cs(ifile,:,:)*q2_norm
 					enddo
 !$omp end do
 !$omp end parallel
@@ -982,11 +1092,11 @@ C **** now AT_MASK are (re)set, we can make the right replica of CS_ATOM
 								endif
 							endif
 						enddo
+						if(j_qsq/=1) cs(ifile,:,:) = cs(ifile,:,:)*q2_norm
 					enddo
 !$omp end do
 !$omp end parallel
 				endif
-CC				write(*,*) 'cs',cs(:,5,5)
 
 C **** now generate the plot data according to the particular case specs
 
@@ -1022,13 +1132,15 @@ C **** now generate the plot data according to the particular case specs
 						n_qdisp = abs(n_q2x-n_q1x)
 						q_min = q1_x
 						q_max = q2_x
-						ax_label = 'Q_x [rlu]'
+						ax_label = 'Q_x [r.l.u.]'
+						if(input_method=='BULK') ax_label = 'Q_x [1/Å]'
 CC						if(j_verb==1) write(*,*) ax_label,n_q1x,n_q2x,n_qdisp
 					else
 						n_qdisp = abs(n_q2y-n_q1y)
 						q_min = q1_y
 						q_max = q2_y
-						ax_label = 'Q_y [rlu]'
+						ax_label = 'Q_y [r.l.u.]'
+						if(input_method=='BULK') ax_label = 'Q_y [1/Å]'
 CC						if(j_verb==1) write(*,*) ax_label,n_q1y,n_q2y,n_qdisp
 					endif
 					q_nx = (n_q2x-n_q1x)/(1.*n_qdisp)			
@@ -1122,7 +1234,6 @@ CC					write(*,*) 'n_qdisp,q_nx,q_ny 1',n_qdisp,q_nx,q_ny,q_min,q_max
 				
  	     	if(j_disp.ge.1) cs_plot = transpose(cs_plot)			!from now on the shape is cs_plot(n_qdisp,n_freq_plot)
 				cs_plot = cs_plot/real(.5*n_frame*n_int)					!.5 comes for the integral of the time window profile
-
 			endif !(abs(j_plot)>1)													!E-resolved cases
 
 C *** apply the speckle filter
@@ -1167,10 +1278,16 @@ C *** apply the speckle filter
 					deallocate(csp)
 				endif				!s_trig>0.
 
-C *** make a copy of CS_PLOT for .TXT output and linear plots
+C *** normalise to the box volume and make a copy of CS_PLOT for .TXT output and linear plots
+				cs_plot = cs_plot/box_volume
 				cs_out = cs_plot										
 
-				if(j_logscale==1) cs_plot = log10(cs_plot)	
+				if(j_logsc==1) then
+				  cs_plot = log10(cs_plot)
+				  wedge_label = 'Log_scale'
+				else
+				  wedge_label = 'Lin_scale'
+				endif	
 				
 C **** Draw the plot  
 				f_min = 0.
@@ -1180,7 +1297,7 @@ C **** Draw the plot
 					c_min = anint(minval(cs_plot)-1.)
 					c_max = anint(maxval(cs_plot)+1.)
 				endif
-				if(j_logscale==1.and.c_min<-8.) c_min = -8.
+				if(j_logsc==1.and.c_min<-8.) c_min = -8.
 				write(*,*) 'c_min,c_max',c_min,c_max
 			
 C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel number.
@@ -1189,11 +1306,11 @@ C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel
 					tr_shift_y = .5
 					if(n_qx==2*(n_qx/2)) tr_shift_x = 1.
 					if(n_qy==2*(n_qy/2)) tr_shift_y = 1.
-					TR(2) = real(n_bz)/n_qx
+					TR(2) = bz_n/n_qx
 					TR(1) = qx_min-tr_shift_x*TR(2)		
 					TR(3) = 0.0
 					TR(5) = 0.0
-					TR(6) = real(n_bz)/n_qy
+					TR(6) = bz_n/n_qy
 					TR(4) = qy_min-tr_shift_y*TR(6)
 				elseif(j_disp==1)then
 					if(n_qdisp==2*(n_qdisp/2)) tr_shift_x = 1.
@@ -1225,13 +1342,24 @@ C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel
 							CALL PGSLCT(map_unit(i_plot))
 						endif
 
-					plot_title1 = trim(subst_name)//'_'//trim(masks)
-						if(j_oneph<=0)then
-							mode = 'NU_FFT'
-						else
-							mode = 'Single_ph'
-						endif
-
+					if(abs(j_plot)<=1) then
+					  if(j_qsq==1) then
+					    plot_title1 = 'S(Q)'//'  '//trim(subst_name)//'_'//trim(masks)
+					  else
+					    plot_title1 = 'S(Q)/Q**2'//'  '//trim(subst_name)//'_'//trim(masks)
+					  endif
+					else
+  				  if(j_qsq==1) then
+					    plot_title1 = 'S(Q,ω)'//'  '//trim(subst_name)//'_'//trim(masks)
+					  else
+					    plot_title1 = 'S(Q,ω)/Q**2'//'  '//trim(subst_name)//'_'//trim(masks)
+					  endif
+					endif
+          if(j_oneph<=0)then
+            mode = 'NU_FFT'
+          else
+            mode = 'Single_ph'
+          endif
 					
 					if(j_disp==0) then
 						if(abs(j_plot)<=1) then
@@ -1241,9 +1369,15 @@ C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel
 						endif
 CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)   
 113   			format('  Q = [',3f6.2,']   Total scattering  ',a,'  ',a)   
-114   			format('  Q = [',3f6.2,']   Energy =',f6.3,' [THz]  ',a,'  ',a)   
-						write(x_title,131)e1
-						write(y_title,131)e2
+114   			format('  Q = [',3f6.2,']   Energy =',f6.3,' [THz]  ',a,'  ',a)  
+            if(input_method=='BULK') then
+              write(x_title,130)e1
+              write(y_title,130)e2
+						else
+              write(x_title,131)e1
+              write(y_title,131)e2
+						endif
+130					format('[',i1,2i2,']',' [1/Å]')
 131					format('[',i1,2i2,']',' [r.l.u.]')
 						call PGSLCT(map_unit(i_plot))
 						CALL PGPAP(p_size,e2_norm/e1_norm)     ! define the plot area as a square
@@ -1254,6 +1388,7 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
 						CALL PGIMAG(cs_plot(1:n_qx,1:n_qy),n_qx,n_qy,1,n_qx,1,n_qy,c_min,c_max,TR)
+						CALL PGWEDG('RI', 1., 3., c_min, c_max,trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					elseif(j_disp==1) then
 						write(plot_title2,115) q1_3d+(i_plot-n_plot/2-1)*dq_p,q2_3d+(i_plot-n_plot/2-1)*dq_p,
      1						trim(at_weight_scheme(j_weight)),trim(mode)
@@ -1267,6 +1402,7 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
 						CALL PGIMAG(cs_plot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
 				
 					if(j_grid==1) then
@@ -1312,17 +1448,25 @@ C **** make an optional hardcopy and .txt output
 				if (j_ps.eq.1) then				!j_ps				
 					jfile = 1
 					do						!look for existing .txt files to continue numbering
-			if(j_name==0.and.t_single)then
+			if(t_single)then
 						write(file_res,107) trim(file_master),jfile
-						write(file_ps,116) trim(file_master),jfile	
+						if(index(pg_out,'ps')/=0)then
+						  write(file_ps,116) trim(file_master),jfile,'ps'
+						elseif(index(pg_out,'png')/=0)then
+						  write(file_ps,116) trim(file_master),jfile,'png'						
+						endif
 			else
-						write(file_res,108) trim(file_master),nfile_min,nfile,jfile
-						write(file_ps,117) trim(file_master),nfile_min,nfile,jfile	
+						write(file_res,108) trim(file_master),nfile_min,nfile,jfile							
+						if(index(pg_out,'ps')/=0)then
+						  write(file_ps,117) trim(file_master),nfile_min,nfile,jfile,'ps'
+						elseif(index(pg_out,'png')/=0)then
+						  write(file_ps,117) trim(file_master),nfile_min,nfile,jfile,'png'					
+						endif
 			endif
 107   			format(a,'_sq_',i2.2,'.txt')
 108   			format(a,'_sq_',i4.4,'_',i4.4,'_',i2.2,'.txt')
-116   			format(a,'_sq_',i2.2,'.ps')
-117   			format(a,'_sq_',i4.4,'_',i4.4,'_',i2.2,'.ps')
+116   			format(a,'_sq_',i2.2,'.',a)
+117   			format(a,'_sq_',i4.4,'_',i4.4,'_',i2.2,'.',a)
 						inquire(file=file_res,exist=found_txt)
 						inquire(file=file_ps,exist=found_ps)
 
@@ -1349,7 +1493,7 @@ C **** make an optional hardcopy and .txt output
 125				format(' Atom masks: ',i3,19i7)
         	write(9,126) j_atc1,j_atc2
 126				format(' Atom pair correlation: ',2i3)
-					write(9,*) 'n_bz:',n_bz
+					write(9,*) 'bz_n:',bz_n
 					write(9,124) e1,e2
 124				format(' Q-plane: e1 = [',3i2,'], e2 = [',3i2,']')
 					if(j_disp==0) then
@@ -1397,7 +1541,7 @@ C **** Output the intensity map to a text file (linear scale)
 							else
 								write(3,*) 'Energy transfer & resolution [THz]:',f_plot,f_width
 							endif
-							write(3,*) 'Q center & map range (B_zones):',q_center,n_bz
+							write(3,*) 'Q center & map range (B_zones):',q_center,bz_n
 							write(3,*) 'Plot size X (lines):  ',n_qx,qx_min,qx_min+(n_qx-1.)*(qx_max-qx_min)/(n_qx)
 							write(3,*) 'Plot size Y (columns):',n_qy,qy_min,qy_min+(n_qy-1.)*(qy_max-qy_min)/(n_qy)
 							write(3,*)
@@ -1424,12 +1568,17 @@ C **** Output the intensity map to a text file (linear scale)
 
 C **** Prepare and plot the same on .PS		
 					write(*,*) file_ps
-					IF (PGOPEN(file_ps//'/VCPS').LE.0) STOP
+					IF (PGOPEN(file_ps//'/'//trim(pg_out)).LE.0) STOP
+          if(index(pg_out,'png')/=0) then
+            CALL PGSCRN(1, 'white', IER)	
+            CALL PGSCRN(0, 'black', IER)  !sets the color index of background to BLACK (will be inverted by PNG)
+					endif
+CC					IF (PGOPEN(trim(file_ps)//'/PNG').LE.0) STOP
 					CALL PGASK(.FALSE.)     ! would not ask for <RET>
 					if(j_disp==0)then
-						CALL PGPAP(7.0,e2_norm/e1_norm)     ! define the plot area as a square
+						CALL PGPAP(p_size,e2_norm/e1_norm)     ! define the plot area as a square
 					else
-						CALL PGPAP(7.0,1./e1_norm)     ! define the plot area as a rectangle
+						CALL PGPAP(p_size,1./e1_norm)     ! define the plot area as a rectangle
 					endif
 					CALL PGQCIR(C1, C2)
 					NC = MAX(0, C2-C1+1)
@@ -1445,6 +1594,7 @@ C **** Prepare and plot the same on .PS
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.0)					!set character height					
 						CALL PGIMAG(cs_plot(1:n_qx,1:n_qy),n_qx,n_qy,1,n_qx,1,n_qy,c_min,c_max,TR)
+						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					elseif(j_disp==1) then
 						CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 						CALL PGLAB(trim(ax_label),'f [THz]',' ')  !put the axis labels
@@ -1453,6 +1603,7 @@ C **** Prepare and plot the same on .PS
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
 						CALL PGIMAG(cs_plot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
 
 					if(j_grid==1) then
@@ -1464,7 +1615,12 @@ C **** Prepare and plot the same on .PS
 						NYSUB = 5
 						CALL PGBOX (XOPT, XTICK, NXSUB, YOPT, YTICK, NYSUB)
 					endif
+          if(index(pg_out,'png')/=0) then
+            CALL PGSCRN(0, 'white', IER)	
+            CALL PGSCRN(1, 'black', IER)  !sets the color index back
+					endif
 					CALL PGCLOS
+					
 				endif		!j_ps = 1
 							
 C
@@ -1619,7 +1775,7 @@ C
 					if(j_plot==0.or.abs(j_plot)==3.or.abs(j_plot)==5.or.j_exit==1) then
 						write(*,*) 'Choose a plot option (PS/TXT file output is ',trim(ps_out(j_ps+1)),'):'
 							write(*,*) '       0  EXIT'
-							write(*,*) '       1  explore total scattering (-1 edit atom masks)'
+							write(*,*) '       1  explore total scattering     (-1 edit atom masks)'
 						if(t_step>.0) then			
 							write(*,*) '       2  explore E=const maps         (-2 edit atom masks)'
 							write(*,*) '       3  make a stack of E=const maps (-3 reset atom masks)'
@@ -1628,13 +1784,15 @@ C
 						endif
 							write(*,*) '       6  change the HKL plane, range and centre (BZ)'
 							write(*,*) '                                       (-6 change the real space range)'
-							if(data_type=='cell'.or.data_type=='quick') then
+							if(input_method=='CELL') then
 								if(j_oneph==0) write(*,*) '       7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
 								if(j_oneph==1) write(*,*) '       7  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
 							endif
 							if(j_ps==0) write(*,*) '       8  toggle the PS/TXT output ON (mind the TXT switch in PAR)'
 							if(j_ps==1) write(*,*) '       8  toggle the PS/TXT output OFF (mind the TXT switch in PAR)'
-							write(*,*) '       9  change the time integration window width, weighting etc.'		!include here the straight FT option
+							if(j_qsq==0) write(*,*) '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
+							if(j_qsq==1) write(*,*) '       9  toggle the S(Q) scaling to S(Q)/Q^2'
+							write(*,*) '      10  options: change the time integration window width, weighting etc.'		!include here the straight FT option
 							read(*,*) j_plot
 					endif
 
@@ -1645,7 +1803,7 @@ C
 					if(j_plot==7) then
 						j_oneph = j_oneph+1
 						j_oneph = mod(j_oneph,2)
-						if(data_type=='bulk') j_oneph = 0
+						if(input_method=='BULK') j_oneph = 0
 						exit bz_loop              !new FT(Q) is needed
 					endif
 
@@ -1656,13 +1814,18 @@ C
 					endif
 
 					if(j_plot==9) then
-						write(*,*) 'Present values: j_weight,nfile,n_int,f_max,plot_size,j_fft:',j_weight,nfile,n_int,f_max,p_size,j_fft
-						write(*,*) 'New values(after j_weight change go on via 6):'
-						read(*,*) j_weight,nfile,n_int,f_max,p_size,j_fft
-CC						if(j_weight==3.and.j_xray==0) then
-CC							write(*,*) 'Xray form-factor data are missing:'
-CC							write(*,*) '  locate first the XRAY_FF.TXT file, set J_XRAY=1 in the .PAR file and restart'
-CC						endif
+						j_qsq = j_qsq+1
+						j_qsq = mod(j_qsq,2)
+						cycle              
+					endif
+
+					if(j_plot==10) then
+						write(*,*) 'Present values: '									
+						write(*,*) 
+     1			'   j_weight,     j_wind,      j_fft,    j_logsc,     j_grid,      nfile,      n_int,       f_max,         p_size:'
+						write(*,*) j_weight,j_wind,j_fft,j_logsc,j_grid,nfile,n_int,f_max,p_size
+						write(*,*) 'New values(after j_weight, j_wind or j_fft change go on via 6):'
+						read(*,*) j_weight,j_wind,j_logsc,j_grid,nfile,n_int,f_max,p_size,j_fft
 						if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd				
 						n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step
 						t_width = .5*n_int*t_step
@@ -1686,7 +1849,7 @@ CC						endif
 			enddo freq_loop
 
 			enddo bz_loop
-			deallocate(cs_atom,cs_mean,x_ffq)				!,cross_sec
+			deallocate(cs_atom,cs_mean,x_ffq,q2_norm)				!,cross_sec
 			enddo map_loop
 
 			close(3)
@@ -1765,7 +1928,7 @@ C        -- JK rainbow
       END IF
       END
 
-      end program mp_sqom53
+      end program mp_sqom54
 
 
 cc Copyright (C) 2004-2009: Leslie Greengard and June-Yub Lee 
@@ -1848,5 +2011,19 @@ c
       enddo
       end
 c
-c
-c
+C **** string conversion to all upper case
+C     
+ 			subroutine up_case (string)
+
+			character(*), intent(inout)	:: string
+			integer											:: j, nc
+			character(len=26), parameter	:: lower = 'abcdefghijklmnopqrstuvwxyz'
+			character(len=26), parameter	:: upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+			do j = 1, len(string)
+				nc = index(lower, string(j:j))
+				if (nc > 0) string(j:j) = upper(nc:nc)
+			end do
+
+			end subroutine up_case	     
+

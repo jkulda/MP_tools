@@ -1,0 +1,14 @@
+MP_DOS: CALCULATING VIBRATIONAL DENSITY OF STATES (DOS)
+
+The vibrational (phonon) density of states (DOS) is calculated by Fourier transform (using FFT) of the velocity-velocity autocorrelation functions of individual atoms. The total phonon DOS is an incoherent sum of contributions of individual atoms forming the system under study and is related by the time-frequency FT to its spherically integrated (averaged) inelastic scattering cross-section. For this reason it is often put into connection with incoherent neutron scattering, but this property applies indifferently even to a perfectly coherent scatterer.
+
+On input data acquired by either of the input methods (CELL, BULK) are eligible. 
+
+The outcome of this program critically depends on adequate time structure of input data, which on its turn depends on the right choice of the MD simulation strategy (particularly concerning the trajectory length and the dump frequency). The time- to frequency-domain FT calls for a contiguous snapshot sequence. As follows from the FT properties the maximum accessible frequency is related the reciprocal value of the MD trajectory time step, it should be kept in mind that only half of the apparent range is really effective (the other half is a mirror image of the first one). In case of an insufficient frequency range (time step too large) the S(w) function will fold over and may bring up unexpected artefacts. The frequency resolution is related to the reciprocal of the MD simulation duration, the technicalities of the implemented FT algorithm (use of a window function to damp truncation effects) reduce the effective resolution to twice the reciprocal value of the trajectory length. 
+
+In most cases the phonon DOS does not exhibit details of energy dependence as sharp as the Q-resolved S(Q,w) scattering functions. As a consequence MD trajectories of a few hundred snapshots may prove sufficient to obtain useful information. For typical substances with optic phonon frequencies not extending beyond 25THz (≈ 100meV) a snapshot sequence with a 0.02ps time step (time tag difference between two subsequent snapshots) and 10ps total length (500 snapshots) will produce a DOS plot with a step of 0.1THz and an effective resolution (FWHM) of 0.2 THz providing a first insight into the dynamics of the simulated system.
+
+The resulting DOS can be displayed either with the neutron scattering weights (squared, b_coh^2, for comparison with neutron data) or with unit weights (for comparison with other theoretical model results). It should be stressed that there is no way to convert the output DOS from one weighting system to the other one at a later stage. 
+
+The total DOS is plotted together with selected partials, file output (.PS and .TXT) as specified in the dialogue.
+

@@ -1,0 +1,30 @@
+echo "Compiling MP_TOOLS v. 1.54"
+alias ff='gfortran -ffixed-form -ffixed-line-length-none -fimplicit-none -O2 -march=native -ffpe-summary=none'
+#
+echo "mp_dbin4    DL_POLY input file conversion"
+ff src/mp_dbin54.f -o /usr/local/bin/mp_dbin4
+#
+echo "mp_lbin4    LAMMPS & GENERAL input file conversion"
+ff src/mp_lbin54.f -o /usr/local/bin/mp_lbin4
+#
+echo "mp_insp4    BINARY data file inspection"
+ff src/mp_insp54.f -o /usr/local/bin/mp_insp4
+#
+echo "mp_pdf4     PDF calculation and plotting"
+ff src/mp_pdf54.f -o /usr/local/bin/mp_pdf4 -L/usr/local/lib -lm -fopenmp  -L/usr/local/pgplot -lpgplot -lX11 -lpng
+#
+echo "mp_dos4     DOS calculation and plotting"
+ff src/singleton.f src/mp_dos54.f -o /usr/local/bin/mp_dos4 -L/usr/local/lib -lm -fopenmp  -L/usr/local/pgplot -lpgplot -lX11 -lpng
+#
+echo "mp_sqom4    S(Q,w) calculation and plotting"
+ff src/singleton.f src/mp_sqom54.f -o /usr/local/bin/mp_sqom4 -L/usr/local/lib -lfinufft  -lstdc++ -lfftw3 -lfftw3_omp -lm -fopenmp -L/usr/local/pgplot -lpgplot -lX11 -lpng
+#
+if ! [ -e /usr/local/mp_tools ]; then sudo mkdir /usr/local/mp_tools;
+echo "Need sudo password to create /usr/local/mp_tools"
+sudo cp -R * /usr/local/mp_tools;
+fi
+#
+#in case of need use: 
+#   -fbounds-check to localize SEGMENTATION ERRORS (slows down the execution by 10-20%) 
+#   -L/usr/X11R6/lib insert in lines containing -lX11 (alternative localisation of X11)
+#   -O or -Ofast instead of -march=native if transportability is the goal

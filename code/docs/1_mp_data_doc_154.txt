@@ -1,0 +1,203 @@
+
+
+MP_TOOLS: GENERAL PRINCIPLES OF INPUT DATA CONVERSION FROM ASCII TO BINARY
+
+
+MP_TOOLS first of all convert input data from diverse ASCII formats, store them in a unique binary form and handle them further on. This file describes the main principles of this action, while dedicated texts give details related to specific conversion tools.  
+
+
+1/ SIMULATION TYPES
+
+MP_TOOLS were primarily developed to treat sequences of dump files from DL_POLY molecular dynamics (MD) simulations but they can also be used to extract information like the pair distribution function (PDF) and to map the intensities of total scattering (S(Q)) from static models (MD, DFT, phase field etc.). The type of simulation has to be specified in the associated parameter file (.PAR) by specifying 
+
+  sim_type = 'TIMESTEP' or 'STATIC'
+
+In the 'STATIC' case all the energy-resolved functions of MP_TOOLS will be avoided.
+
+
+2/ DATA TYPES
+
+At present MP_TOOLS can handle ASCII output data from a vast variety of simulation packages. For historical reasons DL_POLY and LAMMPS (MD) are particular cases, for which the file header contents is decoded to provide automatically the accompanying information on auxiliary parameters of the simulation and on the details of the data structure within the two respective input tools MP_DBIN and MP_LBIN. In all other cases the user has to fill in the corresponding parameter values into the accompanying .PAR file (cf. templates in this package) and provide a symbolic description of the data records, which will be parsed by the input code and again the MP_LBIN tool is to be used for the conversion.
+
+The data type has to be specified by setting
+
+  DAT_TYPE = 'DL_POLY' or 'LAMMPS' or 'GENERAL' 
+  
+An arbitrary short string (<16 characters), eg. 'VASP', can be used in place of 'GENERAL'; it will be preserved with the binary data for later information while the input code will automatically operate along the 'GENERAL' scheme.
+
+
+3/ UNITS OF MEASUREMENT
+
+In general MP_TOOLS use the system of 'atomic' units (sometimes called DAPS) of Angstrom (Å) for length, picosecond (ps) for time and Dalton (Da) or gram/mole for mass. The energy of excitations is expressed as frequency in THz (the inverse of ps, 1THZ ≈ 4.136 meV).
+
+On input, the DL_POLY data is assumed to have space coordinates in Angstroms and velocities and forces following the DAPS logic. For LAMMPS the convention is similar (corresponding its the METAL style).
+
+In the GENERAL case the atom coordinates may be given either in absolute units (Angstrom), in lattice units (l.u.) or as fractions of the simulation box size (i.e. on the scale 0. to 1.), the corresponding case is to be specified in the .PAR file by
+
+  POS_UNITS = 'LATTICE' or 'ANGSTROM' or 'BOX'     
+  
+On output after conversion the binary data use either 'LATTICE' or 'ANGSTROM' units in a transparent way, which is specified in section 4/ DATA INPUT METHODS.
+
+
+4/ DATA INPUT METHODS
+
+Both of the MP_TOOLS data conversion utilities MP_DBIN (DL_POLY) and MP_LBIN (LAMMPS, GENERAL) can use two fundamentally different input methods to interprete the input data: CELL and BULK. Common to the two modes is conversion to a coordinate system having centre in the middle of the simulation box (supercell) as required by the subsequent use of the NUFFT library to execute the non-uniform FFT. The CELL method will convert coordinates into LATTICE units (l.u.) while the BULK method may convert into either LATTICE or into ANGSTROM units (cf. below).
+
+With the CELL input method the coordinates are converted to the lattice units (l.u.). Each atom is checked against structural information given in the ATOMS table of the .PAR file in order to identify its special position in the unit cell and to assign it to the corresponding sublattice. This will make possible to address any single sublattice (e.g. the oxygens at the 0.5 0.5 0 positions in a perovskite crystal) in the course of further analysis. This task is largely facilitated if each atom has already in the input ASCII file its unique symbol (eg. O1 identifying the [.5 .5 0] oxygen in an ABO3 perovskite) ot a numerical key identifying its position in the crystallographic basis (atom type in LAMMPS). In absence of such information the MP_*BIN code attempts to identify each atom by matching its position against the basis vectors given in the ATOMS section of the .PAR file with a tolerance margin given by the EPS parameter. This procedure is only efficient for relatively small atom displacements (EPS not exceeding half of the distance between neighbours).
+
+In the BULK mode the atom coordinates may be either converted to l.u., if the corresponding dimensions of the simulation box are specified in the .PAR file, eg. for a box of 32 x 32 x 32 unit cells
+
+  N_ROW = 32 32 32
+
+or they can by kept as they are (arbitrary in principle, but usually angstrom, Å) by specifying
+
+  N_ROW = 1  1  1
+
+If the input coordinates are given in fractions of the simulation box size, MP_LBIN may convert them by multiplying them by the simulation box size (in LATTICE or ANGSTROM units) the specification in .PAR, eg. in ANGSTROM:
+
+  A_CELL_PAR =  12.012030  10.402723 42.498058	
+
+In any case the BULK mode reads in the atom data without any attempt to put them into correspondence with a regular lattice. On the output the atoms are classified by their labels, in each class they are indexed in the order of the input. The atom labels have to be exactly reproduced in the ATOMS section of the .PAR file. This approach permits to address systems distorted and disordered without any limits, including irregular shapes of the simulation box. On the other hand, in such a case not all functionalities of the MP_TOOLS are available because of the missing information. 
+
+Further details, specific to the MP_DBIN (DL_POLY) and MP_LBIN (LAMMPS, GENERAL) tools are given in separate texts.
+
+
+4/ MP_TOOLS BINARY DATA REPRESENTATION
+
+The output uses a binary direct-access file structure with 1024 byte records (L_REC4 = 256 of 32-bit words), a compromise between I/O speed and the possibility to selectively access individual atom data in the binary files. All the binary data follow a 32-bit word structure.
+
+The first three records contain header information, which is stored in text format, so that it can be displayed without knowledge of the details of the binary file structure. 
+
+RECORD 1 contains information on the origin of the data (MP_TOOLS), version of the program (1.54), number of header lines (including this one) and time stamp:
+    MP_TOOLS        1.54           3   2022/11/01 17:42:22
+
+RECORD 2 contains the name_list DATA_HEADER_1 containing scalar variables and fixed-dimension arrays
+  &DATA_HEADER_1
+    SIM_TYPE      CHARACTER(16)		simulation type  
+    DAT_TYPE      CHARACTER(16)  
+    INPUT_METHOD  CHARACTER(16)  
+    FILE_PAR      CHARACTER(16)   name of the associated parameter file 
+    SUBST_NAME    CHARACTER(16)  
+    T_MS          REAL(4)         MD integration step (microstep) [ps]
+    T_DUMP        REAL(4)         time tag of the frame (snapshot) dump[ps]
+    TEMP          REAL(4)         temperature [K]
+    A_PAR(3)      REAL(4)         lattice parameter [Å] (simulation box if N_ROW = 1 1 1) 
+    ANGLE(3)      REAL(4)         unit cell angles [so far 90 degrees assumed]
+    N_ROW(3)      INTEGER(4)      simulation box size [l.u.] 
+    N_ATOM        INTEGER(4)      number of atoms in unit cell (incl. mixed occupancies)
+    N_EQ          INTEGER(4)      number of symmetry equivalent positions (not yet used)
+    N_TRAJ        INTEGER(4)      MD trajectory: 0 positions, 1 & velocities, 2 & forces
+    J_SHELL_OUT   INTEGER(4)      1 = shell data recorded 
+    N_COND        INTEGER(4)      3 = periodic boundary conditions 
+    N_REC         INTEGER(4)      number of records per output array 
+    N_TOT         INTEGER(4)      total number of atoms in simulation box                     
+
+
+RECORD 3 contains the name_list DATA_HEADER_2 containing allocatable arrays, which can be allocated using the parameter values obtained from DATA_HEADER_1 
+  &DATA_HEADER_2
+    AT_NAME_OUT(N_ATOM) CHARACTER(4),ALLOCATABLE  atom type names  
+    AT_OCCUP_(N_ATOM)   REAL(4),ALLOCATABLE       atom occupancies
+    NSUPER_R(N_ATOM)    INTEGER(4),ALLOCATABLE    atom numbers per type in simulation box 
+
+The rest of the binary file contains sequences, N_REC records each, of the following arrays:
+	  AT_IND(4,N_TOT)		unit cell position indices (1:3), atom type identification (4) 
+	  AT_POS(4,N_TOT)		atom position vectors (1:3), atom charge (4, facultative)
+	  (always present, N_TRAJ ≥ 0)
+
+	  AT_VEL(4,N_TOT)		atom velocities [Å/ps] (1:3), atom mass(4) 
+	  (optional, N_TRAJ ≥ 1)
+
+    AT_FORCE(4,N_TOT) atom forces (1:3) 
+    (optional, N_TRAJ ≥ 2)
+
+In case of data from core-shell simulations with J_SHELL_OUT = 1 the same sequence of shell position, velocities and forces with the same option rules will follow. The last record for each array is zero-padded in case of N_TOT not being commensurate with the record pattern (L_REC4).
+
+
+
+
+
+
+
+
+
+
+***********************************
+
+
+
+
+BRIEF SUMMARY:
+
+GENERAL:
+- the data headers may contain the same information (supercell size etc.) as the .PAR file, in such a case the the priority of one or the other can be specified in a dialogue while reading the first frame in a sequence 
+
+INPUT METHODS:
+  BULK - only chemical atom species, position and velocity info is retained, without any direct correspondence to a regular crystal lattice and unit cell structure; if there is at least partial periodicity in the simulation box, the corresponding N_ROW values should be declared in the .PAR file or in the data files to take advantage of the periodic FT scheme; otherwise N_ROW = 1 should be declared, the periodic boundary conditions will not be applicable to the Fourier transform and window function in space has to be applied to damp spurious termination effects (set J_WINDOW =1 in the .PAR file), this leads to a loss of resolution by a factor of ≈2, but on the other hand this permits to handle crystal structures with any kind of irregularities
+
+
+CELL - all atom coordinates are checked against regular lattice positions and assigned to their "correct" unit cell positions; in principle the most rigorous way, it may however lead to mistakes in case of large atom displacements
+
+FAST - similar to CELL, the assignment is performed on the basis of information in the input data file (specific atom names, atom-type identifiers, recording order) - has to be applied with caution as there is no double check on correct assignement
+
+DISCUS:
+- maintained for compatibility with the DISCUS world, useful for input data in reduced lattice coordinates,  otherwise use the similar, but more flexible LAMMPS style
+- single frame data (no time sequence)
+- positions in reduced coordinates (no means to refine the lattice parameters)
+- only full supercell listings accepted (no symmetry operations)
+- possible modes: CELL, FAST(?),BULK
+
+
+
+
+
+The FAST mode has the same effect as the CELL mode, however the attribution of atoms to their positions (sublattices) is based just on indirect evidence like the sequence order and/or the recorded chemical species in the input file without checking the displaced positions against the ideal ones. Apart of saving some execution time (negligible in principle) this permits to avoid positional ambiguities in case of heavily displaced atoms. The compatibility matrix of the data formats and data types is as follows
+
+            data_type                 CELL        FAST        BULK
+
+            MP_BIN      DL_POLY         Y          N/A          Y 
+            MP_LBIN     LAMMPS          Y           Y           Y  
+            MP_DBIN     DISCUS          Y           Y          N/A
+
+The reason for FAST not being supported in the MP_BIN case is the DL_POLY manner to output data in the order of chemical species, where the (extremely) long sequences of atoms with the same label offer absolutely no quick cross-check in the input data integrity. The DISCUS data format is based on the concept of a sequence of unit cells, which logically corresponds to the CELL and FAST data types. The handling of heavily disordered/displaced systems can be effected by the FAST data type; otherwise the DISCUS data can be quite easily converted to the LAMMPS format by editing just the file headers.
+
+CAUTION: the use of the FAST mode is heavily discouraged whenever the data were generated by computer code running in the MPI parallelisation mode, which does not provide an a-priory warranty of a regular and reproducible sequence of atoms across the simulation box (supercell), as the partial dumps are executed in the order in which the sub-jobs were finished. The OpenMP parallelisation is not concerned by this issue.
+
+For practical reasons the degree of flexibility and of supporting non-standard options varies across those three types. For any new project employing features going beyond the strict limits of the above mentioned original platforms it is strongly recommended to employ the LAMMPS data format, which is compact, flexible and contains self-describing elements. The input of the DISCUS type data only handles full listings of individual atoms within the simulation box (no support for symmetry operations beyond P1). Usually such data can be quite easily converted, in a manual or automated manner, to the LAMMPS type just by adapting their header (format,contents). 
+
+
+2/ SUPPORTED ASCII INPUT formats
+
+
+
+sim_type = 'timestep'	! simmulation type: 'timestep' for MD, 'static' for frames w/o time structure
+dat_type = 'general'  ! origin of data: DL_POLY, LAMMPS, GENERAL (DISCUS, VASP, ...)
+      for DL_POLY, LAMMPS the snapshot header is decoded; for GENERAL snapshot header is
+      skipped and the corresponding info is read from .PAR
+      
+input_method = 'bulk' ! input method: 'CELL', 'BULK','FAST'
+
+
+
+X DISCUS: doesn't have the BOX concept (always supercell lattice) >> no place for BULK
+X input method; similar data from other sources needing BULK >> LAMMPS format
+
+
+
+******************************************************************************************
+
+
+Before opening the data file, MP_BIN (and all its equivalents for other input data formats) reads the associated .PAR file to obtain settings and crystallographic information (cf. examples). The file consists of a sequence of sections starting by a keyword usually corresponding to the name of one of MP_TOOLS. The sections may follow in an arbitrary order, while the order of the lines within them is fixed. Care should be paid to filling out the relevant parts. A good idea is to choose a short name of the .PAR file which will then be replicated as part of the binary output file names (typically followed by a string with the snapshot number). The SIMM_TYPE string in the GENERAL section is crucial to indicate the input method - CELL or BULK by containing the correspond string at its end (_cell or _bulk). As well, for DL_POLY data it is essential to indicate the correct supercell (simulation box) dimensions in multiples of unit cells (N_ROW(3)). For BULK data N_ROW = 1 means that no conversion of position coordinates to reduced lattice units will be performed; in this case the A_PAR variable stores the size of the box instead of the size of the unit cell.
+
+The BULK input method identifies atoms by their labels (names, symbols) appearing in the HISTORY file and records them in the order, in which they appear on input without any effort to assign them to specific lattice positions, just taking care that their positions are given in coordinates centred on the middle of the simulation box. This approach can handle any kind of disordered and/or aggregated system. If there is a prevalent periodicity in the system, the corresponding numbers of unit cells in each direction (N_ROW) defining the size of the whole simulation box should be indicated in the .PAR file to attempt FT based on a periodic grid. If this turns out impossible/inefficient (strong cut-off effects) aperiodic FT should be chosen by setting N_ROW = 1. In this case a real-space window function will be applied automatically when executing the FT in MP_SQOM to suppress cut-off effects, this however implies a resolution loss by a factor ≈2.
+
+The CELL input method (DEFAULT) aims to identify atoms occupying non-equivalent positions within the unit cell and to record them in an ordered manner so that in the course of further treatment the MP_TOOLS can adress atoms individually and handle contributions of their sublattices to the scattering functions separately. To this end it is best when a corresponding naming convention comes up already when setting up the MD simulation task. Within DL_POLY it is the FIELD file where the specific atom names can be defined (eg. individual names of the three oxygen atoms in a perovskite structure, cf. below). They can then be used by the CELL input method in MP_BIN to assign the unit cell positions, such a case is indicated by the value J_BASIS = 1 in the .PAR file (otherwise J_BASIS = 0). 
+
+		Ba Ba  .0  .0  .0  1  .8532		# chem. element, atom name, position, occupancy, b_coh
+		Zr Zr -.5 -.5 -.5  1  .716
+		O  O1 -.5 -.5  .0  1  .5805
+		O  O2  .0 -.5 -.5  1  .5805
+		O  O3 -.5  .0 -.5  1  .5805
+
+Alternatively, if the HISTORY file contains only generic atom labels (AT_LABEL) of the 1st column, the CELL input method will attempt to decode the atom identity, by comparing their actual positions with the basis positions read from the .PAR file, and to attribute them the specific names (AT_NAME) given in the 2nd column. This method assumes that the atoms are not too strongly displaced from their standard positions, the threshold is given as the last number on the 2nd line of the MP_BIN section in the .PAR file. 
+
+

@@ -1,0 +1,133 @@
+MP_SQOM: CALCULATING AND PLOTTING SCATTERING FUNCTION MAPS S(Q) AND S(Q,w)
+
+calculates the scattering functions of simulated (MD, phasefield etc.) crystalline systems, plots their maps and records the corresponding numerical values (ASCII) and graphics (PS, PNG) for further use.
+
+1/ INPUT
+A number of initial settings is read from the accompanying .PAR file from several name lists. Typical input values are displayed below together with brief explanations following the exclamation mark:
+
+&MP_GEN		
+J_VERB = 1					  ! (0/1) verbose command line output 
+J_PROC = 0					  ! requested number of OpenMP parallel processes, 0 = automatic
+                      ! maximum (eg. 12 for a 12 core Xeon processor)
+
+&MP_OUT		
+J_WEIGHT = 2				  ! 1 = uniform weighting, 2 = neutron b_coh; 3 = Xray form-factors 
+J_LOGSC = 1 					! 1 = logarithmic scale for plots (0=linear) 
+J_TXT = 0 						! 1 = accompany .PS output by recording map intensities to .TXT file
+                      ! (always linear scale, speckle filter applied if active)
+J_GRID = 0 				    ! 1 = display grid overlay on PG_PLOT graphs 
+PG_OUT = 'vcps'       ! set device for color map output: PNG, TPNG, CPS, VCPS, NULL 
+                      ! (cf. PG_PLOT notes)
+
+&MP_SQOM									
+N_INT = 0							! integration width in time (number of snapshots, 0 = automatic
+                      ! choice NFILE/2)
+s_trig = 0						! triger level of the speckle filter (0 = OFF, 2 = log_2 ratio 
+                      ! between neighbours) 
+j_oneph = 0						! FT start mode, 0 = NUFFT (usual), 1 = one-phonon mode (very slow,
+                      ! use for verification only), runtime toggle 0/1 available
+j_qsq = 0							! 0 = plot S(Q,w)/Q^2 (recommended for better clarity of color 
+                      ! maps); 1 = keep the natural Q^2 trend of S(Q,w) 
+
+A self-explaining dialogue guides through the specifications of the input data files. Data converted by both the CELL and the BULK input methods are eligible as input to MP_SQOM. 
+
+The actual data type and further information is retrieved from the header of the first data file in an input sequence. The user has to ensure that all the subsequent data files in the sequence are consistent with this information and that they are contiguous in time whenever energy-resolved outcome (S(Q,w)) is the goal. In case of doubt the contents of the data files (header, individual atom data) can be verified using the MP_INSP tool. 
+
+
+2/ LATTICE SUMS AND TIME INTEGRALS
+The Fourier sum over all the atoms is calculated by the non-uniform FFT technique (cf. references), which offers calculation speeds comparable to FFT over regular lattices. The calculation automatically assumes periodic continuation of the box and evaluates the sum only at space frequencies commensurable with the box size to avoid truncation effects. An exception to this case is the BULK data case with no explicit periodicity being defined (N_ROW = 1 1 1), which has to be handled as an aperiodic object. In such a case the Q-space range of the maps is specified in inverse Angstroms rather than in number of Brillouin zones and a window function (Hann) in real space is activated automatically to damp the truncation oscillations. This implies a factor of 2 loss in Q-resolution but permits to handle real space objects without any constraints, neither on their internal structure nor on the form of the simulation box. 
+
+Whenever energy-resolved maps are to be produced, MP_SQOM will calculate Fourier transform of a sequence of S(Q) maps from an time-array of snapshots. As the MD dumps are effectuated with a constant time step, this is effectuated by conventional FFT, using a window function (Hann) to damp the truncation effects. The automatic choice is to take an integral over half the length of the time series and, after multiplication by the complex conjugate of the central frame transform, to accumulate a sliding sum such integrals over the other half. This choice can be modified within the "burried" options (cf. option 10 below). As consequence the frequency resolution will correspond to the reciprocal of 1/4 of the total time series length (1/2 coming from the integration range choice and 1/2 coming from its further reduction by the window function).
+
+
+3/ PLOTTING
+MP_SQOM is intended to provide a self-explaining command line dialogue guiding the user through the different stages of the plotting exercise. Some patience and trial_and_error learning are unavoidable. 
+
+Upon start-up MP_SQOM will produce a total scattering map for the specified input data sequence, Q-range etc., which is intended for experimenting with the adequate intensity scale (color range) and for a first familiarisation with the system. The total scattering function S(Q) is an integral of S(Q,w) over all energy/frequency spectrum. Hence, if for whatever reason the map exhibits a too weak presence of diffuse scattering, it doesn't make much sense to continue towards plotting energy-resolved S(Q,w) maps. Rather the  volume of the input data has to be questioned (simulation box size, number of snapshot files).
+
+All the plotting options are displayed in a way-point menu (upon exiting from the total scattering plot by setting c_min, c_max = 0 0)
+
+******************************************************************************************
+ Choose a plot option (PS/TXT file output is OFF):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the PS/TXT output ON (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+******************************************************************************************
+
+Principal functionalities of MP_SQOM involve plotting
+
+  - total scattering S(Q) maps, calculated as sum of modulus squared of the diffracted wave amplitudes with Xray, neutron or unit amplitudes (to be specified in the .PAR file, can be switched under option 9 in the general switch board); this an automatic introductory option for each new plotting session, upon exit from it it the choice of all the other options is available
+
+  - energy resolved E = const reciprocal space maps and their sequences (options 2 and 3 in the general switch board)
+
+  - energy resolved Q-E momentum-energy space maps and their sequences (options 3 and 4 in the general switch board)
+
+  - contributions of chosen atom types can be masked out (by specifying negative option numbers and subsequent dialogue); it is, however, necessary to keep in mind that in the case of elastic scattering it is the amplitudes and not the intensities that are additive: all atoms interfere with all other atoms! 
+
+  - each plot provides a dialogue to adjust the intensity range of the map
+  
+All the plots can by produce with a choice of unit, neutron and Xray weights. The values of neutron coherent scattering lengths (b_coh) and the parameters to calculate the Xray atom factors (with their Q-dependence) are read from the files  NEUTRON_XS.TXT	XRAY_FF.TXT placed in the /USR/LOCAL/MP_TOOLS/REF directory (normally created by the installation script). When searching these files, MP_SQOM identifies the atoms by their label (1st column of the ATOMS list in the .PAR file) and by their ionisation state (given in the last column of the same list). If for whatever reason different values are to be used, place an edited copy of those files under the same name into the working directory (only the pertinent atoms are necessary) - MP_SQOM starts its search here. 
+
+	
+4/ OUTPUT
+Automatic graphics file output (PS or PNG format) upon exiting from an active plot can be activated via the no. 7 toggle; this can be accompanied by a text file (.TXT) output of the corresponding intensity table if activated int .PAR file. In each case the existence of former output files is tested and a counter is incremented in order not to overwrite them; the .TXT file numbering follows the graphics one without test. The .LOG files keeping a brief history record are opened on a daily basis, their filenames contain the respective date. 
+
+NOTE:
+    It is unavoidable that the resulting S(Q) and S(Q,w) maps contain apparent "noise", which in fact is a grainy structure going back to coherent imaging (speckles) of the microscopic (atom) structure of the MD model systems. This can be handled symptomatically by the built-in speckle filter (cf. S_TRIG in the .PAR file) or by any available image postprocessing tools. It should be kept in mind that the application of any smoothing and noise filtering techniques can generate artefacts and that their results are always accompanied by some loss of detail in the image. 
+
+    On the other hand the grainy structure of the bitmap colorplots can get further amplified by the rudimentary bit sampling technique implemented in the PGPLOT library. Therefore whenever an appealing output from large supercells providing large pixel densities is the goal, it is preferable to use a large high resolution screen (4k), select a screenplot size as large as possible (p_size parameter among the list under option 10), save the maps in the PNG format or take screenshots and subsequently generate reduced size PDF, PNG or JPEG images by using more sophisticated image viewing software (the MacOS Preview does the job).
+
+****************************************************************************
+
+The graphical interface uses the PGPLOT library.
+
+As the Fourier transform cannot make use of periodic boundary conditions here, it has to employ a window function to damp cut-off effects - this leads to a loss of Q-resolution by a factor ≈2 in the resulting scattering function maps.
+
+
+
+
+
+The outcome of this program critically depends on availability of adequate input data, which on its turn depends on the right choice of the MD simulation strategy (particularly concerning the trajectory length and the dump frequency). Depending on the model size, at least a single snapshot is needed to produce a total scattering intensity map S(Q). The S(Q,w) (including the w=0 case) need a contiguous sequence of snapshots so that the time- to frequency-domain FT can be performed. As follows from the FT properties the maximum accessible frequency is related the reciprocal value of the MD trajectory time step, it should be kept in mind that only half of the apparent range is really effective (the other half is a symmetric image of the first one).
+Moreover in case of an insufficient frequency range (time step too large) the S(Q,w) function will fold over and bring up unexpected artefacts. The frequency resolution is related to the reciprocal of the MD simulation duration, again the technicalities of the implemented FT algorithm reduce the effective resolution 4x with respect to the exact reciprocal value of the trajectory length. 
+
+The recommended generic parameters of a time-sequence depend on the dynamical properties of the system under study. AFile dump interval1 of 0.01 and 0.02 ps will provide upper frequency limits of 50 THz and 25 THz, respectively. An MD trajectory length of 4 ps (200-400 snapshots) will provide effective frequency resolution of about 1 THz FWHM - a rock bottom minimum to examine nominally elastic diffuse scattering (majority inelastic contributions filtered out). Reasonable frequency resolution for spectroscopy purposes, 0.1 - 0.2 THz FWHM, compatible eg. with good quality neutron data, calls for sequences 20-40 ps long (≈ 2000 snapshots and more). These numbers give only first orientation, most of the particular cases may need some empirical optimisation.
+
+
+INPUT
+To detect the .PAR and .DAT file compatibility, MP_SQOM tests the first 4 characters of the binary data file header (sim_type string) to coincide with those of the sim_type specified in the .PAR file to ensure that it is dealing with the same general simulation type (timestep etc.).
+
+*****************************************************************
+
+ZERO suppression
+- appearance of zeros in the PhaseField data was a consequence of the large strains, where atoms "migrated" to other cells and were overwritten by the regular hosts, creating false vacancies in their original places - this is resolved by the BULK data type, which doesn't pin atoms to a regular grid
+- however the "counted" nsuper_r quantities are taken over into the BULK description and generalised through it (they permit to see presence of partials/vacancies in the CELL type)
+- the same value n_sup or nsuper_r over a file sequence is assumed
+
+******************************************************************************
+????????????????????????????
+
+- Xray formfactor use is not compatible with the "bulk" approach of md_sqom51!  
+multiplication of the output of FFT(Q) has to be done for each atom sublattice separately
+
+REMOVE BRAGG PEAKS
+	- from each element of CS(ifile,iatom,ix,iy) is subtracted the time (i.e. ifile) average of CS
+
+
+!!!! "normal" MD data do not need any special treatment of cut-off effects in the Q_r FT
+				thanks to periodic boundary conditions
+				HOWEVER: cutting the original supercell to smaller pieces will bring up 
+									termination effects as the PBC cease to apply
+									the same is the case of PHASEFIELD
+
+
+TO DO	
+!!!!!!! check the new multivector option of FINUFFT

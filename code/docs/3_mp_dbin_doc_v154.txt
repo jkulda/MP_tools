@@ -1,0 +1,33 @@
+
+MP_DBIN: CONVERTING DL_POLY ASCII SIMULATION DATA TO THE MP_TOOLS BINARY FORM
+
+Before going into the details of the input methods described below, please read carefully the general introduction to data conversion given in the file  MP_DATA_DOC_V154.TXT.
+
+This tool converts MD trajectory data files (ASCII, single- or multiple-snapshot) of the DL_POLY data type to the unique MP_TOOLS binary format. Contrary to the LAMMPS/GENERAL data type (cf. MP_LBIN_DOC) the DL_POLY data follow a strict model with a typical snapshot header 
+
+ timestep      750125      552960           1           3  3.99999990E-04   270.04999    
+      194.2110000000        0.0000000000        0.0000000000          
+        0.0000000000      194.2110000000        0.0000000000          
+        0.0000000000        0.0000000000      194.2110000000          
+
+cpntaining:
+timestep	MD simulation type 
+750125		number of steps since start of simulation 
+552960		number of atoms (eg. 5 at/cell, no of cells 48^3 = 110592)
+1					trajectory recording mode (1 = positions & velocities, 
+          2 = positions, velocities & forces)
+3					boundary conditions (3 = parallelepiped)
+4.0E-04		MD simulation timestep [ps] 
+270.05 		time tag of the dump [ps] 
+
+Consult the related log file in the EXAMPLES folder for a more detailed idea on how to run this tool.
+
+In general the recommended input method is CELL; in cases where the one-to-one assignment of atoms to lattice positions is impossible or unreliable the dump data can be read in the BULK mode. More details on the input methods are given in  MP_DATA_DOC_V154.TXT
+
+In DL_POLY there is no analogy to the TYPE key in LAMMPS, hence it is advisable already when setting up the MD simulation to define specific atom names (eg. O1,O2 ...) for atoms in special positions in the unit cell. In such a case one can set J_BASIS=1 so that MP_DBIN does not need to attempt the atom identification by position, as would be the case for J_BASIS=0.
+
+NOTE:
+it is important to define correctly the sign of the basis vectors in the .PAR file. As DL_POLY dumps the simulation box by atom types, it may not be an easy task to check this by inspecting the huge ASCII snapshot file, which at its beginning contains thousands of lines related to the atom sitting at the origin of the unit cell. The quick help is the UNIX/LINUX 'tail' command , which will display the last 10 lines (or any other specified number) of the trajectory file with atoms in a non trivial position.
+
+
+

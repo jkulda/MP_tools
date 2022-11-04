@@ -37,6 +37,10 @@ C ***** Ver. 1.53 - uses new semi-sequential binary file format
 C *****						- record length 4096, all data 32bit length
 C *****						- at_mass is saved as at_veloc(4,j,k)
 C *****						- at_charge is saved as at_pos(4,j,k)
+C ***** Ver. 1.535 - uses n_traj of DL_POLY instead of j_force 
+C *****
+C *****
+C *****   FROZEN on 02/10/2022 00:01 and committed as MP_INSP54
 C *****
 C ***** inspects single atom properties in a binary .dat file
 C *****
@@ -53,31 +57,42 @@ C ***** atom positions are converted to and recorded in reduced lattice coordina
 C ***** 
       integer,parameter :: l_rec  =  1024		    !record length in real(4)
       
-      character(4),allocatable      :: at_name(:)
-
-      character(16)     :: sim_type,file_title,data_type
-      character(40)     :: file_master
+      character(4),allocatable      :: at_name_out(:)
+      character(4)			:: version
+      character(16)     :: sim_type,file_par,subst_name,dat_type,dat_source,input_method,string
+      character(40)     :: file_master,string_in
       character(60) 		:: file_dat,file_out
-      character(128)    :: header_record
+      character(1024)    :: header_record
 
+      logical           ::  nml_in
       integer(4),allocatable ::  at_ind(:),ind_at(:),nsuper_r(:)    
-      real(4),allocatable ::  at_pos_c(:),at_veloc_c(:),at_force_c(:),at_occup(:)      
+      real(4),allocatable ::  at_pos_c(:),at_veloc_c(:),at_force_c(:),at_occup_r(:)      
       real(4),allocatable ::  at_pos_s(:),at_veloc_s(:),at_force_s(:)      
       
-      integer(4) ::  at_no,n_traj,n_cond,n_atom,n_eq,j_force,j_shell,jpos_in,jrec_in,jrec_save,n_rec,n2_rec,l_rec4,i_rec
+      integer(4) ::  at_no,n_traj,n_cond,n_atom,n_eq,j_shell_out,jpos_in,jrec_in,jrec_save,n_rec,n2_rec,l_rec4,i_rec
       integer(4) ::  ios,idum,i,j,k,jj,jat,ind,nfile,ncell,n_tot,nsuper,nlayer,nrow,n_row(3),jt,j_layer,j_row,j_pos
       
-      integer(4) :: j_name
+      integer(4) :: j_name,n_head
 
-      real :: a_par(3),angle(3),t_ms,t_step,temp
+      real(4) :: a_par(3),angle(3),t_ms,t_dump,temp
+
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
      
 C ********************* Initialization *******************************      
 
-			write(*,*) '*** Program MP_INSP 1.53 ** Copyright (C) Jiri Kulda (2022) ***'
+			write(*,*) '*** Program MP_INSP 1.54 ** Copyright (C) Jiri Kulda (2022) ***'
 
-			j_force = 0
+			n_traj = 0
 			l_rec4 = l_rec/4
-
+      dat_source = 'nn'
+      version = 'nn'
+			sim_type = 'nn'
+			dat_type = 'nn'
+			input_method = 'nn'
+			t_ms = .0
+			
       write(*,*) 'Master filename: '
       read(*,*) file_master 
 
@@ -101,34 +116,56 @@ C **** open a t-snapshot file and read its header
 				write(*,*) 
 				open (1,file=file_dat,action='read',status ='old',access='direct',form='unformatted',recl=4*l_rec)
 
-   			i_rec = 1
-				read(1,rec=i_rec) sim_type,file_title,t_ms,t_step,temp,a_par,angle,n_row,n_atom,n_eq				
+   			i_rec = 1   			
+				read(1,rec=i_rec) string_in
+				if(string_in(1:8)=='MP_TOOLS') then      !new structure with namelist
+          nml_in = .true.
+					read(1,rec=i_rec) dat_source,version,string
+					read(string,*) n_head
+   			  i_rec = i_rec+1   							
+					read(1,rec=i_rec) header_record
+					read(header_record,nml=data_header_1)			
+          allocate(at_name_out(n_atom*n_eq),at_occup_r(n_atom*n_eq),nsuper_r(n_atom*n_eq))
+   			  i_rec = i_rec+1   							
+					read(1,rec=i_rec) header_record
+					read(header_record,nml=data_header_2)			!read the allocatables
+				else                                  !old w/o structure
+          nml_in = .false.
+          read(1,rec=i_rec) sim_type,file_par,t_ms,t_dump,temp,a_par,angle,n_row,n_atom,n_eq				
+          allocate(at_name_out(n_atom*n_eq),at_occup_r(n_atom*n_eq),nsuper_r(n_atom*n_eq))
+          read(1,rec=i_rec) 
+     1		sim_type,file_par,t_ms,t_dump,temp,a_par,angle,n_row,n_atom,n_eq,n_traj,j_shell_out,
+     2    n_cond,n_rec,n_tot,at_name_out,at_occup_r,nsuper_r																		!char(16): sim_type,file_par, char(4): at_name_out
+          call up_case(sim_type)
+          n_head = 1
+          input_method = 'CELL'
+				  if(index(sim_type,'BULK')/=0) input_method = 'BULK'
+				endif
 
-				allocate(at_name(n_atom*n_eq),at_occup(n_atom*n_eq),nsuper_r(n_atom*n_eq))
-
-				read(1,rec=i_rec) 
-     1		sim_type,file_title,t_ms,t_step,temp,a_par,angle,n_row,n_atom,n_eq,j_force,j_shell,
-     2    n_cond,n_rec,n_tot,at_name,at_occup,nsuper_r																		!char(16): sim_type,file_title, char(4): at_name
-
-				data_type = 'cell'
-				if(index(sim_type,'bulk')/=0) data_type = 'bulk'
-			  if(index(sim_type,'quick')/=0) data_type = 'quick'
-								
-				write(*,*) 'Simulation & data type:              ',sim_type,'    ',data_type
-				write(*,*) 'Time structure t_ms,t_step:       ',t_ms,t_step
-				write(*,*) 'Supercell & temperature:    ',n_row,temp
-				write(*,*) 'Unit cell parameter(3), angle(3): ',a_par,angle
-				write(*,*) 'Atom numbers:              ',n_atom,nsuper_r,n_tot
-				write(*,*) 'Atoms & occupancies:                 ',at_name,at_occup
+				if(nml_in) then
+        write(*,*) 'Code & version, no. of header lines:   ',dat_source,version,n_head	
+        else
+        	write(*,*) 'Data source, version & number of header lines:  ','old header format'	
+        endif
+        							
+				write(*,*) 'Substance name:                        ',subst_name
+				write(*,*) 'Data & simulation type, input method:  ',dat_type,'  ',sim_type,'  ',input_method
+				write(*,*) 'Time structure t_ms,t_dump:         ',t_ms,t_dump
+				write(*,*) 'Supercell & temperature:            ',n_row,temp
+				write(*,*) 'Unit cell parameter(3), angle(3):   ',a_par,angle
+				write(*,*) 'Atom numbers:                       ',n_atom,nsuper_r,n_tot
+				write(*,*) 'Atoms & occupancies:                   ',at_name_out,at_occup_r
 				write(*,*) 
 				
 				nrow = n_row(1)
 				nlayer = n_row(1)*n_row(2)						!only to be used for record number calculation
 				nsuper = n_row(1)*n_row(2)*n_row(3)
 CC				n_tot = n_atom*nsuper
-				
+
+				if(input_method=='FAST') input_method = 'CELL'
+
 				allocate(at_ind(l_rec),at_pos_c(l_rec),at_veloc_c(l_rec),at_force_c(l_rec))
-				if(j_shell==1) allocate(at_pos_s(l_rec),at_veloc_s(l_rec),at_force_s(l_rec))
+				if(j_shell_out==1) allocate(at_pos_s(l_rec),at_veloc_s(l_rec),at_force_s(l_rec))
 				allocate(ind_at(n_atom))
 				
 				ind_at(1) = 0
@@ -137,7 +174,7 @@ CC				n_tot = n_atom*nsuper
 				enddo
 
 				master_loop: do 	
-					if(data_type=='cell'.or.data_type=='quick')	then
+					if(input_method=='CELL'.or.input_method=='FAST')	then
 						write(*,*) 'jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END): '
 						read(*,*) jat,i,j,k
 						if (jat==0) exit master_loop
@@ -145,7 +182,7 @@ CC				n_tot = n_atom*nsuper
 						if(jat>n_atom) cycle
 
 						ind = nsuper*(jat-1)+nlayer*(k-1)+n_row(1)*(j-1)+i
-					else !data_type == 'bulk'
+					else !input_method == 'BULK'
 						write(*,*) 'jat, relative record_index (0 = new file number, -1 = END): '
 						read(*,*) jat,ind
 						if (jat==0) exit master_loop
@@ -167,32 +204,32 @@ CC				n_tot = n_atom*nsuper
 					endif
 				
 					if(jrec_in/=jrec_save) then			!read from disk only when necessary
-						i_rec = jrec_in+1
+						i_rec = jrec_in+n_head
+CC						write(*,*) 'i_rec',i_rec
 						read(1,rec=i_rec) at_ind
 					
-						i_rec = jrec_in+n_rec+1
+						i_rec = jrec_in+n_rec+n_head
 						read(1,rec=i_rec,iostat=ios) at_pos_c
 						if(ios/=0) write(*,*)'at_pos_c: ios,i_rec',ios,i_rec
 					
 						if(index(sim_type,'static')==0.and.index(sim_type,'Static')==0.and.index(sim_type,'STATIC')==0) then
-							i_rec = jrec_in+2*n_rec+1
-							read(1,rec=i_rec) at_veloc_c
-
-							if(j_force==1) read(1,rec=jrec_in+3*n_rec+1) at_force_c  
+							i_rec = jrec_in+2*n_rec+n_head
+							if(n_traj>=1) read(1,rec=i_rec) at_veloc_c
+							if(n_traj==2) read(1,rec=jrec_in+3*n_rec+1) at_force_c  
 				
-							n2_rec = (3+j_force)*n_rec+1
-							if(j_shell==1) then
+							n2_rec = (2+n_traj)*n_rec+n_head
+							if(j_shell_out==1) then
 								read(1,rec=jrec_in+n2_rec) at_pos_s
-								read(1,rec=jrec_in+n2_rec+n_rec) at_veloc_s
-								if(j_force==1) read(1,rec=jrec_in+n2_rec+2*n_rec) at_force_s  					
+								if(n_traj>=1) read(1,rec=jrec_in+n2_rec+n_rec) at_veloc_s
+								if(n_traj==2) read(1,rec=jrec_in+n2_rec+2*n_rec) at_force_s  					
 							endif
 						endif
 						jrec_save = jrec_in
 					endif
 
 					jj = 4*(jpos_in-1)
-					write(*,*) 'Atom, type, mass, charge    ',at_name(at_ind(jj+4)),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)
-					if(data_type=='cell'.or.data_type=='quick')	then
+					write(*,*) 'Atom, type, mass, charge    ',at_name_out(at_ind(jj+4)),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)
+					if(input_method=='CELL'.or.input_method=='FAST')	then
 						write(*,*) 'Cell index            ',at_ind(jj+1:jj+3)
 					else
 						write(*,*) 'Atom index            ',at_ind(jj+1)					
@@ -200,26 +237,42 @@ CC				n_tot = n_atom*nsuper
 					
 					write(*,*) 'Atom position            ',at_pos_c(jj+1:jj+3)
 					if(index(sim_type,'static')==0.and.index(sim_type,'Static')==0.and.index(sim_type,'STATIC')==0) then
-						write(*,*) 'Atom velocity             ',at_veloc_c(jj+1:jj+3)
-						if(j_force.eq.1) write(*,*) 'Atom force                ',at_force_c(jj+1:jj+3)
+						if(n_traj>=1) write(*,*) 'Atom velocity             ',at_veloc_c(jj+1:jj+3)
+						if(n_traj==2) write(*,*) 'Atom force                ',at_force_c(jj+1:jj+3)
 						write(*,*)
-						if(j_shell==1) then
-							write(*,*) trim(at_name(at_ind(jj+4)))//'_s',at_veloc_s(jj+4),at_pos_s(jj+4)
+						if(j_shell_out==1) then
+							write(*,*) trim(at_name_out(at_ind(jj+4)))//'_s',at_veloc_s(jj+4),at_pos_s(jj+4)
 							write(*,*) 'Shell position                ',at_pos_s(jj+1:jj+3)
-							write(*,*) 'Shell velocity                ',at_veloc_s(jj+1:jj+3)
-							if(j_force.eq.1) write(*,*) 'Shell force               ',at_force_s(jj+1:jj+3)
+							if(n_traj>=1) write(*,*) 'Shell velocity                ',at_veloc_s(jj+1:jj+3)
+							if(n_traj==2) write(*,*) 'Shell force               ',at_force_s(jj+1:jj+3)
 						endif
 					endif				
 					write(*,*)         
 				enddo master_loop
 				close(1)
 	
-				deallocate(at_name,at_occup,nsuper_r,ind_at,at_ind,at_pos_c,at_veloc_c,at_force_c)
-				if(j_shell==1) deallocate(at_pos_s,at_veloc_s,at_force_s)
+				deallocate(at_name_out,at_occup_r,nsuper_r,ind_at,at_ind,at_pos_c,at_veloc_c,at_force_c)
+				if(j_shell_out==1) deallocate(at_pos_s,at_veloc_s,at_force_s)
       enddo file_loop
 
       stop
       end program mp_insp53
       
+C **** string conversion to all upper case
+C     
+ 			subroutine up_case (string)
+
+			character(*), intent(inout)	:: string
+			integer											:: j, nc
+			character(len=26), parameter	:: lower = 'abcdefghijklmnopqrstuvwxyz'
+			character(len=26), parameter	:: upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+			do j = 1, len(string)
+				nc = index(lower, string(j:j))
+				if (nc > 0) string(j:j) = upper(nc:nc)
+			end do
+
+			end subroutine up_case	     
+
      
       
