@@ -1,0 +1,206 @@
+JKs-MacBook-Pro:Cu_lammps_JK jiri$ mp_lbin4
+ *** Program MP_LBIN 1.54 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***
+
+ Parameter file name (.par will be added)
+cu_48b48
+ Substance:       Cu
+ Data type:       LAMMPS
+ Simulation type: TIMESTEP
+ Input method:    BULK
+ Atom labels (chemical species)            1
+           4 Cu             1           2           3           4
+ Atom types:
+           1 Cu1
+           2 Cu2
+           3 Cu3
+           4 Cu4
+ Read snapshots number: min, max
+1 5
+ Saved snapshot numbers start:
+120
+ Master for MD input filename:
+cu_48
+ Read input files number (0 0 0 no numbers): min,step,max
+6000 50 6200
+ Simulation type = TIMESTEP
+ Trajectory recording mode =           1
+ Trajectory time start, step [ps]:   1.20000005       1.00000007E-02
+ Simulation box:          48          48          48
+ Lattice parameter:   3.63269901       3.63252735       3.63288212
+ go ahead? (1/0)
+1
+ Input trajectory file:  ./data/cu_48.6000
+
+ Cores E_kin(jat,:)   248.797012       249.635147       247.766724       249.404556       248.728287       248.347366       250.029572       249.081436       249.593124       249.133423       247.811691       250.767883
+ Real temperature: cores only    299.588806
+ Bulk concentrations:
+      Cu1   0.250000000
+      Cu2   0.250000000
+      Cu3   0.250000000
+      Cu4   0.250000000
+ ./data/cu_48b48_n0120.dat
+ Input trajectory file:  ./data/cu_48.6050
+ Input trajectory file:  ./data/cu_48.6100
+ Input trajectory file:  ./data/cu_48.6150
+ Input trajectory file:  ./data/cu_48.6200
+ Trajectory finished:            5  .dat files written in SYS time   23.8789997      sec
+JKs-MacBook-Pro:Cu_lammps_JK jiri$ mp_insp4
+ *** Program MP_INSP 1.54 ** Copyright (C) Jiri Kulda (2022) ***
+ Master filename:
+cu_48b48
+ snapshot file number (0 for no number):
+120
+ Reading ./data/cu_48b48_n0120.dat
+
+ Code & version, no. of header lines:   MP_TOOLS        1.54           3
+ Substance name:                        Cu
+ Data & simulation type, input method:  LAMMPS            TIMESTEP          BULK
+ Time structure t_ms,t_dump:            2.00000009E-04   1.20000005
+ Supercell & temperature:                      48          48          48   299.588806
+ Unit cell parameter(3), angle(3):      3.63269901       3.63252735       3.63288212       90.0000000       90.0000000       90.0000000
+ Atom numbers:                                  4      110592      110592      110592      110592      442368
+ Atoms & occupancies:                   Cu1 Cu2 Cu3 Cu4   0.250000000      0.250000000      0.250000000      0.250000000
+
+ jat, relative record_index (0 = new file number, -1 = END):
+1 1
+ Atom, type, mass, charge    Cu1            1   63.5499992       0.00000000
+ Atom index                       1
+ Atom position               23.8759747       23.8985615       23.8828373
+ Atom velocity               0.473969996     -0.215569004       4.75199986
+
+
+ jat, relative record_index (0 = new file number, -1 = END):
+1 110592
+ Atom, type, mass, charge    Cu1            1   63.5499992       0.00000000
+ Atom index                  442365
+ Atom position               22.8802948       22.9048080       22.9148178
+ Atom velocity              -0.765031993      0.731948018     -0.507098973
+
+
+ jat, relative record_index (0 = new file number, -1 = END):
+2 1
+ Atom, type, mass, charge    Cu2            2   63.5499992       0.00000000
+ Atom index                       2
+ Atom position              -23.5820980      -23.6001415       23.8827457
+ Atom velocity               -1.96235001      -3.07269001       1.73003995
+
+
+ jat, relative record_index (0 = new file number, -1 = END):
+2 110592
+ Atom, type, mass, charge    Cu2            2   63.5499992       0.00000000
+ Atom index                  442366
+ Atom position               23.3749676       23.4011593       22.9117908
+ Atom velocity              -0.249467999      -1.54382002       2.31027007
+
+
+ jat, relative record_index (0 = new file number, -1 = END):
+-1 -1
+JKs-MacBook-Pro:Cu_lammps_JK jiri$ mp_pdf4
+ *** Program MP_PDF 1.54 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***
+ 			*** for the moment only MonteCarlo integration is available ***
+
+ Input data file_master:
+cu_48b48
+ Read data files number min, max (0 0 no numbers, single file):
+122 122
+ Input data:  MP_TOOLS        1.54           3
+ BULK data are not suitable for this PDF algorithm, works with CELL data only.
+JKs-MacBook-Pro:Cu_lammps_JK jiri$
+JKs-MacBook-Pro:Cu_lammps_JK jiri$ mp_sqom4
+ *** Program MP_SQOM 1.54 ** Copyright (C) Jiri Kulda (2022) ***
+
+ Input data file_master:
+cu_48b48
+ Read data files number min, max (0 0 no numbers, single file):
+120 124
+ Input data:  MP_TOOLS        1.54           3
+ Parameter file name (.par to be added) (confirm or type other name): cu_48b48
+,
+
+ Substance name: Cu
+ Atoms from cu_48b48.par
+     Cu1   0.0000  0.0000  0.0000    1.0000  0.7718
+     Cu2   0.5000  0.5000  0.0000    1.0000  0.7718
+     Cu3   0.5000  0.0000  0.5000    1.0000  0.7718
+     Cu4   0.0000  0.5000  0.5000    1.0000  0.7718
+
+ Xray form-factors
+ Cu     13.3380003       3.58279991       7.16760015      0.246999994       5.61579990       11.3965998       1.67349994       64.8125992       1.19099998
+ Cu     13.3380003       3.58279991       7.16760015      0.246999994       5.61579990       11.3965998       1.67349994       64.8125992       1.19099998
+ Cu     13.3380003       3.58279991       7.16760015      0.246999994       5.61579990       11.3965998       1.67349994       64.8125992       1.19099998
+ Cu     13.3380003       3.58279991       7.16760015      0.246999994       5.61579990       11.3965998       1.67349994       64.8125992       1.19099998
+ PAR proc_num_in          =            0
+ OMP processes available  =            4
+ OMP threads maximum      =            4
+ OMP processes requested  =            2
+ Input files:
+ ./data/cu_48b48_n0120.dat
+           5  files read in    3.10000014E-02  sec SYS time
+ Time integration window set to nfile/2:           3
+ MD time sequence:  t_total [ps]   3.99999619E-02 t_step [ps]   9.99999046E-03
+Maximum energy [THz]             50.00      energy step [THz] 50.00
+Time-integration (BN) window FWHM [ps]    0.01
+Energy resolution FWHM [THz]              100.00
+
+ Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))
+6 1
+ Q-pixels X,Y:          288         288
+ Vertical axis:           0           0           1
+ Q_center [hkl]:
+2 2 0
+ q1,q2,q_sq,q_step   8.20390600E-09   0.00000000       0.00000000       0.00000000       8.20429413E-09   0.00000000       1.34614513E-16   3.28896131E-05
+ FINUFFT start
+ FINUFFT on           5 snapshots CPU_TIME  0.776331007       SYS_TIME  0.539000034
+Atom masks reset:  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -6.00000000       6.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -6.0     6.0
+-4 2
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -4.0     2.0
+0 0
+ Choose a plot option (vcps/TXT file output is OFF):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        8  toggle the vcps/TXT output ON (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+8
+ Choose a plot option (vcps/TXT file output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        8  toggle the vcps/TXT output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+1
+Actual atom masks:  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -4.00000000       2.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -4.0     2.0
+0 0
+ cu_48b48_sq_0120_0005_01.ps
+ Choose a plot option (vcps/TXT file output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        8  toggle the vcps/TXT output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+0
+JKs-MacBook-Pro:Cu_lammps_JK jiri$

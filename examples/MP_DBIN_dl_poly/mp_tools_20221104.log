@@ -1,0 +1,157 @@
+
+ 2022/11/04 15:29:13  MP_BIN 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read parameter file:  BZO200dc.par
+ Read snapshots number: min, step, max           1           1           5
+ Saved snapshot numbers start:           1
+ Reading MD trajectory file:  ./data/bzo200_d.txt
+ Simulation type = TIMESTEP        
+ Trajectory recording mode =           2
+ Boundary conditions            3
+ Trajectory time start, step [ps]:   64.0400009       3.99999990E-04
+
+ 2022/11/04 15:33:09  MP_BIN 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read parameter file:  BZO200dc.par
+ Read snapshots number: min, step, max           1           1           5
+ Saved snapshot numbers start:           1
+ Reading MD trajectory file:  ./data/bzo200_dense.txt
+ Simulation type = TIMESTEP        
+ Trajectory recording mode =           2
+ Boundary conditions            3
+ Trajectory time start, step [ps]:   64.0400009       3.99999990E-04
+ Real temperature: core/shell/total    180.498047       18.4861412       198.984192    
+ Trajectory files finished:            5  .dat files written in   14.3920002      sec (SYS)
+
+
+
+ 2022/11/04 15:35:43  MP_PDF 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read the parameter file:  BZO200dc.par
+     Ba    0.0000  0.0000  0.0000    1.0000  5.0700
+     Zr    0.5000  0.5000  0.5000    1.0000  7.1600
+     O1    0.5000  0.5000  0.0000    1.0000  5.8030
+     O2    0.0000  0.5000  0.5000    1.0000  5.8030
+     O3    0.5000  0.0000  0.5000    1.0000  5.8030
+
+ Atoms:             Ba      Zr      O1      O2      O3  
+ Atoms no.:         1       2       3       4       5
+ Neutron at_weights:   5.0700  7.1600  5.8030  5.8030  5.8030
+ input: ./data/BZO200dc_n0002.dat                                   
+
+   Monte Carlo integration    20000000  pairs
+   Masks:           1           1           1           1           1
+  Postscript output written to: BZO200dc_0002_rdfm_01.ps                                    
+  Text output written to: BZO200dc_0002_rdfm_01.txt                                   
+
+
+ 2022/11/04 15:38:47  MP_SQOM 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read the parameter file:  BZO200dc.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Zr    0.5000  0.5000  0.5000    1.0000  0.7160
+     O1    0.5000  0.5000  0.0000    1.0000  0.5803
+     O2    0.0000  0.5000  0.5000    1.0000  0.5803
+     O3    0.5000  0.0000  0.5000    1.0000  0.5803
+ OMP threads maximum =            4
+ OMP processes requested 	=            2
+
+
+
+ 2022/11/04 15:41:09  MP_SQOM 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read the parameter file:  BZO200dc.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Zr    0.5000  0.5000  0.5000    1.0000  0.7160
+     O1    0.5000  0.5000  0.0000    1.0000  0.5803
+     O2    0.0000  0.5000  0.5000    1.0000  0.5803
+     O3    0.5000  0.0000  0.5000    1.0000  0.5803
+ OMP threads maximum =            4
+ OMP processes requested 	=            2
+
+
+ Input files:  ./data/BZO200dc_n0001.dat to ./data/BZO200dc_n0005.dat
+   t0,t_step,n_row(3),n_atom:   64.0400009       4.00009155E-02          32          32          32           5
+   temperature [K]   199.586273    
+ Atoms:        Ba     Zr     O1     O2     O3  
+ Occupations:  1.000  1.000  1.000  1.000  1.000
+Neutron weights b_coh:        0.507  0.716  0.580  0.580  0.580
+ Atom masks:   1      1      1      1      1
+ Atom pair correlation:   0  0
+ bz_n:   6.00000000    
+ Q-plane: e1 = [ 1 0 0], e2 = [ 0 1 0]
+ Q center, Energy transfer [THz]:   2.00000000       2.00000000       0.00000000       0.00000000    
+ Total scattering
+ Energy resolution [THz]     INF
+ Output file:   BZO200dc_sq_0001_0005_01.png
+
+
+
+ 2022/11/04 15:51:30  MP_SQOM 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read the parameter file:  BZO200dc.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Zr    0.5000  0.5000  0.5000    1.0000  0.7160
+     O1    0.5000  0.5000  0.0000    1.0000  0.5803
+     O2    0.0000  0.5000  0.5000    1.0000  0.5803
+     O3    0.5000  0.0000  0.5000    1.0000  0.5803
+ OMP threads maximum =            4
+ OMP processes requested 	=            2
+
+
+ 2022/11/04 15:58:52  MP_SQOM 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read the parameter file:  BZO200dc.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Zr    0.5000  0.5000  0.5000    1.0000  0.7160
+     O1    0.5000  0.5000  0.0000    1.0000  0.5803
+     O2    0.0000  0.5000  0.5000    1.0000  0.5803
+     O3    0.5000  0.0000  0.5000    1.0000  0.5803
+ OMP threads maximum =            4
+ OMP processes requested 	=            2
+
+
+ Input files:  ./data/BZO200dc_n0001.dat to ./data/BZO200dc_n0005.dat
+   t0,t_step,n_row(3),n_atom:   64.0400009       4.00009155E-02          32          32          32           5
+   temperature [K]   199.586273    
+ Atoms:        Ba     Zr     O1     O2     O3  
+ Occupations:  1.000  1.000  1.000  1.000  1.000
+Neutron weights b_coh:        0.507  0.716  0.580  0.580  0.580
+ Atom masks:   1      1      1      1      1
+ Atom pair correlation:   0  0
+ bz_n:   6.00000000    
+ Q-plane: e1 = [ 1 0 0], e2 = [ 0 1 0]
+ Q center, Energy transfer [THz]:   2.00000000       2.00000000       0.00000000       0.00000000    
+ Total scattering
+ Energy resolution [THz]     INF
+ Output file:   BZO200dc_sq_0001_0005_01.ps
+
+
+
+ 2022/11/04 16:00:33  MP_SQOM 1.54  /Users/jiri/Documents/Work/Science/MD/MD_plots/BZO_200_dense
+
+ Read the parameter file:  BZO200dc.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Zr    0.5000  0.5000  0.5000    1.0000  0.7160
+     O1    0.5000  0.5000  0.0000    1.0000  0.5803
+     O2    0.0000  0.5000  0.5000    1.0000  0.5803
+     O3    0.5000  0.0000  0.5000    1.0000  0.5803
+ OMP threads maximum =            4
+ OMP processes requested 	=            2
+
+
+ Input files:  ./data/BZO200dc_n0001.dat to ./data/BZO200dc_n0005.dat
+   t0,t_step,n_row(3),n_atom:   64.0400009       4.00009155E-02          32          32          32           5
+   temperature [K]   199.586273    
+ Atoms:        Ba     Zr     O1     O2     O3  
+ Occupations:  1.000  1.000  1.000  1.000  1.000
+Neutron weights b_coh:        0.507  0.716  0.580  0.580  0.580
+ Atom masks:   1      1      1      1      1
+ Atom pair correlation:   0  0
+ bz_n:   6.00000000    
+ Q-plane: e1 = [ 1 0 0], e2 = [ 0 1 0]
+ Q center, Energy transfer [THz]:   2.00000000       2.00000000       0.00000000       0.00000000    
+ Total scattering
+ Energy resolution [THz]     INF
+ Output file:   BZO200dc_sq_0001_0005_02.png
+
