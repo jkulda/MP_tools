@@ -22,7 +22,7 @@ PG_OUT = 'vcps'       ! set device for color map output: PNG, TPNG, CPS, VCPS, N
 &MP_SQOM									
 N_INT = 0							! integration width in time (number of snapshots, 0 = automatic
                       ! choice NFILE/2)
-s_trig = 0						! triger level of the speckle filter (0 = OFF, 2 = log_2 ratio 
+s_trig = 0						! trigger level of the speckle filter (0 = OFF, 2 = log_2 ratio 
                       ! between neighbours) 
 j_oneph = 0						! FT start mode, 0 = NUFFT (usual), 1 = one-phonon mode (very slow,
                       ! use for verification only), runtime toggle 0/1 available
@@ -44,6 +44,8 @@ Whenever energy-resolved maps are to be produced, MP_SQOM will calculate Fourier
 MP_SQOM is intended to provide a self-explaining command line dialogue guiding the user through the different stages of the plotting exercise. Some patience and trial_and_error learning are unavoidable. 
 
 Upon start-up MP_SQOM will produce a total scattering map for the specified input data sequence, Q-range etc., which is intended for experimenting with the adequate intensity scale (color range) and for a first familiarisation with the system. The total scattering function S(Q) is an integral of S(Q,w) over all energy/frequency spectrum. Hence, if for whatever reason the map exhibits a too weak presence of diffuse scattering, it doesn't make much sense to continue towards plotting energy-resolved S(Q,w) maps. Rather the  volume of the input data has to be questioned (simulation box size, number of snapshot files).
+
+When indicating the central of the map in Q-space, it is possible to include the vertical component to produce a map which is above or below the nominal equatorial plane, eg. after having chosen the (hk0) option the input of 2 2 0 will produce a (h k 0) map with the corresponding centre while 2 2 .5 will produce the (h k .5) map (i.e. lifted by 0 0 .5).
 
 All the plotting options are displayed in a way-point menu (upon exiting from the total scattering plot by setting c_min, c_max = 0 0)
 

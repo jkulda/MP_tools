@@ -34,10 +34,10 @@ Contributed elements: MP_TOOLS depend on the FINUFFT (non-uniform fast Fourier t
 
 Hardware requirements:
   - for static models with < 10^6 atoms (cf. examples and tasks of corresponding size)
-    a middle class notebook with an intel i5_core2 processor (or equivalent) and 8Gb memory is sufficient (the time tags in the Examples logfiles correspond to such a configuration)
+    a middle-class notebook with an intel i5_core2 processor (or equivalent) and 8Gb memory is sufficient (the time tags in the Examples logfiles correspond to such a configuration)
     
   - internal memory of 16Gb is a rock bottom minimum to explore large static supercells
-    (10^7 and +) and/or lattice dynamics with sequences of 10^2-10^3 frames, a workstation with 10-20 cores and 64-128Gb memory will bring comfort and boost overall efficiency    
+    (10^7 atoms and more) and/or lattice dynamics with sequences of 10^2-10^3 frames; a workstation with 10-20 cores and 64-128Gb memory will bring comfort and boost overall efficiency    
 
 Software requirements (all within the reach of standard link and execution pathes):
   - the GNU GCC suite including GFORTRAN (cf. the COMPILE_MP_154.TXT script)

@@ -710,17 +710,21 @@ C *** generate the Xray form-factor tables
 							if(nsuper/=1) then
 								q1 = (qx_min+(i-1)*(bz_n/n_qx))*(e1/a_par)
 								q2 = (qy_min+(j-1)*(bz_n/n_qy))*(e2/a_par)
+                q1 = q1+q_v/a_par
+                q2 = q2+q_v/a_par
 				        q_step = (bz_n/(n_qx*a_par(1)))**2
 							else
 								q1 = (qx_min+(i-1)*(bz_n/n_qx))*e1		!here bz_n is in A^-1
 								q2 = (qy_min+(j-1)*(bz_n/n_qy))*e2
+                q1 = q1+q_v
+                q2 = q2+q_v
 				        q_step = (bz_n/n_qx)**2
 							endif
 							q_sq = dot_product(q1,q1)+dot_product(q2,q2)
 							if(q_sq>=(q_step-.000001)) then
 							  q2_norm(i,j) = 1./sqrt(q_sq)
 							else
-							  write(*,*) 'q1,q2,q_sq,q_step',q1,q2,q_sq,q_step
+CC							  write(*,*) 'q1,q2,q_sq,q_step',q1,q2,q_sq,q_step
 							  q2_norm(i,j) = 1.
 							endif
 			        if(j_weight==3) then
@@ -1773,7 +1777,7 @@ C
 
 				do
 					if(j_plot==0.or.abs(j_plot)==3.or.abs(j_plot)==5.or.j_exit==1) then
-						write(*,*) 'Choose a plot option (PS/TXT file output is ',trim(ps_out(j_ps+1)),'):'
+						write(*,*) 'Choose a plot option (',trim(pg_out),'/TXT file output is ',trim(ps_out(j_ps+1)),'):'
 							write(*,*) '       0  EXIT'
 							write(*,*) '       1  explore total scattering     (-1 edit atom masks)'
 						if(t_step>.0) then			
@@ -1788,8 +1792,8 @@ C
 								if(j_oneph==0) write(*,*) '       7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
 								if(j_oneph==1) write(*,*) '       7  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
 							endif
-							if(j_ps==0) write(*,*) '       8  toggle the PS/TXT output ON (mind the TXT switch in PAR)'
-							if(j_ps==1) write(*,*) '       8  toggle the PS/TXT output OFF (mind the TXT switch in PAR)'
+							if(j_ps==0) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output ON (mind the TXT switch in PAR)'
+							if(j_ps==1) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output OFF (mind the TXT switch in PAR)'
 							if(j_qsq==0) write(*,*) '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
 							if(j_qsq==1) write(*,*) '       9  toggle the S(Q) scaling to S(Q)/Q^2'
 							write(*,*) '      10  options: change the time integration window width, weighting etc.'		!include here the straight FT option
