@@ -19,4 +19,3 @@ The number of Monte-Carlo events to be generated is specified in units of 10^6 c
 In addition to the total PDF also N_CORR partial PDFs corresponding to atom pairs indicated in the PDF_PAIRS list can be accumulated and displayed. 
 
 Output files in the .PS (graphics) and .TXT (PDF tables) formats can be generated upon request.
-

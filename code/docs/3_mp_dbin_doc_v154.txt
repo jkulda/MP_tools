@@ -28,6 +28,3 @@ In DL_POLY there is no analogy to the TYPE key in LAMMPS, hence it is advisable 
 
 NOTE:
 it is important to define correctly the sign of the basis vectors in the .PAR file. As DL_POLY dumps the simulation box by atom types, it may not be an easy task to check this by inspecting the huge ASCII snapshot file, which at its beginning contains thousands of lines related to the atom sitting at the origin of the unit cell. The quick help is the UNIX/LINUX 'tail' command , which will display the last 10 lines (or any other specified number) of the trajectory file with atoms in a non trivial position.
-
-
-

@@ -11,4 +11,3 @@ In most cases the phonon DOS does not exhibit details of energy dependence as sh
 The resulting DOS can be displayed either with the neutron scattering weights (squared, b_coh^2, for comparison with neutron data) or with unit weights (for comparison with other theoretical model results). It should be stressed that there is no way to convert the output DOS from one weighting system to the other one at a later stage. 
 
 The total DOS is plotted together with selected partials, file output (.PS and .TXT) as specified in the dialogue.
-

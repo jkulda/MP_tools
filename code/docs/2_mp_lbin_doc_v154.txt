@@ -86,7 +86,3 @@ While the dump time is only important when simulating dynamical processes (S(Q,w
 
 2/it is crucial to bear in mind that in LAMMPS, whenever it runs under MPI paralelisation, the supercell is ad-hoc separated into blocks attributed to each process, the communication between the blocks operates only from time to time and, unless the contrary is specifically requested, the dump of the snapshots occurs in the order of the processes being ready - hence the output data blocks DO NOT NECESSARILY FOLLOW THE ORDER OF THE SITE INDEXATION!   
 
-
-
-************************
- In case of need, they can be added by modifying the MP_LBIN source code. Arrays containing additional variables should always be appended at the end of the binary output file to preserve compatibility with MP_TOOLS data standard (cf. MP_BIN_DOC.TXT for the binary file structure description).

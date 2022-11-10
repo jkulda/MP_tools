@@ -70,3 +70,5 @@ The examples in this directory cover the two available ASCII data input methods,
 To keep the distribution size reasonable, the data sets extend only over a single or a few snapshots, permitting to test the basic functions of MP_TOOLS: conversion to binary format, inspection of the binary data, plots of total scattering intensities and generation of a PDF. The energy-resolved functionalities calling for sequences of hundreds to thousands snapshots (10-100 Gb) need to be tried in 'real life' circumstances.
 
 The text files like lammps_cu_48.txt containing command line session logs, included in each case, give an idea of what could be a brief tutorial session and give also the possibility to cross-check the details of data file structure. The included .PAR files can be used as templates for own projects.
+
+

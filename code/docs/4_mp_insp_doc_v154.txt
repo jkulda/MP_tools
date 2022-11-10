@@ -80,4 +80,3 @@ For data imported by the BULK input method the atoms are identified by their lab
    Atom position   -127.360130      -127.351135      -2.32302618
 
    jat, relative record_index (0 = new file number, -1 = END):
-
