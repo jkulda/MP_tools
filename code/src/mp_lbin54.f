@@ -199,6 +199,11 @@ CC			write(*,*) 'namelist input: j_verb,j_proc',j_verb,j_proc
       	at_pos_centre = a_cell_half
       endif
       
+      a_cell = .0
+      do k=1,3
+        a_cell(k,k) = a_cell_par(k)
+      enddo
+      
 CC			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
 			allocate(at_name_par(n_atom),at_label(n_atom),x_pos(n_atom,3))
 			allocate(ind_l(n_atom),i_site(n_atom,n_atom),at_occup(n_atom))
@@ -880,6 +885,9 @@ CC  				read(*,*)
 					
 C *** treat BULK data 
 					if(input_method=='BULK') then     
+					  write(*,*) 'a_cell_half',a_cell_half
+					  write(*,*) 'a_cell',(a_cell(k,k),k=1,3)
+					  read(*,*)
 						jat = jl				          
 						at_ind(1,jrec) = jrec
 						at_ind(2:3,jrec) = 0
