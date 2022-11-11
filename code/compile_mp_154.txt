@@ -24,6 +24,21 @@ echo "Need sudo password to create /usr/local/mp_tools"
 sudo cp -R * /usr/local/mp_tools;
 fi
 #
+if ! [ -e /usr/local/mp_tools/ref ]; then sudo mkdir /usr/local/mp_tools/ref;
+echo "Need sudo password to create /usr/local/mp_tools/ref"
+sudo cp ./ref/* /usr/local/mp_tools/ref;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref/neutron_xs.txt ]; 
+then sudo cp ./ref/neutron_xs.txt /usr/local/mp_tools/ref;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref/xray_ff.txt ]; 
+then sudo cp ./ref/xray_ff.txt /usr/local/mp_tools/ref;
+fi
+#
+
+
 #in case of need use: 
 #   -fbounds-check to localize SEGMENTATION ERRORS (slows down the execution by 10-20%) 
 #   -L/usr/X11R6/lib insert in lines containing -lX11 (alternative localisation of X11)
