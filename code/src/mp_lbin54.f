@@ -885,9 +885,6 @@ CC  				read(*,*)
 					
 C *** treat BULK data 
 					if(input_method=='BULK') then     
-					  write(*,*) 'a_cell_half',a_cell_half
-					  write(*,*) 'a_cell',(a_cell(k,k),k=1,3)
-					  read(*,*)
 						jat = jl				          
 						at_ind(1,jrec) = jrec
 						at_ind(2:3,jrec) = 0
