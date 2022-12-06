@@ -181,6 +181,9 @@ CC			write(*,*) 'namelist input: j_verb,j_proc',j_verb,j_proc
       call up_case(input_method)
       call up_case(pos_units)
       call down_case(rec_str)
+
+      if(ext=='ext'.or.ext=='EXT') ext=''
+      if(ext/=''.and.index(ext,'.')==0) ext='.'//ext
       
       if(dat_type=='LAMMPS') then
         dat_origin = 'LAMMPS'
@@ -318,11 +321,12 @@ CC *** tread 1st frame of 1st history file to get info
 				if(t_single) then
 					file_trajectory = file_master
 				else
-					if(i_traj>=1.and.i_traj<=9)    write(number,'(i1.1)') i_traj
-					if(i_traj>=10.and.i_traj<=99)  write(number,'(i2.2)') i_traj
-					if(i_traj>=100.and.i_traj<=999)write(number,'(i3.3)') i_traj
-					if(i_traj>=1000.and.i_traj<=9999)write(number,'(i4.4)') i_traj
-CC					file_trajectory = trim(file_master)//trim(number)
+CC					if(i_traj>=1.and.i_traj<=9)    write(number,'(i1.1)') i_traj
+CC					if(i_traj>=10.and.i_traj<=99)  write(number,'(i2.2)') i_traj
+CC					if(i_traj>=100.and.i_traj<=999)write(number,'(i3.3)') i_traj
+CC					if(i_traj>=1000.and.i_traj<=9999)write(number,'(i4.4)') i_traj
+          write(number,'(i8)') i_traj
+          number = trim(adjustl(number))
 				endif
 
 	    if(dat_origin=='GENERAL') then      !parse input record structure and position for data input in 1st file to test for SHELL presence
@@ -389,7 +393,7 @@ CC				write(*,*) 'ind_id,ind_type,ind_pos', ind_id,ind_type,ind_pos
 					stop
 				endif
 				
-				at_list = ind_id>0.or.ind_type>0     !at_list=.false. means no explicit atom identification
+				at_list = ind_atom>0.or.ind_type>0     !at_list=.false. means no explicit atom identification
 
 				n_traj = 0
 				if(ind_vel/=0) n_traj = 1
@@ -717,11 +721,13 @@ CC				write(*,*)i_traj,nt_min,nt_step,nt_max
 				if(t_single) then
 					file_trajectory = file_master
 				else
-					if(i_traj>=1.and.i_traj<=9)    write(number,'(i1.1)') i_traj
-					if(i_traj>=10.and.i_traj<=99)  write(number,'(i2.2)') i_traj
-					if(i_traj>=100.and.i_traj<=999)write(number,'(i3.3)') i_traj
-					if(i_traj>=1000.and.i_traj<=9999)write(number,'(i4.4)') i_traj
-					if(i_traj>=10000.and.i_traj<=99999)write(number,'(i5.5)') i_traj
+CC					if(i_traj>=1.and.i_traj<=9)    write(number,'(i1.1)') i_traj
+CC					if(i_traj>=10.and.i_traj<=99)  write(number,'(i2.2)') i_traj
+CC					if(i_traj>=100.and.i_traj<=999)write(number,'(i3.3)') i_traj
+CC					if(i_traj>=1000.and.i_traj<=9999)write(number,'(i4.4)') i_traj
+CC					if(i_traj>=10000.and.i_traj<=99999)write(number,'(i5.5)') i_traj
+          write(number,'(i8)') i_traj
+          number = trim(adjustl(number))
 				endif
 
 				if(dat_origin=='GENERAL') then
@@ -794,29 +800,77 @@ C *** test end of trajectory file and position for data input
 				if(j_shell.eq.1) e_kin_s = .0
 
 C ***** now read the data
-        read_loop: do i=1,n_tot_in
+        read_loop: do i=1,n_tot
 
 					read(1,*,iostat=ios)  data_line   		
+					if(ios<0)then
+              exit read_loop
+          elseif(ios>0) then
+						write(*,*) 'Data read problem: ios =',ios
+						write(*,*) 'record:',i,' data:',data_line
+						read(*,*)
+   				endif
           
    				if(ind_id/=0)then
-   					read(data_line(ind_id),*) jrec
+   					read(data_line(ind_id),*,iostat=ios) jrec
+            if(ios/=0)then
+              write(*,*) 'Data read problem: ios =',ios
+              write(*,*) 'record:',i,' data:',data_line
+              read(*,*)
+              cycle read_loop
+            endif
    				else
    					jrec = i
    				endif
-   				if(ind_type/=0)read(data_line(ind_type),*) jl
+   				if(ind_type/=0)read(data_line(ind_type),*,iostat=ios) jl
 					
    				if(ind_atom/=0)string = data_line(ind_atom)
-   				if(ind_mass/=0)read(data_line(ind_mass),*) at_mass_in
-   				if(ind_charge/=0)read(data_line(ind_charge),*) at_charge_in
+					if(ios/=0)then
+						write(*,*) 'Data read problem: ios =',ios
+						write(*,*) 'record:',i,' data:',data_line
+						read(*,*)
+            cycle read_loop
+   				endif
+
+   				if(ind_mass/=0)read(data_line(ind_mass),*,iostat=ios) at_mass_in
+					if(ios/=0)then
+						write(*,*) 'Data read problem: ios =',ios
+						write(*,*) 'record:',i,' data:',data_line
+						read(*,*)
+   				endif
+
+   				if(ind_charge/=0)read(data_line(ind_charge),*,iostat=ios) at_charge_in
+					if(ios/=0)then
+						write(*,*) 'Data read problem: ios =',ios
+						write(*,*) 'record:',i,' data:',data_line
+						read(*,*)
+            cycle read_loop
+   				endif
+
    				read(data_line(ind_pos:ind_pos+2),*,iostat=ios) at_pos_in
 					if(ios/=0)then
 						write(*,*) 'Data read problem: ios =',ios
-						write(*,*) data_line
+						write(*,*) 'record:',i,' data:',data_line
 						read(*,*)
+            cycle read_loop
    				endif
-   				if(ind_vel/=0)read(data_line(ind_vel:ind_vel+2),*) at_veloc_in
-   				if(ind_force/=0)read(data_line(ind_force:ind_force+2),*) at_force_in
-   				
+
+   				if(ind_vel/=0)read(data_line(ind_vel:ind_vel+2),*,iostat=ios) at_veloc_in
+					if(ios/=0)then
+						write(*,*) 'Data read problem: ios =',ios
+						write(*,*) 'record:',i,' data:',data_line
+						read(*,*)
+            cycle read_loop
+   				endif
+
+   				if(ind_force/=0)read(data_line(ind_force:ind_force+2),*,iostat=ios) at_force_in
+ 					if(ios/=0)then
+						write(*,*) 'Data read problem: ios =',ios
+						write(*,*) 'record:',i,' data:',data_line
+						read(*,*)
+             cycle read_loop
+  				endif
+  				
 C *** convert the 'BOX' units into anything more useful
    				if(pos_units=='BOX') then
 	   				at_pos_in = at_pos_in*a_cell_par
@@ -1076,8 +1130,13 @@ C *** define the record structure
       if(mod(n_tot,l_rec4)/=0) n_rec = n_rec+1
 
 C *** generate output filename
-			write(file_dat,104) trim(file_par),i_save
-104   format('./data/',a,'_n',i4.4,'.dat')
+      if(i_save<=9999) then
+        write(file_dat,103) trim(file_par),i_save
+      elseif(i_save>=10000) then
+        write(string,'(i8)') i_save
+        file_dat = './data/'//trim(file_par)//'_n'//trim(adjustl(string))//'.dat'
+      endif
+103   format('./data/',a,'_n',i4.4,'.dat')
 
       if(ifile==nfile_min.or.ifile==10*nfile_step*(ifile/(10*nfile_step))) write(*,*)trim(file_dat)
       i_save = i_save+1       

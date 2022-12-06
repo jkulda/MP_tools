@@ -192,6 +192,9 @@ C *** read auxiliary file <file_par.par> with structure parameters, atom names a
       call up_case(sim_type)
       call up_case(dat_type)
       call up_case(input_method)
+      
+      if(ext=='ext'.or.ext=='EXT') ext=''
+      if(ext/=''.and.index(ext,'.')==0) ext='.'//ext
 
 			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
 			
@@ -297,6 +300,10 @@ CC *** tread 1st frame of 1st history file to get info
         if(i_traj>=10.and.i_traj<=99)  write(number,'(i2.2)') i_traj
         if(i_traj>=100.and.i_traj<=999)write(number,'(i3.3)') i_traj
         if(i_traj>=1000.and.i_traj<=9999)write(number,'(i4.4)') i_traj
+        if(i_traj>=1000)then 
+          write(number,'(i8)') i_traj
+          number = trim(adjustl(number))
+        endif					
         file_trajectory = trim(file_master)//trim(number)
       endif
 
@@ -461,6 +468,10 @@ C *** Now ready to cycle over trajectory files, each snapshot to be saved in a s
 					if(i_traj>=10.and.i_traj<=99)  write(number,'(i2.2)') i_traj
 					if(i_traj>=100.and.i_traj<=999)write(number,'(i3.3)') i_traj
 					if(i_traj>=1000.and.i_traj<=9999)write(number,'(i4.4)') i_traj
+					if(i_traj>=1000)then 
+					  write(number,'(i8)') i_traj
+					  number = trim(adjustl(number))
+					endif					
 					file_trajectory = trim(file_master)//trim(number)
 				endif
 
@@ -580,7 +591,10 @@ CC          	backspace(1)
           endif
 
           read(1,*) at_pos_in
-          if(n_traj>=1) read(1,*) at_veloc_in
+          if(n_traj>=1) read(1,*,iostat=ios_t) at_veloc_in
+          if(ios_t/=0) then
+          	write(*,*) 'Input problem: ios_t,i_atom,ifile,at_name_in,head',ios_t,i_atom,ifile,at_name_in,head
+						endif
           if(n_traj==2) read(1,*) at_force_in
 
 C
@@ -836,8 +850,14 @@ C *** define the record structure
 				if(j_verb==1.and.ifile==nfile_min) write(*,*) 'n_tot,l_rec4,n_rec',n_tot,l_rec4,n_rec			
 
 C *** generate output filename
-				write(file_dat,103) trim(file_par),i_save
+        if(i_save<=9999) then
+				  write(file_dat,103) trim(file_par),i_save
+				elseif(i_save>=10000) then
+				  write(string,'(i8)') i_save
+				  file_dat = './data/'//trim(file_par)//'_n'//trim(adjustl(string))//'.dat'
+				endif
 103     format('./data/',a,'_n',i4.4,'.dat')
+
 				if(i_save==n_save_min.or.i_save==10*(i_save/10)) write(*,*)trim(file_dat)
   			i_save = i_save+1
 

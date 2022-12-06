@@ -97,11 +97,11 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       real 		:: 			 c_min,c_max,c_max2,c1,c2,r_start,r_end,pdf_step,c_smooth,f_smooth(51)
       
       character(4)   :: c_int(2),c_fil(2),version,head,atom
-      character(10)  :: at_weight_scheme(2),pg_out,string,section,c_date,c_time,c_zone
+      character(10)  :: at_weight_scheme(2),pg_out,string,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
       character(16)  :: sim_type_par,data_type,string16
       character(40)  :: file_master,file_inp,file_out,time_stamp,int_mode,x_file_name
-      character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,plot_title,plot_header,line
-      character(128) :: cwd_path
+      character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,plot_title,line
+      character(128) :: cwd_path,plot_header
       character(l_rec):: header_record
       
 			logical ::  nml_in,found_txt,found_ps,t_single
@@ -224,7 +224,12 @@ C *** Generate data file access
 			if(t_single)then
 				write(file_dat_t0,'("./data/",a,".dat")') trim(file_master)
 			else
-				write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
+        if(nfile_min<=9999) then
+          write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
+        elseif(nfile_min>=10000) then
+          write(string,'(i8)') nfile_min
+          file_dat_t0 = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        endif
 			endif
 
 	    open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
@@ -513,7 +518,12 @@ C ***  open the t0 file (binary MD snapshot file)
 			if(t_single)then
 				write(file_dat,'("./data/",a,".dat")') trim(file_master)
 			else
-      	write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+(ifile-nfile_min)*nfile_step
+        if(nfile_min<=9999) then
+          write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+(ifile-nfile_min)*nfile_step
+        elseif(nfile_min>=10000) then
+          write(string,'(i8)') nfile_min+(ifile-nfile_min)*nfile_step
+          file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        endif
 			endif
 
 			write(*,*)
@@ -873,15 +883,34 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
 				if(j_ps==1) then
 					jfile = 1
 					do						!look for existing .ps files to continue numbering
+
 			if(j_name==0.and.t_single)then
 						write(file_ps,1041) trim(file_master),trim(c_fil(j_acc)),jfile
-			else
-						write(file_ps,104) trim(file_master),nfile_min,trim(c_fil(j_acc)),jfile
-			endif
 1041   		format(a,'_rdf',a,'_',i2.2,'.ps')      
-104   		format(a,'_',i4.4,'_rdf',a,'_',i2.2,'.ps')      
+						write(file_res,1042) trim(file_master),trim(c_fil(j_acc)),jfile
+1042   		format(a,'_rdf',a,'_',i2.2,'.txt')      
+			else
+            write(c_jfile,'("_",i2.2)') jfile
+            if(nfile_min<=9999) then
+              write(c_nfile_min,'(i4.4)') nfile_min
+            elseif(nfile_min>=10000) then
+              write(c_nfile_min,'(i8)') nfile_min
+            endif
+            c_nfile_min = '_'//adjustl(c_nfile_min)
+    
+            if(nfile<=9999) then
+              write(c_nfile,'(i4.4)') nfile
+            elseif(nfile>=10000) then
+              write(c_nfile,'(i8)') nfile
+            endif
+            c_nfile = '_'//adjustl(c_nfile)
+    
+            file_res = trim(file_master)//'_pdf'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//'.txt'							
+            file_ps  = trim(file_master)//'_pdf'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//'.ps'
+			endif
 						inquire(file=file_ps,exist=found_ps)
-						if(.not.found_ps) exit				
+						inquire(file=file_res,exist=found_txt)
+						if(.not.found_txt.and.(.not.found_ps)) exit				
 						jfile = jfile+1
 						if(jfile==100) then
 							write(*,*)'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
@@ -940,24 +969,6 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
 C *** save the PDF results into an ASCII file (each line corresponds to a distance point)
 C     look for existing output files in order not overwrite them				
 			if(j_txt==1) then
-				jfile = 1
-					do						!look for existing .txt files to continue numbering
-						if(j_name==0.and.t_single)then
-							write(file_res,123) trim(file_master),trim(c_fil(j_acc)),jfile
-						else
-							write(file_res,124) trim(file_master),nfile_min,trim(c_fil(j_acc)),jfile
-						endif
-123   			format(a,'_rdf',a,'_',i2.2,'.txt')      
-124   			format(a,'_',i4.4,'_rdf',a,'_',i2.2,'.txt')      
-						inquire(file=file_res,exist=found_txt)
-						if(.not.found_txt) exit				
-						jfile = jfile+1
-						if(jfile==100) then
-							write(*,*)'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
-							read(*,*)
-							jfile = 1
-						endif	
-					enddo						     
 				open (4,file=file_res)
 
 C *** write PDF file header

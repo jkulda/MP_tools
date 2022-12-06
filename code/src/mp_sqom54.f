@@ -45,6 +45,8 @@ C *****           - J_QSQ option to divide S(Q,w) by Q^2 to improve clarity of c
 C *****           - PNG driver for PGPLOT included
 C *****           - NAMELIST I/O for .PAR files and .DAT headers implemented
 C ***** 
+C ***** Ver 1.545 - interpolation of intensity maps for improved display appearance 
+C ***** 
 C ***** indexing convention: supercell(u,v,w) = at_ind(j,k,l) = supercell(j_pos,j_row,j_layer)
 C ***** record numbers are directly related to cell positions and atom types
 C *****    jrec = 1+nsuper*(jat-1)+nlayer*(at_ind(3)-1)+nrow*(at_ind(2)-1)+at_ind(1)
@@ -70,8 +72,8 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
 			logical        :: found_txt,found_ps,t_single,nml_in,inv,read_ind,non_zero,inside
       character(1)   :: xyz(3)=(/'X','Y','Z'/)
       character(4)   :: atom,ps_out(2),version,head
-      character(5)   :: c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
-      character(10)  :: string,section,ax_label,c_date,c_time,c_zone,mode,ext,pg_out
+      character(5)   :: pg_ext,c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
+      character(10)  :: string,section,ax_label,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
       character(40)  :: file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
       character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in
       character(128) :: line,plot_title1,plot_title2,plot_title,scan_title,data_path,cwd_path,rec_str
@@ -84,7 +86,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       integer,allocatable ::  ind_at(:),at_mask(:),map_unit(:) 
  
       real, allocatable :: at_base(:,:),conc(:),b_coh(:),x_ffpar(:,:),x_ffq(:,:,:),q2_norm(:,:)			!s_base(:,:),q(:,:,:),at_vel_file(:,:)		!atom basis, site basis fractional coordinates
- 			real, allocatable :: cs_plot(:,:),cs_out(:,:),csp(:),qq(:),ff(:),t_wind(:) 								!q_at_pos(:),q_at_vel(:),at_pos_perp(:),rq_fft(:)
+ 			real, allocatable :: csp(:),qq(:),ff(:),t_wind(:) 								!q_at_pos(:),q_at_vel(:),at_pos_perp(:),rq_fft(:)
 			complex, allocatable :: u_x(:,:),u_y(:,:),u_qx(:,:),u_qy(:,:)
 			 			
  			real(8), allocatable :: xf(:),yf(:)			
@@ -94,26 +96,26 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       complex(8), allocatable :: cf(:),ampl_tot(:),ampl_tot_2d(:,:)												! this is equivalent to complex*16
 
       complex :: 			cs1,cs2_mean,c_f,phase_bz
-      complex, allocatable :: om_phase(:),cs2(:),cs3(:),cs_mean(:,:,:),cs5(:,:),cs6(:,:),cs7(:,:),cs4(:,:)
-      complex, allocatable, target :: cs_atom(:,:,:,:),cs(:,:,:)
+      complex, allocatable :: om_phase(:),cs2(:),cs3(:),cs_mean(:,:,:),cs4(:,:)
+      complex, allocatable, target :: cs_atom(:,:,:,:),cs(:,:,:),cs_plot2(:,:)
       complex, pointer     :: cs_p1(:),cs_p2(:)
 
-      integer :: j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,jm,j1m,j2m,j_bc,j_exit
+      integer :: j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,jm,j1m,j2m,j_bc,j_exit,j_sq
       integer :: i,ii,iii,j,jj,i1,i2,i3,k,kk,l,ll,ios,ier,iflag,j_at,i_rec,nrec,nsuper,nrow,nlayer,n_r1,n_r2,n_row_save(3)
       integer :: j_basis,j_centred,j_test,j_mult,nfile,nfile_0,nfile_min,nfile_max,ifile,jfile,nfile_step,nqx_min,nqy_min
       integer :: n_site,j_dir,i_shift,i_time(8),j_weight,j_wind,j_qsq
-      integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max
+      integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max,n_q1,n_q2,n_qxg,n_qyg
       integer :: e1(3),e2(3),ev(3),j_scan,j_freq,i_plot,j_plot,n_plot,i_step
       integer :: sc_c1,sc_c2,sc_m,j_proc,proc_num,proc_num_in,thread_num,thread_num_max
       integer :: ind,j_site,j_q,n_int,n_frame,j_disp,j_mask,j_logsc,j_grid,j_txt,j_ps
-      integer :: j_shrec,j_atom,n_atom,at_no,j_atc1,j_atc2,j_ft,j_coh,j_zero,j_oneph,j_fft,n_head
+      integer :: j_shrec,j_atom,n_atom,at_no,j_atc1,j_atc2,j_ft,j_coh,j_zero,j_oneph,j_fft,n_head,j_interp,j_cut
 
-      real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn,bz_n,eps_x,box_volume
+      real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn,bz_n,eps_x,box_volume,cut
       real :: at_displ,at_pos(3),at_veloc(3),at_pos_min(3),at_pos_max(3),at_pos_centre(3),a_cell_par(3)
       real :: t2,t3,t4,t_sum,t_dump,t_step,t_dump0,t_tot,tt0,tt,xx,f_width,t_width,temp_par
       real :: f_plot,ff_plot,f_max_plot,freq_step,f_min,ff_min,f_max,ff_max,f_map_min,f_map_max,f_map_step,f_phase
       real :: arg,q1_x,q1_y,q2_x,q2_y,qx_min,qx_max,qy_min,qy_max,q_min,q_max,qq_min,qq_max,qq_plot,dq(3),dq_p(3),q_step
-      real :: tr_shift_x,tr_shift_y,d_x,d_y,q_x,q_y
+      real :: tr_shift_x,tr_shift_y,d_x,d_y,q_x,q_y,cut_off
       real :: e1_norm,e2_norm,ev_norm,tpq_center(3),tpe1,tpe2,tpev,tpe1_shift,tpe2_shift
       real :: q1(3),q2(3),q1_3d(3),q2_3d(3),q_v(3),q_center(3),q_nx,q_ny,wtime
       real :: c_min,c_max,c_min_save,c_max_save,sc_r		!,tau(3),c_vert(3),b_perp(3),q_tot(3),q_unit(3),q_norm
@@ -125,7 +127,7 @@ C
       integer(4),allocatable,target   :: at_ind_in(:)
       integer(4),pointer :: at_ind(:,:,:)
       
-      real(4),allocatable ::	at_occup_r(:)
+      real(4),allocatable ::	at_occup_r(:),cs_plot(:,:),cs_out(:,:),cs_pgplot(:,:)
       real(4),allocatable,target ::	at_pos_in(:,:)
  			real(4), pointer :: at_pos_file(:,:,:,:)
  			real(4), pointer :: at_pos_file_bulk(:,:,:)
@@ -134,25 +136,24 @@ C
       integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
       real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp
 
-
-      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
-     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
-      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
-     
-      namelist /mp_gen/ j_verb,j_proc       
-      namelist /mp_out/ j_weight,j_logsc,j_txt,j_grid,pg_out       
-      										!general rule: namelists of tools should only contain their local parameters
-                          !what is of global interest they should pass into data_header
-CC      namelist /mp_bin/ sim_type,dat_type,input_method,subst_name,data_path,ext,eps_x,n_atom,n_row,
-CC     1      j_basis,j_centred,j_test,j_mult,j_shrec,  n_tot_in,a_cell_par,temp_par,rec_str
-      namelist /mp_sqom/ n_int,s_trig,j_oneph,j_qsq,j_wind
-
 C *** PGPLOT stuff
 			integer :: PGOPEN,C1,C2,NC,plot_unit,map_unit_1,map_unit_2
 			real :: TR(6),CONTRA,BRIGHT,p_size
       CHARACTER*4 XOPT, YOPT
       REAL XTICK, YTICK
       INTEGER NXSUB, NYSUB					
+
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
+     
+      namelist /mp_gen/ j_verb,j_proc       
+      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out       
+      										!general rule: namelists of tools should only contain their local parameters
+                          !what is of global interest they should pass into data_header
+CC      namelist /mp_bin/ sim_type,dat_type,input_method,subst_name,data_path,ext,eps_x,n_atom,n_row,
+CC     1      j_basis,j_centred,j_test,j_mult,j_shrec,  n_tot_in,a_cell_par,temp_par,rec_str
+      namelist /mp_sqom/ n_int,s_trig,j_oneph,j_qsq,j_wind,j_interp
 
 C
 C ********************* Initialization *******************************      
@@ -192,8 +193,14 @@ C *** other initialisations
 			at_weight_scheme(2) = 'Neutron weights'
 			at_weight_scheme(3) = 'Xray weights'
 			f_max = .0
+			f_max_plot = .0
 			j_coh = 1
+			j_sq = 1
 			j_wind = 0			!no FT window in space by default
+			j_interp = 0
+			j_cut = 1
+			cut = 1.
+			cut_off = 1.
 			eps_x = .05
 
 C *** Generate data file access
@@ -215,7 +222,12 @@ C *** Generate data file access
 			if(t_single)then
 				write(file_dat_t0,'("./data/",a,".dat")') trim(file_master)
 			else
-				write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
+        if(nfile_min<=9999) then
+          write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
+        elseif(nfile_min>=10000) then
+          write(string,'(i8)') nfile_min
+          file_dat_t0 = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        endif
 			endif
 
 	    open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
@@ -293,6 +305,14 @@ C **** Read the auxiliary file <file_title.par> with structure parameters, atom 
       read(4,nml=mp_gen)
       rewind(4)
       read(4,nml=mp_out)
+      
+      call down_case(pg_out) 
+      if(index(pg_out,'png')/=0) then
+        pg_ext = '.png'
+      else
+        pg_ext = '.ps'
+      endif
+
       rewind(4)
       read(4,nml=mp_sqom) 
 CC      read(4,nml=mp_bin) 
@@ -399,7 +419,14 @@ C *** write overview of atom data
  
 C **** for an MD snapshot sequence open a second data file to see the time step between recorded snapshots
 			if(sim_type=='TIMESTEP') then
-				write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
+
+        if((nfile_min+nfile_step)<=9999) then
+          write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
+        elseif((nfile_min+nfile_step)>=10000) then
+          write(string,'(i8)') nfile_min+nfile_step
+          file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        endif
+
 				open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
 				if(ios.ne.0) then
 					write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
@@ -477,7 +504,12 @@ C ***  open the binary MD snapshot file
 				if(t_single)then
 					write(file_dat,'("./data/",a,".dat")') trim(file_master)
 				else
-					write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
+          if(jfile<=9999) then
+            write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
+          elseif(jfile>=10000) then
+            write(string,'(i8)') jfile
+            file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+          endif
 				endif
 
         open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
@@ -1166,38 +1198,42 @@ CC					write(*,*) 'n_qdisp,q_nx,q_ny 1',n_qdisp,q_nx,q_ny,q_min,q_max
 						enddo
 						om_phase = om_phase*t_wind																					!window will be included in om_phase
 
-!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs3,cs_p1,cs_p2) 
+!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs1,cs3,cs_p1,cs_p2) 
 !$omp do
 						do ii=1,n_qx
 							do jj=1,n_qy
 								cs3 = .0
-								if(j_atc1== 0) then
-									cs_p1 => cs(n_int/2+1:nfile-n_int/2,ii,jj)					!point to a subsection with negative shift in time
-									do i=1,n_int
-										cs_p2 => cs(i:nfile-n_int+i,ii,jj)								!point to a subsection with positive shift in time
-										cs3 = cs3+om_phase(i)*cs_p2												!Time window to reduce cut-off effects is contained in the phase factor
-									enddo									
-									cs3 = cs3*(conjg(cs_p1))
-								else
-									cs_p1 => cs_atom(n_int/2+1:nfile-n_int/2,j_atc1,ii,jj)					!point to a subsection with negative shift in time
-									do i=1,n_int
-										cs_p2 => cs_atom(i:nfile-n_int+i,j_atc2,ii,jj)								!point to a subsection with positive shift in time
-										cs3 = cs3+om_phase(i)*cs_p2												!Time window to reduce cut-off effects is contained in the phase factor
-									enddo									
-									cs3 = cs3*(conjg(cs_p1))								
-								endif											
+								if(j_sq==1) then                              !calculate the S(Q,w)
+                  if(j_atc1== 0) then
+                    do i=1,nfile-n_int+1
+                      cs_p2 => cs(i:i+n_int-1,ii,jj)								!point to a subsection with positive shift in time
+                      cs1 = dot_product(om_phase,cs_p2)
+                      cs3(i) = cs3(i)+cs1*conjg(cs1)
+                    enddo
+                  else                                                  !special pair-correlation case
+                    do i=1,nfile-n_int+1
+                      cs_p1 => cs_atom(i:i+n_int-1,j_atc1,ii,jj)								!point to a subsection with positive shift in time
+                      cs_p2 => cs_atom(i:i+n_int-1,j_atc2,ii,jj)								!point to a subsection with positive shift in time
+                      cs1 = dot_product(om_phase,cs_p1+cs_p2)
+                      cs3(i) = cs3(i)+cs1*conjg(cs1)
+                    enddo
+                  endif
+                else                                   !calculate the I(Q,t)
+                  cs_p1 => cs(1:nfile-j_freq,ii,jj)					!point to a subsection with negative shift in time
+                  cs_p2 => cs(j_freq+1:nfile,ii,jj)								!point to a subsection with positive shift in time
+                  cs3 = cs_p2*(conjg(cs_p1)) 
+                  cs3 = cs3*(1./(nfile-j_freq))               
+                endif
 
 								do i=1,nfile-n_int+1
 									cs_plot(ii,jj) = cs_plot(ii,jj)+cs3(i)
 								enddo
 							enddo												
-						enddo																		
+						enddo	
 !$omp end do
 !$omp end parallel
-
-				deallocate(cs3)
-				
-				
+				  deallocate(cs3)
+								
 				elseif(j_disp==1) then							!for dispersion
 					allocate(cs_plot(n_freq_plot,n_qdisp),cs_out(n_freq_plot,n_qdisp),qq(n_qdisp),ff(n_freq_plot))
 					allocate(cs2(n_int),cs3(n_int),cs4(n_int,n_qdisp))
@@ -1205,27 +1241,33 @@ CC					write(*,*) 'n_qdisp,q_nx,q_ny 1',n_qdisp,q_nx,q_ny,q_min,q_max
 					cs4 = (.0,.0)
 !$omp parallel shared(cs,cs4,t_wind,nfile,n_int,n_qdisp,n_qx,n_qy,n_q1x,n_q1y,q_nx,q_ny) private (cs1,cs2,cs3) 
 !$omp do
-					do ifile = 1,nfile-n_int+1
-						do ii = 1,n_qdisp
-							if(j_atc1==0) then
-								cs1 = cs(ifile+n_int/2,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))	!here pointers would be difficult, but the arrays are smaller
-								do i=1,n_int																																		!our FT center is on n/2+1
-										cs2(i) = cs(ifile+i-1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))*t_wind(i)
-								enddo		
-								cs3 = fft(cs2,inv=.false.)/sqrt(1.*n_int)
-							else
-								cs1 =cs_atom(ifile+n_int/2,j_atc1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))	!here pointers would be difficult, but the arrays are smaller
-								do i=1,n_int																																		!our FT center is on n/2+1
-									cs2(i) =cs_atom(ifile+i-1,j_atc2,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))*t_wind(i)
-								enddo
-								cs3 = fft(cs2,inv=.false.)/sqrt(1.*n_int)
-							endif	
-								cs4(:,ii) = cs4(:,ii)+cs3*conjg(cs1)			
-						enddo
-					enddo
+            do ifile = 1,nfile-n_int+1
+              do ii = 1,n_qdisp
+                if(j_atc1==0) then
+                  if(j_sq==1)	then	      !j_sq=1 calculate S(Q,w)
+                    do i=1,n_int																																		!our FT center is on n/2+1
+                      cs2(i) = cs(ifile+i-1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))*t_wind(i)
+                    enddo
+                    cs3 = fft(cs2,inv=.false.)
+                  else                     !j_sq/=1 calculate I(Q,t)
+                    do i=1,n_int																																		!I(Q,t)  hence no FT
+                      cs3(i) = cs(ifile+i-1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
+                    enddo
+                  endif
+                else
+                  do i=1,n_int																																		!our FT center is on n/2+1
+                    cs2(i) =cs_atom(ifile+i-1,j_atc1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
+                    cs2(i) =cs2(i)+cs_atom(ifile+i-1,j_atc2,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
+                  enddo
+                  cs2 = cs2*t_wind
+                  cs3 = fft(cs2,inv=.false.)
+                endif	
+                  cs4(:,ii) = cs4(:,ii)+cs3*conjg(cs3)			
+              enddo
+            enddo
 !$omp end do
 !$omp end parallel
-					cs_plot(:,:) = abs(cs4(1:n_freq_plot,:))
+					cs_plot(:,:) = cs4(1:n_freq_plot,:)
 					deallocate(cs2,cs3,cs4)
 				endif		!j_disp
 
@@ -1284,7 +1326,7 @@ C *** apply the speckle filter
 
 C *** normalise to the box volume and make a copy of CS_PLOT for .TXT output and linear plots
 				cs_plot = cs_plot/box_volume
-				cs_out = cs_plot										
+				cs_out = cs_plot
 
 				if(j_logsc==1) then
 				  cs_plot = log10(cs_plot)
@@ -1292,14 +1334,69 @@ C *** normalise to the box volume and make a copy of CS_PLOT for .TXT output and
 				else
 				  wedge_label = 'Lin_scale'
 				endif	
-				
+
+C *** interpolate or smooth CS_PLOT by FFT for a more presentable graphical resolution (best in Log_scale)
+        if(j_disp==0.and.j_interp/=0) then            !no post-treatment
+          cut_off = maxval(cs_plot)
+          write(*,*) 'Interpolation factor(INTEGER) (0=OFF, 1=NO INTERP, try 2,3,...)',j_interp
+CC            write(*,*) 'Smoothing factor (1=NO SMOOTH, try 2,3,...)',j_cut
+          write(*,*) 'Smoothing factor(REAL) (1=NO SMOOTH, try 2.,3.5,...)',cut
+          write(*,*) 'I_max(REAL) =',cut_off
+          write(*,*) 'confirm or type new values:'
+          read(*,*) j_interp,cut,cut_off
+          if(j_interp==0) then      !switching interp off
+            n_qxg = n_qx
+            n_qyg = n_qy
+            allocate(cs_pgplot(n_qxg,n_qyg))
+            cs_pgplot = cs_plot
+          else                      !doing interp
+            n_qxg = j_interp*n_qx      !proportional interpolation
+            n_qyg = j_interp*n_qy
+CC              n_q1 =  n_qx/(2.*j_cut)    !proportional smoothing
+CC              n_q2 =  n_qy/(2.*j_cut)    
+            n_q1 =  n_qx/(2.*cut)    !proportional smoothing
+            n_q2 =  n_qy/(2.*cut)    
+
+            do i=1,n_qx
+            do j=1,n_qy
+              if(cs_plot(i,j)>cut_off) cs_plot(i,j)=cut_off
+CC            cs_plot(i,j) = (.5,0)*(1.-cos(twopi*(i*i+j*j)/real(n_qx*n_qy)))												!
+CC					  dat(n_shift+i) = 1.												!
+            enddo
+            enddo
+
+            allocate(cs4(n_qx,n_qy))
+            allocate(cs_plot2(n_qxg,n_qyg),cs_pgplot(n_qxg-1,n_qyg-1))
+
+            cs4 = fft((1.,.0)*cs_plot)
+
+C *** intercalate zeros for interpolation
+            cs_plot2 = (.0,.0)
+            cs_plot2(1:n_q1,1:n_q2) = cs4(1:n_q1,1:n_q2)
+            cs_plot2(1:n_q1,n_qyg-n_q2+1:n_qyg) = cs4(1:n_q1,n_qy-n_q2+1:n_qy)
+            cs_plot2(n_qxg-n_q1+1:n_qxg,1:n_q2) = cs4(n_qx-n_q1+1:n_qx,1:n_q2)
+            cs_plot2(n_qxg-n_q1+1:n_qxg,n_qyg-n_q2+1:n_qyg) = cs4(n_qx-n_q1+1:n_qx,n_qy-n_q2+1:n_qy)
+         
+            cs_pgplot = real(fft(cs_plot2,inv=.true.)/(1.*n_qx*n_qy))
+            deallocate(cs_plot2,cs4)
+            n_qxg = n_qxg-1     !the last point is off the interpolation range!
+            n_qyg = n_qyg-1
+          endif
+        else      !for the moment no interpolation for the dispersion plots (being too grainy)
+          j_interp = 0
+          n_qxg = n_qx
+          n_qyg = n_qy
+          allocate(cs_pgplot(n_qxg,n_qyg))
+          cs_pgplot = cs_plot
+        endif
+
 C **** Draw the plot  
 				f_min = 0.
 				if(f_max==.0) f_max = f_max_plot
 				
 				if(c_min_save==0..and.c_max_save==0.) then
-					c_min = anint(minval(cs_plot)-1.)
-					c_max = anint(maxval(cs_plot)+1.)
+					c_min = anint(minval(cs_pgplot)-1.)
+					c_max = anint(maxval(cs_pgplot)+1.)
 				endif
 				if(j_logsc==1.and.c_min<-8.) c_min = -8.
 				write(*,*) 'c_min,c_max',c_min,c_max
@@ -1308,13 +1405,13 @@ C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel
 				if(j_disp==0) then
 					tr_shift_x = .5
 					tr_shift_y = .5
-					if(n_qx==2*(n_qx/2)) tr_shift_x = 1.
-					if(n_qy==2*(n_qy/2)) tr_shift_y = 1.
-					TR(2) = bz_n/n_qx
+					if(n_qxg==2*(n_qxg/2)) tr_shift_x = 1.
+					if(n_qyg==2*(n_qyg/2)) tr_shift_y = 1.
+					TR(2) = bz_n/n_qxg
 					TR(1) = qx_min-tr_shift_x*TR(2)		
 					TR(3) = 0.0
 					TR(5) = 0.0
-					TR(6) = bz_n/n_qy
+					TR(6) = bz_n/n_qyg
 					TR(4) = qy_min-tr_shift_y*TR(6)
 				elseif(j_disp==1)then
 					if(n_qdisp==2*(n_qdisp/2)) tr_shift_x = 1.
@@ -1367,13 +1464,13 @@ C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel
 					
 					if(j_disp==0) then
 						if(abs(j_plot)<=1) then
-							write(plot_title2,113) q_center,trim(at_weight_scheme(j_weight)),trim(mode)
+							write(plot_title2,113) q_center,trim(at_weight_scheme(j_weight)),trim(mode),j_interp,cut,cut_off
 						else 
-							write(plot_title2,114) q_center,f_plot,trim(at_weight_scheme(j_weight)),trim(mode)
+							write(plot_title2,114) q_center,f_plot,trim(at_weight_scheme(j_weight)),trim(mode),j_interp,cut,cut_off
 						endif
 CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)   
-113   			format('  Q = [',3f6.2,']   Total scattering  ',a,'  ',a)   
-114   			format('  Q = [',3f6.2,']   Energy =',f6.3,' [THz]  ',a,'  ',a)  
+113   			format('  Q = [',3f6.2,']   Total scattering  ',a,'  ',a,'  Map: ',i2,f5.1,f5.1)   
+114   			format('  Q = [',3f6.2,']   Energy =',f6.3,' [THz]  ',a,'  ',a,'  Map: ',i2,f5.1,f5.1)  
             if(input_method=='BULK') then
               write(x_title,130)e1
               write(y_title,130)e2
@@ -1391,7 +1488,7 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						CALL PGSCH(.7)					!set character height					
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
-						CALL PGIMAG(cs_plot(1:n_qx,1:n_qy),n_qx,n_qy,1,n_qx,1,n_qy,c_min,c_max,TR)
+						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
 						CALL PGWEDG('RI', 1., 3., c_min, c_max,trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					elseif(j_disp==1) then
 						write(plot_title2,115) q1_3d+(i_plot-n_plot/2-1)*dq_p,q2_3d+(i_plot-n_plot/2-1)*dq_p,
@@ -1405,7 +1502,7 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						CALL PGSCH(.7)					!set character height					
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
-						CALL PGIMAG(cs_plot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
 				
@@ -1452,24 +1549,31 @@ C **** make an optional hardcopy and .txt output
 				if (j_ps.eq.1) then				!j_ps				
 					jfile = 1
 					do						!look for existing .txt files to continue numbering
-			if(t_single)then
-						write(file_res,107) trim(file_master),jfile
-						if(index(pg_out,'ps')/=0)then
-						  write(file_ps,116) trim(file_master),jfile,'ps'
-						elseif(index(pg_out,'png')/=0)then
-						  write(file_ps,116) trim(file_master),jfile,'png'						
-						endif
-			else
-						write(file_res,108) trim(file_master),nfile_min,nfile,jfile							
-						if(index(pg_out,'ps')/=0)then
-						  write(file_ps,117) trim(file_master),nfile_min,nfile,jfile,'ps'
-						elseif(index(pg_out,'png')/=0)then
-						  write(file_ps,117) trim(file_master),nfile_min,nfile,jfile,'png'					
-						endif
-			endif
+            if(t_single)then
+                write(file_res,107) trim(file_master),jfile
+                write(file_ps,116) trim(file_master),jfile,trim(pg_ext)
+            else			
+              write(c_jfile,'("_",i2.2)') jfile
+              if(nfile_min<=9999) then
+                write(c_nfile_min,'(i4.4)') nfile_min
+              elseif(nfile_min>=10000) then
+                write(c_nfile_min,'(i8)') nfile_min
+              endif
+              c_nfile_min = '_'//adjustl(c_nfile_min)
+      
+              if(nfile<=9999) then
+                write(c_nfile,'(i4.4)') nfile
+              elseif(nfile>=10000) then
+                write(c_nfile,'(i8)') nfile
+              endif
+              c_nfile = '_'//adjustl(c_nfile)
+      
+              file_res = trim(file_master)//'_sq'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//'.txt'							
+              file_ps  = trim(file_master)//'_sq'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//trim(pg_ext)
+            endif
 107   			format(a,'_sq_',i2.2,'.txt')
 108   			format(a,'_sq_',i4.4,'_',i4.4,'_',i2.2,'.txt')
-116   			format(a,'_sq_',i2.2,'.',a)
+116   			format(a,'_sq_',i2.2,a)
 117   			format(a,'_sq_',i4.4,'_',i4.4,'_',i2.2,'.',a)
 						inquire(file=file_res,exist=found_txt)
 						inquire(file=file_ps,exist=found_ps)
@@ -1597,7 +1701,7 @@ CC					IF (PGOPEN(trim(file_ps)//'/PNG').LE.0) STOP
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title))			!put plot title on 2 lines
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.0)					!set character height					
-						CALL PGIMAG(cs_plot(1:n_qx,1:n_qy),n_qx,n_qy,1,n_qx,1,n_qy,c_min,c_max,TR)
+						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					elseif(j_disp==1) then
 						CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
@@ -1606,7 +1710,7 @@ CC					IF (PGOPEN(trim(file_ps)//'/PNG').LE.0) STOP
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title))			!put plot title on 2 lines
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
-						CALL PGIMAG(cs_plot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
 
@@ -1767,7 +1871,7 @@ C
 C
 C **** deallocate and cycle loops
 C				
-				deallocate(cs_plot,cs_out)				!,cross_sec
+				deallocate(cs_plot,cs_pgplot,cs_out)				!,cross_sec
 				if(abs(j_plot)>1.and.j_disp.ge.1) deallocate(qq,ff)
 
 			enddo plot_loop
@@ -1777,9 +1881,10 @@ C
 
 				do
 					if(j_plot==0.or.abs(j_plot)==3.or.abs(j_plot)==5.or.j_exit==1) then
-						write(*,*) 'Choose a plot option (',trim(pg_out),'/TXT file output is ',trim(ps_out(j_ps+1)),'):'
-							write(*,*) '       0  EXIT'
-							write(*,*) '       1  explore total scattering     (-1 edit atom masks)'
+CC						write(*,*) 'Choose a plot option (',trim(pg_out),'/TXT file output is ',trim(ps_out(j_ps+1)),'):'
+						write(*,*) 'Choose a plot option (FILE output is ',trim(ps_out(j_ps+1)),'):'
+              write(*,*) '       0  EXIT'
+              write(*,*) '       1  explore total scattering     (-1 edit atom masks)'
 						if(t_step>.0) then			
 							write(*,*) '       2  explore E=const maps         (-2 edit atom masks)'
 							write(*,*) '       3  make a stack of E=const maps (-3 reset atom masks)'
@@ -1792,12 +1897,17 @@ C
 								if(j_oneph==0) write(*,*) '       7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
 								if(j_oneph==1) write(*,*) '       7  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
 							endif
-							if(j_ps==0) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output ON (mind the TXT switch in PAR)'
-							if(j_ps==1) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output OFF (mind the TXT switch in PAR)'
+CC							if(j_ps==0) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output ON (mind the TXT switch in PAR)'
+CC							if(j_ps==1) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output OFF (mind the TXT switch in PAR)'
+							write(*,*) '       8  toggle the FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the TXT switch in PAR)'
 							if(j_qsq==0) write(*,*) '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
 							if(j_qsq==1) write(*,*) '       9  toggle the S(Q) scaling to S(Q)/Q^2'
 							write(*,*) '      10  options: change the time integration window width, weighting etc.'		!include here the straight FT option
 							read(*,*) j_plot
+						  if(t_step==.0.and.j_plot>1.and.j_plot<6) then
+						    write(*,*) 'Inelastic options not accessible with t_step = 0'
+						    cycle
+						  endif										
 					endif
 
 					if(j_plot==0) exit map_loop
@@ -1826,10 +1936,14 @@ C
 					if(j_plot==10) then
 						write(*,*) 'Present values: '									
 						write(*,*) 
-     1			'   j_weight,     j_wind,      j_fft,    j_logsc,     j_grid,      nfile,      n_int,       f_max,         p_size:'
-						write(*,*) j_weight,j_wind,j_fft,j_logsc,j_grid,nfile,n_int,f_max,p_size
-						write(*,*) 'New values(after j_weight, j_wind or j_fft change go on via 6):'
-						read(*,*) j_weight,j_wind,j_logsc,j_grid,nfile,n_int,f_max,p_size,j_fft
+     1			'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
+						write(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
+						write(*,*) 'Input new values(after j_weight, j_wind or j_fft change go on via 6):'
+						read(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
+						write(*,*) 'New values: '									
+						write(*,*) 
+     1			'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
+						write(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
 						if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd				
 						n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step
 						t_width = .5*n_int*t_step
@@ -2015,6 +2129,7 @@ c
       enddo
       end
 c
+C **********************************************************************************************************
 C **** string conversion to all upper case
 C     
  			subroutine up_case (string)
@@ -2031,3 +2146,19 @@ C
 
 			end subroutine up_case	     
 
+C **** string conversion to all lower case
+C          
+ 			subroutine down_case (string)
+
+			character(*), intent(inout)	:: string
+			integer											:: j, nc
+			character(len=26), parameter	:: lower = 'abcdefghijklmnopqrstuvwxyz'
+			character(len=26), parameter	:: upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+			do j = 1, len(string)
+				nc = index(upper, string(j:j))
+				if (nc > 0) string(j:j) = lower(nc:nc)
+			end do
+
+			end subroutine down_case	     
+     

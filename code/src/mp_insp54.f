@@ -108,7 +108,12 @@ C **** open a t-snapshot file and read its header
 				if(jt==0)then
 					file_dat = './data/'//trim(file_master)//'.dat'
 				else
-					write(file_dat,101) trim(file_master),jt
+          if(jt<=9999) then
+            write(file_dat,101) trim(file_master),jt
+          elseif(jt>=10000) then
+            write(string,'(i8)') jt
+            file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+          endif
 				endif 			
 101   	format('./data/',a,'_n',i4.4,'.dat')
 

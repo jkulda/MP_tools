@@ -70,7 +70,7 @@ C *****
 			logical        :: found_txt,found_ps,t_single,nml_in	
       character(4),allocatable   :: at_label(:),at_name_par(:)
       character(4)   :: version,head,atom
-      character(10)  :: string,section,ax_label,pg_out,c_date,c_time,c_zone
+      character(10)  :: string,section,ax_label,pg_out,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
       character(16)  :: dat_source,string16
       character(40)  :: file_master,file_inp,time_stamp,x_title,y_title,at_weight_scheme(2),x_file_name
       character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,string_in
@@ -159,23 +159,24 @@ C *** Generate data file access
 			write(*,*) 'Input data file_master: '
 			read(*,*) file_master 
 						
-      write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
+      write(*,*) 'Read data files number min, max: '
       read(*,*)   nfile_min,nfile_max
       nfile_step = 1
-			t_single = nfile_min==0.and.nfile_max==0
 
-			if(t_single)then
-				nfile_min = 1		!for conformity with loop control conventions
-				nfile_max = 1
-			endif
-			
+      if((nfile_max-nfile_min)<10) then
+        write(*,*) 'The trajectory is too short: >= 10 snapshots needed'
+        stop
+      endif
+      	
       nfile = ((nfile_max-nfile_min)/nfile_step)+1
       
-			if(t_single)then
-				write(file_dat_t0,'("./data/",a,".dat")') trim(file_master)
-			else
-				write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
-			endif
+      if(nfile_min<=9999) then
+        write(file_dat_t0,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min
+      elseif(nfile_min>=10000) then
+        write(string,'(i8)') nfile_min
+        file_dat_t0 = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+      endif
+
 
 	    open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
 			if(ios.ne.0) then
@@ -318,7 +319,14 @@ C *** read neutron scattering lengths (always)
 			
 C **** for an MD snapshot sequence open a second data file to see the time step between recorded snapshots
 			if(sim_type=='TIMESTEP') then
-				write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
+
+        if((nfile_min+nfile_step)<=9999) then
+          write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
+        elseif((nfile_min+nfile_step)>=10000) then
+          write(string,'(i8)') nfile_min+nfile_step
+          file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        endif
+
 				open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
 				if(ios.ne.0) then
 					write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
@@ -382,7 +390,13 @@ C
       file_loop: do jfile=nfile_min,nfile_min+nfile-1
 
 C ***  open the binary MD snapshot file
-				write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
+        if(jfile<=9999) then
+          write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
+        elseif(jfile>=10000) then
+          write(string,'(i8)') jfile
+          file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        endif
+
 CC        write(*,*) file_dat
         open (1,file=file_dat,action='read',status ='old',access='direct',form='unformatted',recl=4*l_rec,iostat=ios)
         if(ios.ne.0) then
@@ -624,11 +638,26 @@ C **** make an optional hardcopy and .txt output
 				if (j_ps.eq.1) then				!j_ps	
 					jfile = 1
 					do						!look for existing .txt files to continue numbering
-						write(file_res,108) trim(file_master),nfile_min,nfile,jfile
-108   			format(a,'_',i4.4,'_',i4.4,'_dos_',i2.2,'.txt')
+
+            write(c_jfile,'("_",i2.2)') jfile
+            if(nfile_min<=9999) then
+              write(c_nfile_min,'(i4.4)') nfile_min
+            elseif(nfile_min>=10000) then
+              write(c_nfile_min,'(i8)') nfile_min
+            endif
+            c_nfile_min = '_'//adjustl(c_nfile_min)
+    
+            if(nfile<=9999) then
+              write(c_nfile,'(i4.4)') nfile
+            elseif(nfile>=10000) then
+              write(c_nfile,'(i8)') nfile
+            endif
+            c_nfile = '_'//adjustl(c_nfile)
+    
+            file_res = trim(file_master)//'_dos'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//'.txt'							
+            file_ps  = trim(file_master)//'_dos'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//'.ps'
+
 						inquire(file=file_res,exist=found_txt)
-						write(file_ps,117) trim(file_master),nfile_min,nfile,jfile	
-117   			format(a,'_',i4.4,'_',i4.4,'_dos_',i2.2,'.ps')
 						inquire(file=file_ps,exist=found_ps)
 
 						if(.not.found_txt.and.(.not.found_ps)) exit				
