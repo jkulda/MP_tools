@@ -38,7 +38,7 @@ C ***** Ver 1.53  - introduces semi-sequential binary data format
 C *****						- record length 4096, all data 32bit length
 C *****						- at_mass is saved as at_veloc(4,j,k)
 C *****						- at_charge is saved as at_pos(4,j,k)
-C *****           - CELL, fast and BULK data type
+C *****           - CELL and BULK data type
 C ***** 
 C ***** Ver 1.54  - improved handling of the BULK type: avoid the BZ concept 
 C *****           - J_QSQ option to divide S(Q,w) by Q^2 to improve clarity of color maps
@@ -102,7 +102,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
 
       integer :: j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,jm,j1m,j2m,j_bc,j_exit,j_sq
       integer :: i,ii,iii,j,jj,i1,i2,i3,k,kk,l,ll,ios,ier,iflag,j_at,i_rec,nrec,nsuper,nrow,nlayer,n_r1,n_r2,n_row_save(3)
-      integer :: j_basis,j_centred,j_test,j_mult,nfile,nfile_0,nfile_min,nfile_max,ifile,jfile,nfile_step,nqx_min,nqy_min
+      integer :: j_basis,j_centred,j_test,j_mult,nfile,nfile_0,nfile_min,nfile_max,nfile_mem,ifile,jfile,nfile_step,nqx_min,nqy_min
       integer :: n_site,j_dir,i_shift,i_time(8),j_weight,j_wind,j_qsq
       integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max,n_q1,n_q2,n_qxg,n_qyg
       integer :: e1(3),e2(3),ev(3),j_scan,j_freq,i_plot,j_plot,n_plot,i_step
@@ -129,8 +129,8 @@ C
       
       real(4),allocatable ::	at_occup_r(:),cs_plot(:,:),cs_out(:,:),cs_pgplot(:,:)
       real(4),allocatable,target ::	at_pos_in(:,:)
- 			real(4), pointer :: at_pos_file(:,:,:,:)
- 			real(4), pointer :: at_pos_file_bulk(:,:,:)
+ 			real(4), pointer :: at_pos_file(:,:,:)
+ 			real(4), pointer :: at_pos_file_bulk(:,:)
 
       character(16)  :: sim_type,dat_type,input_method,file_par,subst_name,dat_source,string16
       integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
@@ -153,7 +153,7 @@ C *** PGPLOT stuff
                           !what is of global interest they should pass into data_header
 CC      namelist /mp_bin/ sim_type,dat_type,input_method,subst_name,data_path,ext,eps_x,n_atom,n_row,
 CC     1      j_basis,j_centred,j_test,j_mult,j_shrec,  n_tot_in,a_cell_par,temp_par,rec_str
-      namelist /mp_sqom/ n_int,s_trig,j_oneph,j_qsq,j_wind,j_interp
+      namelist /mp_sqom/ nfile_mem,nfile_step,n_int,s_trig,j_oneph,j_qsq,j_wind,j_interp
 
 C
 C ********************* Initialization *******************************      
@@ -202,6 +202,8 @@ C *** other initialisations
 			cut = 1.
 			cut_off = 1.
 			eps_x = .05
+      nfile_step = 1
+      nfile_mem = 200
 
 C *** Generate data file access
 			write(*,*) 'Input data file_master: '
@@ -209,7 +211,6 @@ C *** Generate data file access
 						
       write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
       read(*,*)   nfile_min,nfile_max
-      nfile_step = 1
 			t_single = nfile_min==0.and.nfile_max==0
 
 			if(t_single)then
@@ -490,80 +491,80 @@ C ********************* OpenMP initialization end ******************************
 
 C *** cycle over snapshot files to accumulate input data
 C
-			allocate(at_pos_in(4*n_tot,nfile),at_ind_in(4*n_tot))			
 
       write(*,*) 'Input files:'
 
 			CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
 			sc_r = 1./sc_r
 
-			ifile = 0
-      file_loop: do jfile=nfile_min,nfile_max,nfile_step
+  		allocate(at_ind_in(4*n_tot))			
+
+      if(nfile<=nfile_mem) then             !if snapshots fit into the memory, read them all at once
+  			allocate(at_pos_in(4*n_tot,nfile))			
+
+        ifile = 0
+        file_loop: do jfile=nfile_min,nfile_max,nfile_step
 
 C ***  open the binary MD snapshot file
-				if(t_single)then
-					write(file_dat,'("./data/",a,".dat")') trim(file_master)
-				else
-          if(jfile<=9999) then
-            write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
-          elseif(jfile>=10000) then
-            write(string,'(i8)') jfile
-            file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+          if(t_single)then
+            write(file_dat,'("./data/",a,".dat")') trim(file_master)
+          else
+            if(jfile<=9999) then
+              write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
+            elseif(jfile>=10000) then
+              write(string,'(i8)') jfile
+              file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+            endif
           endif
-				endif
 
-        open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
-        if(ios.ne.0) then
-        	write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
-        	write(*,*) 'Skip(1), stop execution(0)?'
+          open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
+          if(ios.ne.0) then
+            write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
+        	write(*,*) 'Skip this one (2), skip the rest (1), stop execution(0)?'
         	read(*,*) jj
+        	if(jj==2) cycle file_loop
         	if(jj==1) exit file_loop
-        	if(jj==0) stop
-        endif
-				ifile = ifile+1				
-        if(jfile==nfile_min.or.ifile==100*(ifile/100)) write(*,*) file_dat
+          if(jj==0) stop
+          endif
+          ifile = ifile+1				
+          if(jfile==nfile_min.or.ifile==100*(ifile/100)) write(*,*) file_dat
 CC       if(jfile==nfile_min.or.ifile==10*(ifile/10)) then
 CC 					CALL SYSTEM_CLOCK (COUNT = sc_c2)				!, COUNT MAX = sc_m)
 CC          write(*,*) (sc_c2-sc_c1)*sc_r,file_dat				!,jfile,ifile
 CC        endif
 
-				ind_at(1) = 0
-				do j = 2,n_atom
-					ind_at(j) = ind_at(j-1)+nsuper_r(j-1)
-				enddo
+          ind_at(1) = 0
+          do j = 2,n_atom
+            ind_at(j) = ind_at(j-1)+nsuper_r(j-1)
+          enddo
 
-				i_rec = n_head	
-				do j=1,n_rec-1
-					i_rec = i_rec+1
-					if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			!only needed for 1_phonon with CELL 
-				enddo	
-				i_rec = i_rec+1
-				if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
-			
-				do j=1,n_rec-1
-					i_rec = i_rec+1
-					read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,ifile)			
-				enddo	
-				i_rec = i_rec+1
-				read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,ifile)					
-				close(1)
-			enddo file_loop
-     
-			if(input_method=='CELL'.or.input_method=='FAST') then
-				at_ind(1:4,1:nsuper,1:n_atom) => at_ind_in
-				at_pos_file(1:4,1:nsuper,1:n_atom,1:nfile) => at_pos_in
-			else
-				at_pos_file_bulk(1:4,1:n_tot,1:nfile) => at_pos_in
-			endif				
+          i_rec = n_head	
+          do j=1,n_rec-1
+            i_rec = i_rec+1
+            if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			!only needed for 1_phonon with CELL 
+          enddo	
+          i_rec = i_rec+1
+          if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
+      
+          do j=1,n_rec-1
+            i_rec = i_rec+1
+            read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,ifile)			
+          enddo	
+          i_rec = i_rec+1
+          read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,ifile)					
+          close(1)
+        enddo file_loop
 
-			if(ifile.ne.nfile) then						!update nfile in case of shorter sequence
-				nfile = ifile
-			endif
-			nfile_0 = nfile				!for later memory
-			
+        if(ifile.ne.nfile) then						!update nfile in case of shorter sequence
+          nfile = ifile
+        endif
+        nfile_0 = nfile				!for later memory
 				CALL SYSTEM_CLOCK (COUNT = sc_c2)
 				write(*,*) nfile,' files read in ',(sc_c2-sc_c1)*sc_r, ' sec SYS time'
 
+      endif  !nfile <= nfile_mem
+     
+			
 CC      do
 CC        write(*,*) 'irec,ifil'
 CC        read(*,*) i,ifile
@@ -791,14 +792,73 @@ CC					t_wind(i) = t_wind(i)-0.012604*cos(3.*twopi*(i)/real(n_int+1))
         endif
 				  
 				t_sum = .0
-				call cpu_time(t1)
-				
+				call cpu_time(t1)				
 				CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
 				sc_r = 1./sc_r
 
 				allocate(cs_atom(nfile,n_atom,n_qx,n_qy))
 							 
 				frame_loop: do ifile=1,nfile
+
+          if(nfile>nfile_mem) then
+            allocate(at_pos_in(4*n_tot,1))
+            jfile = nfile_min+(ifile-1)*nfile_step
+            if(jfile<=9999) then
+              write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),jfile
+            elseif(jfile>=10000) then
+              write(string,'(i8)') jfile
+              file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+            endif
+            open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
+            if(ios.ne.0) then
+              write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
+              write(*,*) 'Skip the rest (1), stop execution(0)?'
+              read(*,*) jj
+              if(jj==1) exit frame_loop
+              if(jj==0) stop
+            endif
+
+            if(jfile==nfile_min.or.ifile==100*(ifile/100)) write(*,*) file_dat
+CC       if(jfile==nfile_min.or.ifile==10*(ifile/10)) then
+CC 					CALL SYSTEM_CLOCK (COUNT = sc_c2)				!, COUNT MAX = sc_m)
+CC          write(*,*) (sc_c2-sc_c1)*sc_r,file_dat				!,jfile,ifile
+CC        endif
+
+            ind_at(1) = 0
+            do j = 2,n_atom
+              ind_at(j) = ind_at(j-1)+nsuper_r(j-1)
+            enddo
+
+            i_rec = n_head	
+            do j=1,n_rec-1
+              i_rec = i_rec+1
+              if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			!only needed for 1_phonon with CELL 
+            enddo	
+            i_rec = i_rec+1
+            if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
+      
+            do j=1,n_rec-1
+              i_rec = i_rec+1
+              read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,1)			
+            enddo	
+            i_rec = i_rec+1
+            read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,1)					
+            close(1)
+
+            if(input_method=='CELL') then
+              at_ind(1:4,1:nsuper,1:n_atom) => at_ind_in
+              at_pos_file(1:4,1:nsuper,1:n_atom) => at_pos_in
+            else
+              at_pos_file_bulk(1:4,1:n_tot) => at_pos_in
+            endif				
+          else
+            if(input_method=='CELL') then
+              at_ind(1:4,1:nsuper,1:n_atom) => at_ind_in
+              at_pos_file(1:4,1:nsuper,1:n_atom) => at_pos_in(:,ifile)
+            else
+              at_pos_file_bulk(1:4,1:n_tot) => at_pos_in(:,ifile)
+            endif				
+          endif
 				
 				  if(j_oneph==1) then      !do one-phonon approximation
 CC	  	  	nrow = n_row(1)					!!!!!!!!!!! modify to N_ROW
@@ -813,11 +873,11 @@ CC	  	  	nrow = n_row(1)					!!!!!!!!!!! modify to N_ROW
               if(j_dir==1)then											!(hk0) plane - vertical [0 0 1]
 							ii = 0
               do i=1,nsuper
-              	if(at_pos_file(1,i,j,ifile)/=.0.or.at_pos_file(2,i,j,ifile)/=.0.or.at_pos_file(3,i,j,ifile)/=.0) then
+              	if(at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0) then
  									k = at_ind(1,i,j)
 									l = at_ind(2,i,j)
-									d_x = at_pos_file(1,i,j,ifile)-at_base(j,1)-at_ind(1,i,j)+n_row(1)/2
-									d_y = at_pos_file(2,i,j,ifile)-at_base(j,2)-at_ind(2,i,j)+n_row(2)/2
+									d_x = at_pos_file(1,i,j)-at_base(j,1)-at_ind(1,i,j)+n_row(1)/2
+									d_y = at_pos_file(2,i,j)-at_base(j,2)-at_ind(2,i,j)+n_row(2)/2
 									u_x(k,l) = u_x(k,l)+d_x			!*c_f     !staying in the plane
 									u_y(k,l) = u_y(k,l)+d_y			!*c_f
  								endif
@@ -826,14 +886,14 @@ CC	  	  	nrow = n_row(1)					!!!!!!!!!!! modify to N_ROW
               elseif(j_dir==2) then     ! the (h h l) plane
 
               do i=1,nsuper
-              	if(at_pos_file(1,i,j,ifile)/=.0.or.at_pos_file(2,i,j,ifile)/=.0.or.at_pos_file(3,i,j,ifile)/=.0) then
+              	if(at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0) then
 CC                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
                   k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,(n_row(1)+n_row(2))/2)+1
                   l = at_ind(3,i,j)
-                  d_x = at_pos_file(1,i,j,ifile)-at_base(j,1)-at_ind(1,i,j)+n_row(1)/2+1
-                  d_x = d_x+at_pos_file(2,i,j,ifile)-at_base(j,2)-at_ind(2,i,j)+n_row(2)/2+1
+                  d_x = at_pos_file(1,i,j)-at_base(j,1)-at_ind(1,i,j)+n_row(1)/2+1
+                  d_x = d_x+at_pos_file(2,i,j)-at_base(j,2)-at_ind(2,i,j)+n_row(2)/2+1
                   d_x = d_x/sqrt2
-                  d_y = at_pos_file(3,i,j,ifile)-at_base(j,3)-at_ind(3,i,j)+n_row(3)/2+1
+                  d_y = at_pos_file(3,i,j)-at_base(j,3)-at_ind(3,i,j)+n_row(3)/2+1
                   u_x(k,l) = u_x(k,l)+d_x   !staying in the plane
                   u_y(k,l) = u_y(k,l)+d_y
  								endif
@@ -870,11 +930,11 @@ CC                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
 				  else                    !j_oneph/=1 do the complete NUFFT thing
  						do j = 1,n_atom
 							allocate(xf(n_sup(j)),yf(n_sup(j)),cf(n_sup(j)))																	
- 
-   						if(input_method=='CELL'.or.input_method=='FAST') then
+
+					if(input_method=='CELL') then
 								ii = 0
 								do i=1,nsuper
-									non_zero = (at_pos_file(1,i,j,ifile)/=.0.or.at_pos_file(2,i,j,ifile)/=.0.or.at_pos_file(3,i,j,ifile)/=.0)
+									non_zero = (at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0)
 									inside = .true.
 									do iii=1,3
 										inside = inside.and.((at_ind(iii,i,j)-n_row(iii)/2-1)>=at_pos_min(iii).and.
@@ -883,9 +943,9 @@ CC                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
 
 									if(non_zero.and.inside) then
 										ii = ii+1
-										xf(ii) = dot_product(e1,(at_pos_file(1:3,i,j,ifile)-at_pos_centre))*tpe1
-										yf(ii) = dot_product(e2,(at_pos_file(1:3,i,j,ifile)-at_pos_centre))*tpe2
-										cf(ii) = cexp((0.,-1.)*dot_product(tpq_center,at_pos_file(1:3,i,j,ifile)))
+										xf(ii) = dot_product(e1,(at_pos_file(1:3,i,j)-at_pos_centre))*tpe1
+										yf(ii) = dot_product(e2,(at_pos_file(1:3,i,j)-at_pos_centre))*tpe2
+										cf(ii) = cexp((0.,-1.)*dot_product(tpq_center,at_pos_file(1:3,i,j)))
 										if(j_wind==1) cf(ii) = cf(ii)*(1+cos(xf(ii)))*(1+cos(yf(ii)))     !apply Hann window in space, include phase shift into x,y directly
 									endif
 								enddo              
@@ -895,21 +955,21 @@ CC                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
 									inside = .true.
 									do iii=1,3
 									 if(nsuper==1) then
-										inside = inside.and.(at_pos_file_bulk(iii,ind_at(j)+i,ifile)>=(at_pos_min(iii)-eps_x).and.
-     1										at_pos_file_bulk(iii,ind_at(j)+i,ifile)<(at_pos_max(iii))+eps_x)     !!!+1
+										inside = inside.and.(at_pos_file_bulk(iii,ind_at(j)+i)>=(at_pos_min(iii)-eps_x).and.
+     1										at_pos_file_bulk(iii,ind_at(j)+i)<(at_pos_max(iii))+eps_x)     !!!+1
      							 else
-										inside = inside.and.(at_pos_file_bulk(iii,ind_at(j)+i,ifile)>=(at_pos_min(iii)-1).and.
-     1										at_pos_file_bulk(iii,ind_at(j)+i,ifile)<(at_pos_max(iii))+1)     !!!+1
+										inside = inside.and.(at_pos_file_bulk(iii,ind_at(j)+i)>=(at_pos_min(iii)-1).and.
+     1										at_pos_file_bulk(iii,ind_at(j)+i)<(at_pos_max(iii))+1)     !!!+1
      							 endif
 									enddo
 									if(inside)then
 										ii = ii+1
-										xf(ii) = dot_product(e1,(at_pos_file_bulk(1:3,ind_at(j)+i,ifile)-at_pos_centre))*tpe1
-										yf(ii) = dot_product(e2,(at_pos_file_bulk(1:3,ind_at(j)+i,ifile)-at_pos_centre))*tpe2
-										cf(ii) = cexp((0.,-1.)*dot_product(tpq_center,at_pos_file_bulk(1:3,ind_at(j)+i,ifile)))
+										xf(ii) = dot_product(e1,(at_pos_file_bulk(1:3,ind_at(j)+i)-at_pos_centre))*tpe1
+										yf(ii) = dot_product(e2,(at_pos_file_bulk(1:3,ind_at(j)+i)-at_pos_centre))*tpe2
+										cf(ii) = cexp((0.,-1.)*dot_product(tpq_center,at_pos_file_bulk(1:3,ind_at(j)+i)))
 										if(j_wind==1) cf(ii) = cf(ii)*(1+cos(xf(ii)))*(1+cos(yf(ii)))     !apply Hann window in space, include phase shift into x,y directly
 									else
-                    write(*,*) ii,at_pos_file_bulk(1:3,ind_at(j)+i,ifile)
+                    write(*,*) ii,at_pos_file_bulk(1:3,ind_at(j)+i)
                     read(*,*)								
                		endif
 								enddo							
@@ -930,8 +990,13 @@ CC              cs_atom(ifile,j,:,:) = ampl_tot_2d/sqrt(real(n_fft))
               cs_atom(ifile,j,:,:) = ampl_tot_2d
  				 			deallocate(xf,yf,cf,ampl_tot_2d,ampl_tot)					!,om_phase(nfile))	
  						enddo  !j (n_atom)
-         endif ! j_oneph
-          if(mod(ifile,200)==0) write(*,*) 'FFT done frame',ifile
+          endif ! j_oneph
+
+          if(mod(ifile,200)==0) write(*,*) 'FT(Q) done frame',ifile
+          if(nfile>nfile_mem) then
+            deallocate(at_pos_in)
+          endif
+
 				enddo frame_loop  !ifile		!finish all file_related normalisation here
 
 				if(j_wind==1) cs_atom = cs_atom*.25			! apply the Hann window norm
@@ -1191,6 +1256,7 @@ CC					write(*,*) 'n_qdisp,q_nx,q_ny 1',n_qdisp,q_nx,q_ny,q_min,q_max
 				if(j_disp==0) then	
 					f_plot = f_map_min+(i_plot-1)*freq_step
 					j_freq = n_freq_min+i_plot-1										!for map
+CC					allocate(cs_plot(n_qx,n_qy),cs_out(n_qx,n_qy),cs3(n_int))					
 					allocate(cs_plot(n_qx,n_qy),cs_out(n_qx,n_qy),cs3(nfile-n_int+1))					
 					cs_plot = .0
 						do i=1,n_int
@@ -1198,36 +1264,33 @@ CC					write(*,*) 'n_qdisp,q_nx,q_ny 1',n_qdisp,q_nx,q_ny,q_min,q_max
 						enddo
 						om_phase = om_phase*t_wind																					!window will be included in om_phase
 
-!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs1,cs3,cs_p1,cs_p2) 
+CCCCCCC!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs1,cs3,cs_p1,cs_p2) 
+!$omp parallel shared(cs,cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs3,cs_p1,cs_p2) 
 !$omp do
 						do ii=1,n_qx
 							do jj=1,n_qy
 								cs3 = .0
 								if(j_sq==1) then                              !calculate the S(Q,w)
                   if(j_atc1== 0) then
-                    do i=1,nfile-n_int+1
-                      cs_p2 => cs(i:i+n_int-1,ii,jj)								!point to a subsection with positive shift in time
-                      cs1 = dot_product(om_phase,cs_p2)
-                      cs3(i) = cs3(i)+cs1*conjg(cs1)
-                    enddo
-                  else                                                  !special pair-correlation case
-                    do i=1,nfile-n_int+1
-                      cs_p1 => cs_atom(i:i+n_int-1,j_atc1,ii,jj)								!point to a subsection with positive shift in time
-                      cs_p2 => cs_atom(i:i+n_int-1,j_atc2,ii,jj)								!point to a subsection with positive shift in time
-                      cs1 = dot_product(om_phase,cs_p1+cs_p2)
-                      cs3(i) = cs3(i)+cs1*conjg(cs1)
-                    enddo
+                    do i=1,n_int
+                      cs_p2 => cs(i:nfile-n_int+i,ii,jj)								!point to a subsection with positive shift in time
+                      cs3 = cs3+om_phase(i)*cs_p2												!Time window to reduce cut-off effects is contained in the phase factor
+                    enddo									
+                  else
+                    do i=1,n_int
+                      cs_p1 => cs_atom(i:nfile-n_int+i,j_atc1,ii,jj)					!point to a subsection with negative shift in time
+                      cs_p2 => cs_atom(i:nfile-n_int+i,j_atc2,ii,jj)								!point to a subsection with positive shift in time
+                      cs3 = cs3+om_phase(i)*(cs_p1+cs_p2)												!Time window to reduce cut-off effects is contained in the phase factor
+                    enddo									
                   endif
+                  cs3 = cs3*conjg(cs3)											
                 else                                   !calculate the I(Q,t)
                   cs_p1 => cs(1:nfile-j_freq,ii,jj)					!point to a subsection with negative shift in time
                   cs_p2 => cs(j_freq+1:nfile,ii,jj)								!point to a subsection with positive shift in time
                   cs3 = cs_p2*(conjg(cs_p1)) 
                   cs3 = cs3*(1./(nfile-j_freq))               
                 endif
-
-								do i=1,nfile-n_int+1
-									cs_plot(ii,jj) = cs_plot(ii,jj)+cs3(i)
-								enddo
+							  cs_plot(ii,jj) = sum(cs3)
 							enddo												
 						enddo	
 !$omp end do
