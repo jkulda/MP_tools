@@ -1,0 +1,59 @@
+Download and uncompress pgplot tarfiles
+
+Download both the pgplot tarfile and the specific configuration files for MacOSX created by Benjamin Weiner and copy/move them into
+cd /usr/local/src/:
+wget -cNS --retr-symlinks ftp://ftp.astro.caltech.edu/pub/pgplot/pgplot5.2.tar.gz 
+wget -cNS http://mingus.as.arizona.edu/~bjw/software/pgplot_macosx_conf.tar
+
+Unpack the tarfiles:
+tar -zxvf pgplot5.2.tar.gz 
+cd /usr/local/src/pgplot/ 
+tar -xvf ../pgplot_macosx_conf.tar
+
+
+Create the installation directory in /usr/local (may need sudo):
+  sudo mkdir -p /usr/local/pgplot
+  cd /usr/local/pgplot/ 
+and  copy there the drivers.list  
+  cp /usr/local/src/pgplot/drivers.list .
+
+to select the drivers edit the drivers.list: uncomment the drivers needed for MP_TOOLS:  
+/NULL, /XSERVE, /PNG, /TPNG, /CPS, /VCPS
+
+Edit the configuration file for your system linux, MacOSX (64bit) 
+(you may need to copy the attached sys_macosx directory into /usr/local/src/pgplot)):
+when using the GCC compiler suite (recommended), change the FCOMPL and CCOMPL lines to 
+FCOMPL="/usr/local/bin/gfortran" 
+CCOMPL="/usr/local/bin/gcc" 
+(btw SHARED_LIB="" so only the static library libpgplot.a will be generated).
+
+Modify the file /usr/local/src/pgplot/makemake:
+comment out the line 
+  pndriv.o : ./png.h ./pngconf.h ./zlib.h ./zconf.h 
+i.e.
+  #pndriv.o : ./png.h ./pngconf.h ./zlib.h ./zconf.h 
+
+Run makemake 
+cd /usr/local/pgplot/ 
+/usr/local/src/pgplot/makemake /usr/local/pgplot macosx gfortran_gcc_64
+
+Copy the corrected PNG driver into the drivers list (overwrite the original one)
+  cp pndriv_corrected.c ./drivers/pndriv.c  
+alternatively, to do the correction, edit the driver source pndriv.c to fix the pointer problem: 
+setjmp(png_ptr->jmpbuf)   should be   setjmp(png_jmpbuf(png_ptr)) (line ≈255)
+
+and then do the make 
+  make 
+runs with (many) warnings, but hopefully no faults; once got through, do
+  make clean 
+The static library libpgplot.a should now be present in /usr/local/pgplot.
+
+Check that there is no older version of libpgplot.a elsewhere in the linking path (/usr/local/lib);
+but there is no point to move the new version there, because anyways the /usr/local/pgplot directory 
+has to be added to the linking path (-L/usr/local/pgplot) to provide access to the other PGPLOT resources;
+
+Linking a fortran code against pgplot needs to include the X11 and the PNG libraries:
+/usr/local/bin/gfortran stuff.f -o stuff -ffixed-line-length-132 -L/usr/pkg/pgplot -lpgplot -lX11 -lpng 
+on systems, where the X11 libraries are not part of standard configuration, you may need 
+to add their path as well (-L/usr/X11/lib)  
+
