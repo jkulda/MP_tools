@@ -104,13 +104,13 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       integer :: i,ii,iii,j,jj,i1,i2,i3,k,kk,l,ll,ios,ier,iflag,j_at,i_rec,nrec,nsuper,nrow,nlayer,n_r1,n_r2,n_row_save(3)
       integer :: j_basis,j_centred,j_test,j_mult,nfile,nfile_0,nfile_min,nfile_max,nfile_mem,ifile,jfile,nfile_step,nqx_min,nqy_min
       integer :: n_site,j_dir,i_shift,i_time(8),j_weight,j_wind,j_qsq
-      integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max,n_q1,n_q2,n_qxg,n_qyg
+      integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max,n_q1,n_q2,n_qxg,n_qyg,n_qxp,n_qyp
       integer :: e1(3),e2(3),ev(3),j_scan,j_freq,i_plot,j_plot,n_plot,i_step
       integer :: sc_c1,sc_c2,sc_m,j_proc,proc_num,proc_num_in,thread_num,thread_num_max
       integer :: ind,j_site,j_q,n_int,n_frame,j_disp,j_mask,j_logsc,j_grid,j_txt,j_ps
-      integer :: j_shrec,j_atom,n_atom,at_no,j_atc1,j_atc2,j_ft,j_coh,j_zero,j_oneph,j_fft,n_head,j_interp,j_cut
+      integer :: j_shrec,j_atom,n_atom,at_no,j_atc1,j_atc2,j_ft,j_coh,j_zero,j_oneph,j_fft,n_head,j_interp,j_interp_x,j_interp_y,j_cut
 
-      real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn,bz_n,eps_x,box_volume,cut
+      real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn,bz_n,eps_x,box_volume,cut_x,cut_y
       real :: at_displ,at_pos(3),at_veloc(3),at_pos_min(3),at_pos_max(3),at_pos_centre(3),a_cell_par(3)
       real :: t2,t3,t4,t_sum,t_dump,t_step,t_dump0,t_tot,tt0,tt,xx,f_width,t_width,temp_par
       real :: f_plot,ff_plot,f_max_plot,freq_step,f_min,ff_min,f_max,ff_max,f_map_min,f_map_max,f_map_step,f_phase
@@ -137,7 +137,7 @@ C
       real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp
 
 C *** PGPLOT stuff
-			integer :: PGOPEN,C1,C2,NC,plot_unit,map_unit_1,map_unit_2
+			integer :: PGOPEN,C1,C2,NC,plot_unit,n_plot_max
 			real :: TR(6),CONTRA,BRIGHT,p_size
       CHARACTER*4 XOPT, YOPT
       REAL XTICK, YTICK
@@ -183,8 +183,7 @@ C ********************* Get a time stamp and open a .LOG file ******************
 C *** other initialisations
 			ps_out = (/'OFF ','ON  '/)			!PGPLOT
 			plot_unit = 0
-			map_unit_1 = -1	
-			map_unit_2 = -1
+			n_plot_max = 7
 			p_size = 7.											!PGPLOT
 			eps_fft = 1.e-6						!finufft
 			iflag = -1						!finufft			
@@ -199,8 +198,10 @@ C *** other initialisations
 			j_wind = 0			!no FT window in space by default
 			j_interp = 0
 			j_cut = 1
-			cut = 1.
-			cut_off = 1.
+CC			cut = 1.
+			cut_x = 1.
+			cut_y = 1.
+			cut_off = 0.
 			eps_x = .05
       nfile_step = 1
       nfile_mem = 200
@@ -319,6 +320,14 @@ C **** Read the auxiliary file <file_title.par> with structure parameters, atom 
 CC      read(4,nml=mp_bin) 
 CC			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
 CC			write(*,*) 'namelist input: j_verb,j_proc,j_shrec,j_grid,sim_type,dat_type',j_verb,j_proc,j_shrec,j_grid,sim_type,dat_type
+
+      if(j_interp>0) then
+        j_interp_x = 1
+        j_interp_y = 1
+      else
+        j_interp_x = 0
+        j_interp_y = 0
+      endif
 
 C *** Read the atom positions       
       rewind(4)
@@ -1061,7 +1070,7 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 					write(*,'("Actual atom masks:",50i3)')(at_mask(i),i=1,n_atom),j_atc1,j_atc2
 				endif
 
-				if(j_plot==-1.or.j_plot==-2.or.j_plot==-3.or.j_plot==-5)	then	!edit atom masks
+				if(j_plot==-1.or.j_plot==-2.or.j_plot==-4)	then	!edit atom masks
 					write(*,*)'Type in atom masks:'
 					do
 						read(*,*)(at_mask(i),i=1,n_atom)
@@ -1113,19 +1122,21 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 
 				elseif(abs(j_plot)==4.or.abs(j_plot)==5) then
 					do
+CC						write(*,*) 'ev,q_v',ev,q_v					
 						write(*,*) 'E(Q) map: initial and final points Q1, Q2 [hkl]:'
 						read(*,*) q1_3d,q2_3d					
 						q1 =q1_3d-q_v
 						q2 =q2_3d-q_v	
 						if(dot_product(q1,ev).ne.0.)then
-							write(*,*) 'Q1 not in the Q-plane:',q1
+							write(*,*) 'Q1 not in the Q-plane:',q1,(dot_product(q1,ev))
 							cycle
 						endif
 						if(dot_product(q2,ev).ne.0.)then
-							write(*,*) 'Q2 not in the Q-plane:',q2
+							write(*,*) 'Q2 not in the Q-plane:',q2,(dot_product(q2,ev))
 							cycle
 						endif
-						exit
+CC            write(*,*) 'q1,q2',q1,q2
+ 						exit
 					enddo
 
 					j_disp = 1									! E(Q) "dispersion" map
@@ -1139,7 +1150,7 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 					if(abs(j_plot)==5) then
 						write(*,*) 'perpendicular Q_step length [rlu]:'
 						read(*,*) q_step
-						n_plot = 7
+						n_plot = n_plot_max
 						dq = q2-q1
 						dq_p = (/dq(2)*ev(3)-dq(3)*ev(2),dq(3)*ev(1)-dq(1)*ev(3),dq(1)*ev(2)-dq(2)*ev(1)/) !dq_p is perpendicular in plane to dq
 						dq_p = -1.*dq_p/sqrt(dot_product(dq_p,dq_p))													
@@ -1224,10 +1235,21 @@ C **** now generate the plot data according to the particular case specs
 						cycle
 					endif
 								
-					n_q1x = abs(q1_x-qx_min)*n_row(1)*e1_norm+1			!find indices of the first and last Q_points of the dispersion plot
-					n_q2x = abs(q2_x-qx_min)*n_row(1)*e1_norm+1
-					n_q1y = abs(q1_y-qy_min)*n_row(2)*e2_norm+1
-					n_q2y = abs(q2_y-qy_min)*n_row(2)*e2_norm+1
+CC					n_q1x = abs(q1_x-qx_min)*n_row(1)*e1_norm+1			!find indices of the first and last Q_points of the dispersion plot
+CC					n_q2x = abs(q2_x-qx_min)*n_row(1)*e1_norm+1
+CC					n_q1y = abs(q1_y-qy_min)*n_row(2)*e2_norm+1
+CC					n_q2y = abs(q2_y-qy_min)*n_row(2)*e2_norm+1
+CC
+CC					write(*,*) 'n_q1x,n_q2x,n_q1y,n_q2y',n_q1x,n_q2x,n_q1y,n_q2y
+
+
+					n_q1x = abs(q1_x-qx_min)*dot_product(e1,n_row)+1			!find indices of the first and last Q_points of the dispersion plot
+					n_q2x = abs(q2_x-qx_min)*dot_product(e1,n_row)+1
+					n_q1y = abs(q1_y-qy_min)*dot_product(e2,n_row)+1
+					n_q2y = abs(q2_y-qy_min)*dot_product(e2,n_row)+1
+
+CC					write(*,*) 'n_q1x,n_q2x,n_q1y,n_q2y',n_q1x,n_q2x,n_q1y,n_q2y
+
 
 					if(abs(n_q2x-n_q1x).ge.abs(n_q2y-n_q1y))then
 						n_qdisp = abs(n_q2x-n_q1x)
@@ -1246,7 +1268,7 @@ CC						if(j_verb==1) write(*,*) ax_label,n_q1y,n_q2y,n_qdisp
 					endif
 					q_nx = (n_q2x-n_q1x)/(1.*n_qdisp)			
 					q_ny = (n_q2y-n_q1y)/(1.*n_qdisp)			
-CC					write(*,*) 'n_qdisp,q_nx,q_ny 1',n_qdisp,q_nx,q_ny,q_min,q_max
+CC					write(*,*) 'n_qdisp,q_nx,q_ny,q_min,q_max',n_qdisp,q_nx,q_ny,q_min,q_max
 
 				endif !if(j_disp>0)
 
@@ -1389,105 +1411,9 @@ C *** apply the speckle filter
 
 C *** normalise to the box volume and make a copy of CS_PLOT for .TXT output and linear plots
 				cs_plot = cs_plot/box_volume
-				cs_out = cs_plot
 
-				if(j_logsc==1) then
-				  cs_plot = log10(cs_plot)
-				  wedge_label = 'Log_scale'
-				else
-				  wedge_label = 'Lin_scale'
-				endif	
 
-C *** interpolate or smooth CS_PLOT by FFT for a more presentable graphical resolution (best in Log_scale)
-        if(j_disp==0.and.j_interp/=0) then            !no post-treatment
-          cut_off = maxval(cs_plot)
-          write(*,*) 'Interpolation factor(INTEGER) (0=OFF, 1=NO INTERP, try 2,3,...)',j_interp
-CC            write(*,*) 'Smoothing factor (1=NO SMOOTH, try 2,3,...)',j_cut
-          write(*,*) 'Smoothing factor(REAL) (1=NO SMOOTH, try 2.,3.5,...)',cut
-          write(*,*) 'I_max(REAL) =',cut_off
-          write(*,*) 'confirm or type new values:'
-          read(*,*) j_interp,cut,cut_off
-          if(j_interp==0) then      !switching interp off
-            n_qxg = n_qx
-            n_qyg = n_qy
-            allocate(cs_pgplot(n_qxg,n_qyg))
-            cs_pgplot = cs_plot
-          else                      !doing interp
-            n_qxg = j_interp*n_qx      !proportional interpolation
-            n_qyg = j_interp*n_qy
-CC              n_q1 =  n_qx/(2.*j_cut)    !proportional smoothing
-CC              n_q2 =  n_qy/(2.*j_cut)    
-            n_q1 =  n_qx/(2.*cut)    !proportional smoothing
-            n_q2 =  n_qy/(2.*cut)    
-
-            do i=1,n_qx
-            do j=1,n_qy
-              if(cs_plot(i,j)>cut_off) cs_plot(i,j)=cut_off
-CC            cs_plot(i,j) = (.5,0)*(1.-cos(twopi*(i*i+j*j)/real(n_qx*n_qy)))												!
-CC					  dat(n_shift+i) = 1.												!
-            enddo
-            enddo
-
-            allocate(cs4(n_qx,n_qy))
-            allocate(cs_plot2(n_qxg,n_qyg),cs_pgplot(n_qxg-1,n_qyg-1))
-
-            cs4 = fft((1.,.0)*cs_plot)
-
-C *** intercalate zeros for interpolation
-            cs_plot2 = (.0,.0)
-            cs_plot2(1:n_q1,1:n_q2) = cs4(1:n_q1,1:n_q2)
-            cs_plot2(1:n_q1,n_qyg-n_q2+1:n_qyg) = cs4(1:n_q1,n_qy-n_q2+1:n_qy)
-            cs_plot2(n_qxg-n_q1+1:n_qxg,1:n_q2) = cs4(n_qx-n_q1+1:n_qx,1:n_q2)
-            cs_plot2(n_qxg-n_q1+1:n_qxg,n_qyg-n_q2+1:n_qyg) = cs4(n_qx-n_q1+1:n_qx,n_qy-n_q2+1:n_qy)
-         
-            cs_pgplot = real(fft(cs_plot2,inv=.true.)/(1.*n_qx*n_qy))
-            deallocate(cs_plot2,cs4)
-            n_qxg = n_qxg-1     !the last point is off the interpolation range!
-            n_qyg = n_qyg-1
-          endif
-        else      !for the moment no interpolation for the dispersion plots (being too grainy)
-          j_interp = 0
-          n_qxg = n_qx
-          n_qyg = n_qy
-          allocate(cs_pgplot(n_qxg,n_qyg))
-          cs_pgplot = cs_plot
-        endif
-
-C **** Draw the plot  
-				f_min = 0.
-				if(f_max==.0) f_max = f_max_plot
-				
-				if(c_min_save==0..and.c_max_save==0.) then
-					c_min = anint(minval(cs_pgplot)-1.)
-					c_max = anint(maxval(cs_pgplot)+1.)
-				endif
-				if(j_logsc==1.and.c_min<-8.) c_min = -8.
-				write(*,*) 'c_min,c_max',c_min,c_max
-			
-C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel number.
-				if(j_disp==0) then
-					tr_shift_x = .5
-					tr_shift_y = .5
-					if(n_qxg==2*(n_qxg/2)) tr_shift_x = 1.
-					if(n_qyg==2*(n_qyg/2)) tr_shift_y = 1.
-					TR(2) = bz_n/n_qxg
-					TR(1) = qx_min-tr_shift_x*TR(2)		
-					TR(3) = 0.0
-					TR(5) = 0.0
-					TR(6) = bz_n/n_qyg
-					TR(4) = qy_min-tr_shift_y*TR(6)
-				elseif(j_disp==1)then
-					if(n_qdisp==2*(n_qdisp/2)) tr_shift_x = 1.
-					TR(2) = (q_max-q_min)/(n_qdisp)
-					TR(1) = q_min-tr_shift_x*TR(2)
-					TR(3) = 0.0
-					TR(5) = 0.0
-					TR(6) = f_max/(n_freq_plot-1.)
-					TR(4) = -TR(6)
-				endif
-
-	
-				scale_loop: do
+CC				scale_loop: do
 						if(map_unit(i_plot).le.0)then    !open the PGPLOT window, 1,1 no of panes
 							map_unit(i_plot) = PGOPEN('/xserv')   !open the PGPLOT window, 1,1 no of panes
 							CALL PGQCIR(C1, C2)
@@ -1524,16 +1450,134 @@ C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel
           else
             mode = 'Single_ph'
           endif
-					
+	
+				if(j_logsc==1) then
+				  wedge_label = 'Log_scale'
+				else
+				  wedge_label = 'Lin_scale'
+				endif	
+
+				
+        if(j_disp==0) then
+          n_qxp = n_qx
+          n_qyp = n_qy
+        else
+          n_qxp = n_qdisp
+          n_qyp = n_freq_plot       !could have been done already before 
+        endif
+        
+
+				scale_loop: do
+          if(j_logsc==1) then
+            cs_out = log10(cs_plot)
+          else
+            cs_out = cs_plot
+          endif	
+
+C *** interpolate or smooth CS_PLOT by FFT for a more presentable graphical resolution (best in Log_scale)
+        if(j_interp/=0) then            !do post-treatment
+          if(cut_off==.0) cut_off = maxval(cs_out)
+          write(*,*) 'Interpolation factor X,Y (INTEGER) (0 0=OFF, 1=NO INTERP, try 2,3,...)',j_interp_x,j_interp_y
+CC            write(*,*) 'Smoothing factor (1=NO SMOOTH, try 2,3,...)',j_cut
+          write(*,*) 'Smoothing factor X,Y (REAL) (1=NO SMOOTH, try 2.,3.5,...)',cut_x,cut_y
+          write(*,*) 'I_max(REAL) =',cut_off
+          write(*,*) 'confirm or type new (5) values:'
+          read(*,*) j_interp_x,j_interp_y,cut_x,cut_y,cut_off
+          j_interp = j_interp_x+j_interp_y
+          if(j_interp==0) then      !switching post-treatment off
+            n_qxg = n_qxp
+            n_qyg = n_qyp
+            if(ubound(cs_pgplot,1)/=n_qxg.or.ubound(cs_pgplot,2)/=n_qyg) then
+              if(allocated(cs_pgplot)) deallocate(cs_pgplot)
+              allocate(cs_pgplot(n_qxg,n_qyg))
+            endif
+            cs_pgplot = cs_out
+          else                      !doing interp
+            n_qxg = j_interp_x*n_qxp      !proportional interpolation
+            n_qyg = j_interp_y*n_qyp
+            n_q1 =  n_qxp/(2.*cut_x)    !proportional smoothing
+            n_q2 =  n_qyp/(2.*cut_y)    
+
+            do i=1,n_qxp
+            do j=1,n_qyp
+              if(cs_out(i,j)>cut_off) cs_out(i,j)=cut_off
+            enddo
+            enddo
+
+            allocate(cs4(n_qxp,n_qyp))
+            allocate(cs_plot2(n_qxg,n_qyg))
+            if(ubound(cs_pgplot,1)/=n_qxg-1.or.ubound(cs_pgplot,2)/=n_qyg-1) then
+              if(allocated(cs_pgplot)) deallocate(cs_pgplot)
+              allocate(cs_pgplot(n_qxg,n_qyg))
+            endif
+
+            cs4 = fft((1.,.0)*cs_out)
+
+C *** intercalate zeros for interpolation
+            cs_plot2 = (.0,.0)
+            cs_plot2(1:n_q1,1:n_q2) = cs4(1:n_q1,1:n_q2)
+            cs_plot2(1:n_q1,n_qyg-n_q2+1:n_qyg) = cs4(1:n_q1,n_qyp-n_q2+1:n_qyp)
+            cs_plot2(n_qxg-n_q1+1:n_qxg,1:n_q2) = cs4(n_qxp-n_q1+1:n_qxp,1:n_q2)
+            cs_plot2(n_qxg-n_q1+1:n_qxg,n_qyg-n_q2+1:n_qyg) = cs4(n_qxp-n_q1+1:n_qxp,n_qyp-n_q2+1:n_qyp)
+         
+            cs_pgplot = real(fft(cs_plot2,inv=.true.)/(1.*n_qxp*n_qyp))
+            deallocate(cs_plot2,cs4)
+          endif
+        else      !for the moment no interpolation for the dispersion plots (being too grainy)
+          n_qxg = n_qxp
+          n_qyg = n_qyp
+            if(ubound(cs_pgplot,1)/=n_qxg.or.ubound(cs_pgplot,2)/=n_qyg) then
+              if(allocated(cs_pgplot)) deallocate(cs_pgplot)
+              allocate(cs_pgplot(n_qxg,n_qyg))
+            endif
+          cs_pgplot = cs_out
+        endif
+
+C **** Draw the plot  
+				f_min = 0.
+				if(f_max==.0) f_max = f_max_plot
+				
+				if(c_min_save==0..and.c_max_save==0.) then
+					c_min = anint(minval(cs_pgplot)-1.)
+					c_max = anint(maxval(cs_pgplot)+1.)
+				endif
+				if(j_logsc==1.and.c_min<-8.) c_min = -8.
+				write(*,*) 'c_min,c_max',c_min,c_max
+			
+C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel number.
+				if(j_disp==0) then
+					tr_shift_x = .5
+					tr_shift_y = .5
+					if(n_qxg==2*(n_qxg/2)) tr_shift_x = 1.
+					if(n_qyg==2*(n_qyg/2)) tr_shift_y = 1.
+					TR(2) = bz_n/n_qxg
+					TR(1) = qx_min-tr_shift_x*TR(2)		
+					TR(3) = 0.0
+					TR(5) = 0.0
+					TR(6) = bz_n/n_qyg
+					TR(4) = qy_min-tr_shift_y*TR(6)
+				elseif(j_disp==1)then
+CC					if(n_qdisp==2*(n_qdisp/2)) tr_shift_x = 1.
+					if(n_qxg==2*(n_qxg/2)) tr_shift_x = 1.
+CC					TR(2) = (q_max-q_min)/(n_qdisp)
+					TR(2) = (q_max-q_min)/(n_qxg)
+					TR(1) = q_min-tr_shift_x*TR(2)
+					TR(3) = 0.0
+					TR(5) = 0.0
+CC					TR(6) = f_max/(n_freq_plot-1.)
+					TR(6) = f_max/(n_qyg)
+					TR(4) = -TR(6)
+				endif
+
 					if(j_disp==0) then
 						if(abs(j_plot)<=1) then
-							write(plot_title2,113) q_center,trim(at_weight_scheme(j_weight)),trim(mode),j_interp,cut,cut_off
+							write(plot_title2,113) q_center,trim(at_weight_scheme(j_weight)),trim(mode),j_interp_x,j_interp_y,cut_x,cut_y,cut_off
 						else 
-							write(plot_title2,114) q_center,f_plot,trim(at_weight_scheme(j_weight)),trim(mode),j_interp,cut,cut_off
+							write(plot_title2,114) q_center,f_plot,trim(at_weight_scheme(j_weight)),trim(mode),j_interp_x,j_interp_y,cut_x,cut_y,cut_off
 						endif
 CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)   
-113   			format('  Q = [',3f6.2,']   Total scattering  ',a,'  ',a,'  Map: ',i2,f5.1,f5.1)   
-114   			format('  Q = [',3f6.2,']   Energy =',f6.3,' [THz]  ',a,'  ',a,'  Map: ',i2,f5.1,f5.1)  
+113   			format('  Q = [',3f6.2,']   Total scattering  ',a,'  ',a,'  Map: ',2i2,3f5.1)   
+114   			format('  Q = [',3f6.2,']   Energy =',f6.3,' [THz]  ',a,'  ',a,'  Map: ',2i2,3f5.1)  
             if(input_method=='BULK') then
               write(x_title,130)e1
               write(y_title,130)e2
@@ -1565,7 +1609,8 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						CALL PGSCH(.7)					!set character height					
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
-						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+CC						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
 				
@@ -1588,7 +1633,7 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						elseif(abs(j_plot)==2) then
 							write(*,'("Modify intensity scale: min,max (0 0 change E_plot, 9 9 EXIT)",2f8.1)') c_min,c_max
 						elseif(abs(j_plot)==4) then
-							write(*,'("Modify intensity scale: min,max (0 0 change Q1,Q2, 9 9 EXIT)",2f8.1)') c_min,c_max
+							write(*,'("Modify intensity scale: min,max (0 0 change Q1,Q2, 2 2 linear scans, 9 9 EXIT)",2f8.1)') c_min,c_max
 						endif
 
 						read(*,*)c_min,c_max								!,j_grid
@@ -1601,8 +1646,8 @@ CC						j_ps = 0						!j_ps is set in the options list under 8
 						j_scan = 0
 						j_exit = 0
 CC						if(c_min==1) j_ps=1
-						if(c_min==2) j_scan=1			!go for linear scans
-						if(c_min==9.or.(c_min==0.and.abs(j_plot)<=1)) j_exit=1		!will ask for new options at the end of the frequency_loop
+						if(c_min==2.and.c_max==2) j_scan=1			!go for linear scans
+						if((c_min==9.and.c_max==9).or.(c_min==0.and.abs(j_plot)<=1)) j_exit=1		!will ask for new options at the end of the frequency_loop
 					endif
 
 					c_min = c_min_save
@@ -1773,7 +1818,8 @@ CC					IF (PGOPEN(trim(file_ps)//'/PNG').LE.0) STOP
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title))			!put plot title on 2 lines
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
-						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+CC						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
 
@@ -1840,17 +1886,24 @@ C
 								enddo
 								j_freq = nint(ff_plot/freq_step)+1
 								if(ii==1)then
-									c_min = .0
-									c_max = maxval(cs_out(1:n_qdisp,j_freq))
-									if(c_max.le.1.) then
-										c_max = 1.
-									else
-										c_max = 10.*(int(c_max/10.)+1)
-									endif
+CC									c_min = minval(cs_out(1:n_qdisp,j_freq))
+CC									c_max = maxval(cs_out(1:n_qdisp,j_freq))
+									c_min = minval(cs_pgplot(1:n_qdisp,j_freq))
+									c_max = maxval(cs_pgplot(1:n_qdisp,j_freq))
+CC									if(c_max.le.1.) then
+CC										c_max = 1.
+CC									else
+CC										c_max = 10.*(int(c_max/10.)+1)
+CC									endif
 								else
 									c_min = c_min_save
 									c_max = c_max_save
 								endif
+
+CC							write(*,*) 'n_qxg,j_freq,qq,cs_pgplot(j_q,1:j_freq):',n_qyg,j_freq
+CC							write(*,*) qq
+CC							write(*,*) cs_pgplot(1:n_qxg,j_freq)
+
 							write(scan_title,105) trim(plot_title1),ff_plot
 105       		format(a,'   E =',f5.2,' [THz]')   
 							do
@@ -1860,10 +1913,14 @@ C
 								CALL PGENV(qq(1),qq(n_qdisp),c_min,c_max,0,1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 								CALL PGLAB(trim(ax_label), 'cts',trim(scan_title))  !put the axis labels
 								CALL PGSCI (ii+1)  !red-green-blue
-								CALL PGLINE(n_qdisp,qq,cs_out(1:n_qdisp,j_freq))  !plots the curve
-								c_min_save = c_min
+CC								CALL PGLINE(n_qdisp,qq,cs_pgplot(1:n_qdisp,j_freq))  !plots the curve
+								CALL PGLINE(n_qxg,qq,cs_pgplot(1:n_qxg,j_freq))  !plots the curve
+CC						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
+CC						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
+
+							c_min_save = c_min
 								c_max_save = c_max
-								write(*,*) 'ii',ii
+CC								write(*,*) 'ii',ii
 								if(ii.eq.1)then
 									write(*,*) 'No c_min/c_max adjustment in 1st panel'
 									c_min = .0
@@ -1890,12 +1947,19 @@ C
 								ff(j) = ff_min+(j-1)*(ff_max-ff_min)/real(n_freq_plot-1)
 							enddo
 							if(ii==1)then
-								c_min = .0
-								c_max = 10.
+CC								c_min = .0
+CC								c_max = 10.
+									c_min = minval(cs_pgplot(j_q,1:j_freq))
+									c_max = maxval(cs_pgplot(j_q,1:j_freq))
 							else
 								c_min = c_min_save
 								c_max = c_max_save
 							endif
+							
+CC							write(*,*) 'n_qyg,j_q,j_freq,ff,cs_pgplot(j_q,1:j_freq):',n_qyg,j_q,j_freq
+CC							write(*,*) ff
+CC							write(*,*) cs_pgplot(j_q,1:j_freq)
+							
 							write(scan_title,106) trim(plot_title1),qq_plot
 106       		format(a,'   q = ',f5.2,' [r.l.u.]')   
 							do
@@ -1905,7 +1969,8 @@ C
 								CALL PGENV(ff_min,ff_max,c_min,c_max,0,1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 								CALL PGLAB('E [THz]', 'cts',trim(scan_title))  !put the axis labels
 								CALL PGSCI (ii+1)  !red-green-blue
-								CALL PGLINE(n_freq_plot,ff,cs_out(j_q,1:j_freq))  !plots the curve
+CC								CALL PGLINE(n_freq_plot,ff,cs_pgplot(j_q,1:j_freq))  !plots the curve
+								CALL PGLINE(n_qyg,ff,cs_pgplot(j_q,1:j_freq))  !plots the curve
 								c_min_save = c_min
 								c_max_save = c_max
 								if(ii.eq.1)then
@@ -2014,6 +2079,14 @@ CC							if(j_ps==1) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT outpu
 						freq_step = 1./(n_int*t_step)
 						write(*,*) 'Time-integration (BN window FWHM) [ps]',t_width
 						write(*,*) 'Energy resolution [THz]',f_width
+
+            if(j_interp>0) then
+              j_interp_x = 1
+              j_interp_y = 1
+            else
+              j_interp_x = 0
+              j_interp_y = 0
+            endif
 
 						deallocate(t_wind,om_phase)
 						allocate(t_wind(n_int),SOURCE=0.0)
