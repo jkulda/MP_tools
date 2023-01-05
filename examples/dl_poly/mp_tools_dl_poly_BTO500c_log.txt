@@ -1,0 +1,528 @@
+2023-01-04 17:25:41 dl_poly>
+2023-01-04 17:25:41 dl_poly> ls
+BTO500c.par	data
+2023-01-04 17:25:46 dl_poly> ls data
+h1.txt
+2023-01-04 17:25:51 dl_poly> mp_dbin4
+ *** Program MP_BIN 1.54 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***
+
+ Parameter file name (.par will be added)
+BTO500c
+ Sim_type, dat_type, input method: TIMESTEP        DL_POLY         CELL
+ Atom labels            3
+           1 Ba             1
+           1 Ti             2
+           3 O              3           4           5
+ BTO_500K structure info (atoms):
+           1 Ba     0.00000000       0.00000000       0.00000000
+           2 Ti    0.500000000      0.500000000      0.500000000
+           3 O1    0.500000000      0.500000000       0.00000000
+           4 O2     0.00000000      0.500000000      0.500000000
+           5 O3    0.500000000       0.00000000      0.500000000
+ Read snapshots number: min, max
+1 5
+ Saved snapshot numbers start:
+1
+ Master for MD trajectory filename:
+h1
+ Read input files number (0 0 no numbers): min,max
+0 0
+ Input trajectory file:  ./data/h1.txt
+ No shells
+ Simulation type = TIMESTEP
+ Trajectory recording mode =           1
+ Boundary conditions            3
+ Trajectory time start [ps]:   340.019989
+ Input trajectory file:  ./data/h1.txt
+ Lattice parameter estimate =   4.00939989       4.00939989       4.00939989
+ OK? (1/0)
+1
+ reading the 1st snapshot (takes a few seconds) ...
+ 1st snapshot: total of      625001  atoms read in   3.46737194      sec
+ Occupancies: nominal 		real
+      Ba     1.00000000       1.00000000
+      Ti     1.00000000       1.00000000
+      O1     1.00000000       1.00000000
+      O2     1.00000000       1.00000000
+      O3     1.00000000       1.00000000
+ ./data/BTO500c_n0001.dat
+ Trajectory files finished:            5  .dat files written in   21.4069996      sec (SYS)
+
+
+
+
+
+2023-01-04 17:26:40 dl_poly> mp_insp4
+ *** Program MP_INSP 1.54 ** Copyright (C) Jiri Kulda (2022) ***
+ Master filename:
+BTO500c
+ snapshot file number (0 for no number):
+1
+ Reading ./data/BTO500c_n0001.dat
+
+ Code & version, no. of header lines:   MP_TOOLS        1.54           3
+ Substance name:                        BTO_500K
+ Data & simulation type, input method:  DL_POLY           TIMESTEP          CELL
+ Time structure t_ms,t_dump:            1.99999995E-04   340.019989
+ Supercell & temperature:                      50          50          50   510.768799
+ Unit cell parameter(3), angle(3):      4.00939989       4.00939989       4.00939989       90.0000000       90.0000000       90.0000000
+ Atom numbers:                                  5      125000      125000      125000      125000      125000      625000
+ Atoms & occupancies:                   Ba  Ti  O1  O2  O3     1.00000000       1.00000000       1.00000000       1.00000000       1.00000000
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+1 1 1 1
+ Atom, type, mass, charge    Ba             1   124.320000       5.61999989
+ Cell index                       1           1           1
+ Atom position              -24.9636478      -24.9701824      -24.9872055
+ Atom velocity                1.00473869      -2.09704852       5.16198158
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+5 1 1 1
+ Atom, type, mass, charge    O3             5   14.4994001      0.910000026
+ Cell index                       1           1           1
+ Atom position              -24.4848194      -25.0100918      -24.4761105
+ Atom velocity                9.37452698      -1.66118717      -10.9438610
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+5 50 50 50
+ Atom, type, mass, charge    O3             5   14.4994001      0.910000026
+ Cell index                      50          50          50
+ Atom position               24.4875145       24.0281010       24.4959660
+ Atom velocity                2.98586035      -5.98197126      -12.4425888
+
+
+ jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+9 9 9 9
+2023-01-04 17:27:22 dl_poly>
+
+
+
+
+
+2023-01-04 17:27:25 dl_poly> mp_pdf4
+ *** Program MP_PDF 1.54 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***
+ 			*** for the moment only MonteCarlo integration is available ***
+
+ Input data file_master:
+BTO500c
+ Read data files number min, max (0 0 no numbers, single file):
+1 1
+ Input data:  MP_TOOLS        1.54           3
+ Parameter file name (.par to be added) (confirm or type other name): BTO500c
+,
+
+ Substance name: BTO_500K
+ Atoms from BTO500c.par
+     Ba    0.0000  0.0000  0.0000    1.0000  5.0700
+     Ti    0.5000  0.5000  0.5000    1.0000 -3.4380
+     O1    0.5000  0.5000  0.0000    1.0000  5.8030
+     O2    0.0000  0.5000  0.5000    1.0000  5.8030
+     O3    0.5000  0.0000  0.5000    1.0000  5.8030
+ partial correlations
+        1     Ba_Ba     1   1   1
+        2     Ti_Ti     2   2   1
+        3     O1_O1     3   3   1
+        4     O2_O2     4   4   1
+        5     O3_O3     5   5   1
+        6     Ba_Ti     1   2   1
+        7     Ba_Ox     1   3   3
+        8     Ti_Ox     2   3   3
+        9     Ox_Oy     3   4   3
+ Setting a_par to   4.00939989       4.00939989       4.00939989
+ MC sampling pairs per frame ([x 10^6], 124 max)
+100
+ Monte Carlo integration over   100000000 cell pairs
+ Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT, negative = EDIT
+1
+ Atoms:             Ba      Ti      O1      O2      O3
+ Atoms no.:         1       2       3       4       5
+ Uniform at_weights:   1.0000  1.0000  1.0000  1.0000  1.0000
+ Actual masks:
+  1  1  1  1  1
+
+ input: ./data/BTO500c_n0001.dat
+ Accumulating the PDFs ...
+
+   8.55300045                 10000000
+   17.0809994                 20000000
+   25.5779991                 30000000
+   34.0660019                 40000000
+   42.6150017                 50000000
+   51.1370010                 60000000
+   59.6220016                 70000000
+   68.1299973                 80000000
+   76.6819992                 90000000
+   85.2229996                100000000
+ Plot range r_1, r_2, max =   20.4799995      r_2=0 END
+1.5 9.5
+
+ Plotting BTO_500K:  1/0 for PDF_tot & 4 indices of partial PDFs to be added (0 = skip, -1 = end)
+1 6 7 8 9
+ Modify vertical scale (min,max; 0,0 EXIT)
+-.5 3
+ Modify vertical scale (min,max; 0,0 EXIT)
+-.1 3
+ Modify vertical scale (min,max; 0,0 EXIT)
+0 0
+  1   edit partials
+  2   save graph (.PS) & edit partials
+  3   save graph (.PS) & PDF (.TXT)
+  4   change plot range
+  5   edit at_weights (restart integration)
+  0   EXIT
+3
+  Postscript output written to: BTO500c_pdf_0001_0001_01.ps
+  Text output written to: BTO500c_pdf_0001_0001_01.txt
+
+  0   EXIT
+  1   edit at_weights (restart integration)
+1
+ Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT, negative = EDIT
+2
+ Atoms:             Ba      Ti      O1      O2      O3
+ Atoms no.:         1       2       3       4       5
+ Neutron at_weights:   5.0700 -3.4380  5.8030  5.8030  5.8030
+ Actual masks:
+  1  1  1  1  1
+
+ input: ./data/BTO500c_n0001.dat
+ Accumulating the PDFs ...
+
+   8.58699989                 10000000
+   17.0590000                 20000000
+   25.5760002                 30000000
+   34.0699997                 40000000
+   42.5470009                 50000000
+   51.0559998                 60000000
+   59.5550003                 70000000
+   68.0390015                 80000000
+   76.5380020                 90000000
+   85.0589981                100000000
+ Plot range r_1, r_2, max =   20.4799995      r_2=0 END
+1.5 9.5
+
+ Plotting BTO_500K:  1/0 for PDF_tot & 4 indices of partial PDFs to be added (0 = skip, -1 = end)
+1 6 7 8 9
+ Modify vertical scale (min,max; 0,0 EXIT)
+-2 8
+ Modify vertical scale (min,max; 0,0 EXIT)
+0 0
+  1   edit partials
+  2   save graph (.PS) & edit partials
+  3   save graph (.PS) & PDF (.TXT)
+  4   change plot range
+  5   edit at_weights (restart integration)
+  0   EXIT
+3
+  Postscript output written to: BTO500c_pdf_0001_0001_02.ps
+  Text output written to: BTO500c_pdf_0001_0001_02.txt
+
+  0   EXIT
+  1   edit at_weights (restart integration)
+0
+2023-01-04 17:33:09 dl_poly>
+
+
+
+
+
+
+
+2023-01-04 17:33:13 dl_poly> mp_sqom4
+ *** Program MP_SQOM 1.54 ** Copyright (C) Jiri Kulda (2022) ***
+
+ Input data file_master:
+BTO500c
+ Read data files number min, max (0 0 no numbers, single file):
+1 5
+ Input data:  MP_TOOLS        1.54           3
+ Parameter file name (.par to be added) (confirm or type other name): BTO500c
+,
+
+ Substance name: BTO_500K
+ Atoms from BTO500c.par
+     Ba    0.0000  0.0000  0.0000    1.0000  0.5070
+     Ti    0.5000  0.5000  0.5000    1.0000 -0.3438
+     O1    0.5000  0.5000  0.0000    1.0000  0.5803
+     O2    0.0000  0.5000  0.5000    1.0000  0.5803
+     O3    0.5000  0.0000  0.5000    1.0000  0.5803
+ Input files:
+ ./data/BTO500c_n0001.dat
+           5  files read in    4.30000015E-02  sec SYS time
+ MD time sequence:  t_total [ps]   8.00781250E-02 t_step [ps]   2.00195312E-02
+Maximum energy [THz]             24.98      energy step [THz] 24.98
+Time-integration (BN) window FWHM [ps]    0.02
+Energy resolution FWHM [THz]               49.95
+
+ Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))
+6 1
+ Q-pixels X,Y:          300         300
+ Vertical axis:           0           0           1
+ Q_center [hkl]:
+2 2 0
+ FINUFFT start
+Atom masks reset:  1  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -5.00000000       5.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -5.0     5.0
+-3.5 1.5
+ c_min,c_max  -3.50000000       1.50000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.5     1.5
+0 0
+ Choose a plot option (FILE output is OFF):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output ON (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+8
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+1
+Actual atom masks:  1  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -3.50000000       1.50000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.5     1.5
+0 0
+ BTO500c_sq_0001_0005_01.txt
+ BTO500c_sq_0001_0005_01.png
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+-1
+Actual atom masks:  1  1  1  1  1  0  0
+ Type in atom masks:
+1 0 0 0 0 0 0 0
+ Total scattering (instant integration range)
+ c_min,c_max  -3.50000000       1.50000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.5     1.5
+0 0
+ BTO500c_sq_0001_0005_02.txt
+ BTO500c_sq_0001_0005_02.png
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+-1
+Actual atom masks:  1  0  0  0  0  0  0
+ Type in atom masks:
+0 1 1 1 1 0 0
+ Total scattering (instant integration range)
+ c_min,c_max  -3.50000000       1.50000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.5     1.5
+0 0
+ BTO500c_sq_0001_0005_03.txt
+ BTO500c_sq_0001_0005_03.png
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+10
+ Present values:
+    j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:
+           2           0           1           1           0           5           3   24.9756088       7.00000000               1
+ Input new values(after j_weight, j_wind or j_fft change go on via 6):
+3,,,,,,,,12,,
+ New values:
+    j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:
+           3           0           1           1           0           5           3   24.9756088       12.0000000               1
+ Time-integration (BN window FWHM) [ps]   3.00292969E-02
+ Energy resolution [THz]   33.3008118
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+1
+Actual atom masks:  0  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -3.50000000       1.50000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.5     1.5
+0 6
+ c_min,c_max   0.00000000       6.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)     0.0     6.0
+0 0
+ BTO500c_sq_0001_0005_04.txt                       #!!!!!!! NOTE: these maps are empty! after changing weighting scheme always pass via option 6 !!!!!
+ BTO500c_sq_0001_0005_04.png
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+6 1
+ Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))
+6 1
+ Q-pixels X,Y:          300         300
+ Vertical axis:           0           0           1
+ Q_center [hkl]:
+2 2 0
+ FINUFFT start
+Atom masks reset:  1  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -3.00000000       9.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -3.0     9.0
+-1 5
+ c_min,c_max  -1.00000000       5.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -1.0     5.0
+0 0
+ Choose a plot option (FILE output is OFF):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output ON (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+8
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+1
+Actual atom masks:  1  1  1  1  1  0  0
+ Total scattering (instant integration range)
+ c_min,c_max  -1.00000000       5.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -1.0     5.0
+0 0
+ BTO500c_sq_0001_0005_05.txt
+ BTO500c_sq_0001_0005_05.png
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+-1
+Actual atom masks:  1  1  1  1  1  0  0
+ Type in atom masks:
+0 1 1 1 1 0 0
+ Total scattering (instant integration range)
+ c_min,c_max  -1.00000000       5.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -1.0     5.0
+0 0
+ BTO500c_sq_0001_0005_06.txt
+ BTO500c_sq_0001_0005_06.png
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+-1
+Actual atom masks:  0  1  1  1  1  0  0
+ Type in atom masks:
+1 0 0 0 0 0 0
+ Total scattering (instant integration range)
+ c_min,c_max  -1.00000000       5.00000000
+Modify intensity scale: min,max (0 0 or 9 9 EXIT)    -1.0     5.0
+0 0
+ BTO500c_sq_0001_0005_07.txt
+ BTO500c_sq_0001_0005_07.png
+ Choose a plot option (FILE output is ON):
+        0  EXIT
+        1  explore total scattering     (-1 edit atom masks)
+        2  explore E=const maps         (-2 edit atom masks)
+        3  make a stack of E=const maps (-3 reset atom masks)
+        4  explore E(Q) maps            (-4 edit atom masks)
+        5  make a stack of E(Q) maps    (-5 reset atom masks)
+        6  change the HKL plane, range and centre (BZ)
+                                        (-6 change the real space range)
+        7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+        8  toggle the FILE output OFF (mind the TXT switch in PAR)
+        9  toggle the S(Q)/Q^2 scaling to S(Q)
+       10  options: change the time integration window width, weighting etc.
+0
+2023-01-04 17:44:37 dl_poly>
+2023-01-04 17:44:37 dl_poly>

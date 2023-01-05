@@ -141,6 +141,7 @@ C ********************* Get a time stamp and open a .LOG file ******************
 
 C *** diverse initialisations
 			l_rec4 = l_rec/4
+			j_test = 1
 			n_head = 3
 			n_head_in1 = 0
 			n_head_in2 = 0
@@ -155,6 +156,7 @@ C *** diverse initialisations
 			at_list = .true.
       t_ms = .0
       t_dump0 = .0
+      temp_par = .0
       
 C *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
       write(*,*) 'Parameter file name (.par will be added)'
@@ -450,14 +452,14 @@ C *** look for keyword 'TIMESTEP'
             write(*,*)'Type in T_MS [ps] (frequent value = .0002)'
             read(*,*) t_ms
             t_dump0 = t_ms*n_tstep0
-            write(*,*)'The frequency scale will rely on T_MS=',t_ms
-            write(*,*)'If strange, modify this value and restart the whole treatment.'
-            write(9,*)'Input data do not contain explicit TIME information!'
-            write(9,*)'The frequency scale will rely on T_MS=',t_ms
             exit
           endif
         enddo
         t_step = t_ms*nt_step
+        write(*,*)'The frequency scale will rely on T_MS=',t_ms
+        write(*,*)'If strange, modify this value and restart the whole treatment.'
+        write(9,*)'Input data do not contain explicit TIME information!'
+        write(9,*)'The frequency scale will rely on T_MS=',t_ms
 
         rewind(1)
         
@@ -1009,6 +1011,10 @@ CC 						if(1000*(i/1000)==i) write(*,*)i,at_name_in,jat,at_ind_in
 						enddo
 					
 						jrec = nsuper*(jat-1)+nlayer*(at_ind_in(3)-1)+n_row(1)*(at_ind_in(2)-1)+at_ind_in(1)
+						if(jrec>n_tot) then
+						  write(*,*) 'JREC overflow:',jrec,' > ',n_tot,' check n_tot_in, n_row and j_centred in the .PAR'
+						  stop
+						endif
 						at_ind(1:3,jrec) = at_ind_in
 						at_ind(4,jrec) = jat					
 					endif		!input_method CELL

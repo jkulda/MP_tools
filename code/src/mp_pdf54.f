@@ -704,7 +704,7 @@ C *** handle unoccupied positions
 
 					enddo integration_loop_2
 					CALL SYSTEM_CLOCK (COUNT = sc_c2)
-					write(*,*) (sc_c2-sc_c1)/sc_r,k*n_mc
+					if(k==10*(k/10).or.k==n_h) write(*,*) (sc_c2-sc_c1)/sc_r,k*n_mc
 				enddo		!k=1,n_h
       enddo file_loop
 

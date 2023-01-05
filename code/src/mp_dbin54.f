@@ -186,6 +186,7 @@ C *** read auxiliary file <file_par.par> with structure parameters, atom names a
 
       read(4,nml=mp_gen)
 
+      j_test = 1
       data_path = './data/'
       rewind(4)
       read(4,nml=mp_bin)

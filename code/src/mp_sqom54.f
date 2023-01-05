@@ -308,12 +308,13 @@ C **** Read the auxiliary file <file_title.par> with structure parameters, atom 
       rewind(4)
       read(4,nml=mp_out)
       
-      call down_case(pg_out) 
-      if(index(pg_out,'png')/=0) then
-        pg_ext = '.png'
-      else
-        pg_ext = '.ps'
-      endif
+CC      call down_case(pg_out) 
+CC      if(index(pg_out,'png')/=0) then
+CC        pg_ext = '.png'
+CC      else
+CC        pg_ext = '.ps'
+      pg_out = 'png'
+      pg_ext = '.png'     !use PNG for intensity maps, the .PS stays emergency solution line 1788
 
       rewind(4)
       read(4,nml=mp_sqom) 
@@ -1784,7 +1785,17 @@ C **** Output the intensity map to a text file (linear scale)
 
 C **** Prepare and plot the same on .PS		
 					write(*,*) file_ps
-					IF (PGOPEN(file_ps//'/'//trim(pg_out)).LE.0) STOP
+					IF (PGOPEN(file_ps//'/'//trim(pg_out)).LE.0) then
+					  write(*,*) 'Could not open ',file_ps//'/'//trim(pg_out),' missing or incorrect PGPLOT PNG driver!'
+            pg_out = 'vcps'
+					  pg_ext = '.ps'
+            if(t_single)then
+                write(file_ps,116) trim(file_master),jfile,trim(pg_ext)
+            else			
+              file_ps  = trim(file_master)//'_sq'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//trim(pg_ext)
+            endif
+					  write(*,*) 'The PS format will be used',file_ps//'/'//trim(pg_out),' from now on!'					  
+					endif
           if(index(pg_out,'png')/=0) then
             CALL PGSCRN(1, 'white', IER)	
             CALL PGSCRN(0, 'black', IER)  !sets the color index of background to BLACK (will be inverted by PNG)

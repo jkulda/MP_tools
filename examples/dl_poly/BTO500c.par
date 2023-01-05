@@ -1,0 +1,90 @@
+! **********					Copyright (C) 2022  Jiri Kulda, Grenoble/Prague          **********
+! ***** %%%%%%%%%%%%%%%%   		  MP_TOOLS parameter file  		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!
+! 		edit to your convenience, almost any of the toolkit programs needs some input from here
+!
+! "nml" .PAR format
+!
+! the order of the groups and the items order within them don't matter and only those really needed may be present,
+! new items have first to be added to the NAMELIST declarations within the code
+!
+
+atoms
+Ba Ba  .0  .0  .0  1  2+		!chem. element, atom name, position, occupancy, valence state
+Ti Ti  .5  .5  .5  1  4+			
+O  O1  .5  .5  .0  1  n
+O  O2  .0  .5  .5  1  n
+O  O3  .5  .0  .5  1  n
+
+! NAMELIST input data here may correspond just to a subset of the NAMELIST variables in the code, their order is free
+! the rest of the line after an exclamation mark is skipped
+! all character input is CASE_INSENSITIVE (internally converted to upper case)
+
+&mp_gen		
+j_verb = 0					  ! (0/1) verbose command line output 
+j_proc = 0					  ! requested number of OpenMP parallel processes, 0 = automatic maximum (12 for 12 core PowerMac)
+/					            ! end the namelist by a slash
+
+&mp_out		
+j_weight = 2				  ! 1 uniform weighting, 2 neutron b_coh; 3 Xray form-factors 
+j_logsc = 1 					! 1 logarithmic scale for plots (0=linear) 
+j_txt = 1 						! 1 accompany .PS output by dump to a to .TXT file (always linear scale, speckle filter applied if active)
+j_grid = 1 				    ! 0 no grid, 1 grid overlay on PG_PLOT graphs
+pg_out = 'vcps'       ! set file device for PGPLOT color map output: png, tpng, cps, vcps, null (cf. PGPLOT notes)
+/					            ! end the namelist by a slash
+
+&mp_bin
+subst_name = 'BTO_500K'	! substance name
+sim_type = 'timestep'	! simmulation type: 'timestep' for MD, 'static' for frames w/o time structure
+dat_type = 'dl_poly'  ! origin of data: DL_POLY, VASP, LAMMPS, DISCUS, GENERAL etc.
+input_method = 'cell' ! input method: 'cell', 'bulk'
+n_atom = 5						! number of atoms per unit cell (n_atom)
+n_row = 50 50 50  		! simulation box format
+eps_x = .2            ! fractional coordinate tolerance range (max displacement) for atom type identification
+data_path = './data/' ! ASCII data path (if omitted ./data/ will be supplied automatically), use quotes & start with . or /
+ext = '.txt'					! extension to add to the ASCII input file, EXT,ext or omitted = no extension, typical choice: '.txt'
+j_basis = 0  	        ! 0 chemical species (no basis positions), 1 atom_type (2nd column in data) indicates basis positions (PREFERABLE!);  2= atom name is given explicitely (eg. O3) 
+j_centred = 1         ! 1 origin of the coordinate system is at the box centre (DL_POLY), 0 the origin is at the cell(1 1 1) (LAMMPS)
+j_shrec = 0					  ! 1/0 record the SHELLS positions etc. in the binary files (for MD with shell model, if present in the dump)
+!
+! the following items only needed for GENERAL (can be omitted completely for DL_POLY & LAMMPS)
+!
+!temp_par = 0.        ! nominal temperature (default 0) only for use with static simulation data 
+!n_head_in1 = 7				! number of trajectory header lines (including possible empty ones)
+!n_head_in2 = 1				! number of frame (snapshot) header lines (including possible empty ones)
+!rec_str = 'element id nn nn nn x y z'  !record string contents, covered items:   id type element mass q x y z vx vy vz fx fy fz nn (cf. docs)
+!pos_units = 'ANGSTROM' !position units(LATTICE lattice units, ANGSTROM angstrom, BOX relative to box dimensions (0.00 - 1.00))
+!a_cell_par = 79.740 79.740 79.740	!box size in position units
+!n_tot_in = 40000		  ! total number of atoms in input dump file (simulation box)
+!t_step = .002				! time step [ps] between successive snapshot dumps (defines the energy scale of S(Q,w))
+/ 										! end the namelist by a slash
+
+&mp_sqom									
+n_int = 0							! integration width in time (number of snapshots, 0 = automatic choice NFILE/2)
+nfile_mem = 200       ! number of snapshots to be loaded into the memory before launching NUFFT (cf. docs)
+s_trig = 0						! 0=OFF, triger level of the speckle filter (log_2 ratio between neighbours); 2 is normal when using a Hann window in space; 
+j_oneph = 0						! 0	start in the NUFFT mode (default), 1 one-phonon mode, runtime toggle 0,1
+j_qsq = 0							! 1 keep S(Q,w) scaling with Q^2 (default); 0 divide S(Q,w) by Q^2 for more uniform color scale of intensity maps
+j_interp = 0          ! 0 OFF (default), 1 FT post-treatment of intensity maps (also accessible via the option "10")
+/
+
+&mp_pdf
+n_pdf = 1024   		    ! dimension of the PDF array (1024 max, 2**N best for FFT)
+pdf_step = .02		    ! PDF step [Angstrom]; useful choice: n_pdf=1024, pdf_step=.02
+!a_par_pdf = 	4.02 4.02 4.02		! lattice parameters in case of input data in LATTICE units
+j_acc = 2      	      ! 2 Monte Carlo integration algorithm (future: 1 Gaussian, 0 interactive definition)
+n_h = 20     		      ! x10^6 MC sampling events (optimum 20; single snapshot min 16 cells)
+j_smooth = 1					! smoothing/broadening the accumulated RDF to simulate resolution effects: 1 no smoothing, 4-10 useful, 0 interactive mode
+n_corr = 9					  ! number of specified atom correlation pairs (cf. below) to be accumulated
+/				              ! end the list by ! or empty line 
+
+pdf_pairs
+Ba_Ba  1  1  1	!atom pair name, atom number1, atom number2, multiplicity
+Ti_Ti  2  2  1
+O1_O1  3  3  1	!taking all 3 oxygens separately permits to assess the accuracy of the RDFs
+O2_O2  4  4  1
+O3_O3  5  5  1
+Ba_Ti  1  2  1
+Ba_Ox  1  3  3
+Ti_Ox  2  3  3
+Ox_Oy  3  4  3
