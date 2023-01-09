@@ -539,7 +539,7 @@ C ***  open the t0 file (binary MD snapshot file)
 				if(jj==0) stop
 			endif
 
-			i_rec = 1	
+			i_rec = n_head	
 			do j=1,n_rec-1
 				i_rec = i_rec+1
 				read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			
