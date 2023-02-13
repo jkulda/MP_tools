@@ -90,7 +90,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
 
 			real,allocatable ::  at_pos_file(:,:,:),rdf_part(:,:),rdf_tot(:),r(:)
       real,allocatable ::  r_plot(:),rdf_tot_plot(:),rdf_part_plot(:,:)
-      real,allocatable ::  b_coh(:),at_weight(:),at_base(:,:),at_occup_par(:),at_pos(:,:),at_pos2(:,:)
+      real,allocatable ::  b_coh(:),at_weight(:),at_base(:,:),at_pos(:,:),at_pos2(:,:)
 	  
 			integer ::       i_rdf,n_pdf,j_acc,n_int,n_int2,n_corr
       real    ::       rdf_dist,rdf_range,rdf_sum,rdf_tot_sum,rdf_norm,rand_rdf(3),at_weight_sum
@@ -98,8 +98,8 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       
       character(4)   :: c_int(2),c_fil(2),version,head,atom
       character(10)  :: at_weight_scheme(2),pg_out,string,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
-      character(16)  :: sim_type_par,data_type,string16
-      character(40)  :: file_master,file_inp,file_out,time_stamp,int_mode,x_file_name
+      character(16)  :: sim_type_par,data_type,string16,filter_name
+      character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name
       character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,plot_title,line
       character(128) :: cwd_path,plot_header
       character(l_rec):: header_record
@@ -114,7 +114,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       integer ::  at_no,at_ind(3),at_ind2(3),d_ind(3),j_dom,j_base(3),n_plot,n_smooth,n_smooth_fwhm
       integer ::  j_atom,j_weight,j_xray,j_edit,j_mask,j_smooth,ifile,ifile0,jfil_step,jint,jint2,n_atom,sc_c2,sc_c1,ier,ios
       
-      real :: t_dump,tt0,tt,b_sum,rand1,rand2,sc_r,at_displ
+      real :: t_dump,filter_fwhm,tt0,tt,b_sum,rand1,rand2,sc_r,at_displ,p_size
 
       real :: diff_pos(3),x_plot,y_plot
 
@@ -124,16 +124,16 @@ C **** the following variables MUST have the following type(4) or multiples beca
 
       real(4),allocatable ::	at_pos_in(:),at_occup_r(:)
 
-      character(16)  :: sim_type,dat_type,input_method,file_par,subst_name,dat_source
+      character(16)  :: sim_type,dat_type,input_method,file_par,dat_source
       integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
-      real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),a_par_pdf(3),temp
+      real(4)        :: rec_zero(l_rec),t_ms,t_step,t0,t1,a_par(3),angle(3),a_par_pdf(3),temp
 
-      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
-     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
-      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
-      namelist /mp_out/ j_weight,j_xray,j_logsc,j_txt,j_grid,pg_out       
+      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out       
       										!general rule: namelists of tools should only contain their local parameters
                           !what is of global interest they should pass into data_header
 			namelist /mp_pdf/ n_pdf,pdf_step,a_par_pdf,n_h,j_acc,j_smooth,n_corr
@@ -141,6 +141,16 @@ C **** the following variables MUST have the following type(4) or multiples beca
 C **** PGPLOT stuff
       INTEGER :: PGOPEN,j_xserv
 
+C *** Set my colors for line plots								  
+          CALL PGSHLS (20,.0,.3,.0)     !dark grey
+          CALL PGSHLS (21,.0,.4,.7)     !my blue
+          CALL PGSHLS (22,120.,.5,1.)   !my red
+          CALL PGSHLS (23,240.,.35,.8)  !my green
+          CALL PGSHLS (24,60.,.4,.9)    !my violet
+          CALL PGSHLS (25,170.,.5,.9)   !my yellow
+          CALL PGSHLS (26,320.,.4,.9)   !my turquoise
+          CALL PGSHLS (27,.0,.7,.0)     !light grey
+        
 
 C ********************* Initialization *******************************      
 
@@ -276,7 +286,7 @@ CC        write(*,nml=data_header_1)
 
       allocate(at_name_out(n_atom),at_occup_r(n_atom),nsuper_r(n_atom))
 			allocate(at_label(n_atom),at_name_par(n_atom),at_base(n_atom,3),at_weight(n_atom),at_mask(n_atom))
-			allocate(at_occup_par(n_atom),b_coh(n_atom),SOURCE=.0)												!we need this to read .par
+			allocate(b_coh(n_atom),SOURCE=.0)												!we need this to read .par
       at_mask = 1
 
       if(nml_in) then      !new structure with namelist
@@ -326,17 +336,16 @@ C *** Read the atom positions
         if(string(1:5).eq.section) exit	!find the mp_simple part of the .par file
       enddo
 			do j=1,n_atom
-        read(4,*) at_label(j),at_name_par(j),at_base(j,:),at_occup_par(j)	!for BULK the at_base and at_occup_par are not significant
+        read(4,*) at_label(j),at_name_par(j)	!at_base comes from header, for BULK the at_base is not significant
 			enddo
 			do j=1,n_atom
-				if(at_name_out(j)/=at_name_par(j)) then
-					write(*,*) 'Atom names in .DAT and .PAR do not match: ',j,at_name_out(j),at_name_par(j)
-					stop
+				if(at_name_par(j)/=at_name_out(j)) then
+					write(*,*) 'Atom names in .PAR and .DAT do not match: ',j,at_name_par(j),at_name_out(j)
+					write(*,*) 'Prefer .DAT? (1/0)'
+					read(*,*) ii
+					if(ii==1) at_name_par = at_name_out
+					exit 
 				endif
-CC				if(at_occup_r(j)/=at_occup_par(j)) then
-CC					write(*,*) 'Atom occupancies in .DAT and .PAR do not match: ',j,at_occup_r(j),at_occup_par(j)
-CC					stop
-CC				endif
 			enddo			
 
 C *** Read the atom positions       
@@ -844,7 +853,7 @@ CCc            CALL PGSCI (0)  !black
 CC            CALL PGSLS (1)  !full
 CC            CALL PGENV(r_start,r_end,c_min,c_max2,0,j_grid+1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 CC            CALL PGLAB('r(A)', 'g(r)',plot_title)  !put the axis labels
-            CALL PGSCI (j+1)  !red-green-blue
+            CALL PGSCI (j+20)  !my red-green-blue
             CALL PGLINE(n_plot,r_plot,rdf_part_plot(j_part(j),:))  !plots the curve
 						CALL PGSTBG(0)																				 !erase graphics under text
           	CALL PGSLW(5)			!operates in steps of 5
