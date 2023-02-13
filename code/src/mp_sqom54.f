@@ -44,8 +44,7 @@ C ***** Ver 1.54  - improved handling of the BULK type: avoid the BZ concept
 C *****           - J_QSQ option to divide S(Q,w) by Q^2 to improve clarity of color maps
 C *****           - PNG driver for PGPLOT included
 C *****           - NAMELIST I/O for .PAR files and .DAT headers implemented
-C ***** 
-C ***** Ver 1.545 - interpolation of intensity maps for improved display appearance 
+C *****           - FT interpolation/filtering of intensity maps for improved display appearance 
 C ***** 
 C ***** indexing convention: supercell(u,v,w) = at_ind(j,k,l) = supercell(j_pos,j_row,j_layer)
 C ***** record numbers are directly related to cell positions and atom types
@@ -73,9 +72,9 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       character(1)   :: xyz(3)=(/'X','Y','Z'/)
       character(4)   :: atom,ps_out(2),version,head
       character(5)   :: pg_ext,c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
-      character(10)  :: string,section,ax_label,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
-      character(40)  :: file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
-      character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in
+      character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
+      character(40)  :: subst_name,file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
+      character(40)  :: x_label,y_label,file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in
       character(128) :: line,plot_title1,plot_title2,plot_title,scan_title,data_path,cwd_path,rec_str
       character(l_rec):: header_record
 
@@ -132,7 +131,7 @@ C
  			real(4), pointer :: at_pos_file(:,:,:)
  			real(4), pointer :: at_pos_file_bulk(:,:)
 
-      character(16)  :: sim_type,dat_type,input_method,file_par,subst_name,dat_source,string16
+      character(16)  :: sim_type,dat_type,input_method,file_par,dat_source,string16
       integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
       real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp
 
@@ -153,7 +152,7 @@ C *** PGPLOT stuff
                           !what is of global interest they should pass into data_header
 CC      namelist /mp_bin/ sim_type,dat_type,input_method,subst_name,data_path,ext,eps_x,n_atom,n_row,
 CC     1      j_basis,j_centred,j_test,j_mult,j_shrec,  n_tot_in,a_cell_par,temp_par,rec_str
-      namelist /mp_sqom/ nfile_mem,nfile_step,n_int,s_trig,j_oneph,j_qsq,j_wind,j_interp
+      namelist /mp_sqom/ nfile_mem,nfile_step,n_int,s_trig,j_oneph,j_sq,j_qsq,j_wind,j_interp
 
 C
 C ********************* Initialization *******************************      
@@ -205,13 +204,21 @@ CC			cut = 1.
 			eps_x = .05
       nfile_step = 1
       nfile_mem = 200
+      j_verb = 1
 
 C *** Generate data file access
 			write(*,*) 'Input data file_master: '
 			read(*,*) file_master 
-						
-      write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
-      read(*,*)   nfile_min,nfile_max
+			
+			
+			if(j_verb==1)	then	
+        write(*,*) 'Read data files number min, step, max (0 0 no numbers, single file): '
+        read(*,*)   nfile_min,nfile_step,nfile_max
+      else
+        write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
+        read(*,*)   nfile_min,nfile_max
+        nfile_step = 1
+      endif
 			t_single = nfile_min==0.and.nfile_max==0
 
 			if(t_single)then
@@ -308,13 +315,14 @@ C **** Read the auxiliary file <file_title.par> with structure parameters, atom 
       rewind(4)
       read(4,nml=mp_out)
       
-CC      call down_case(pg_out) 
-CC      if(index(pg_out,'png')/=0) then
-CC        pg_ext = '.png'
-CC      else
-CC        pg_ext = '.ps'
-      pg_out = 'png'
-      pg_ext = '.png'     !use PNG for intensity maps, the .PS stays emergency solution line 1788
+      call down_case(pg_out) 
+      if(index(pg_out,'png')/=0) then
+        pg_ext = '.png'
+      else
+        pg_ext = '.ps'
+      endif
+CC      pg_out = 'png'
+CC      pg_ext = '.png'     !use PNG for intensity maps, the .PS stays emergency solution line 1788
 
       rewind(4)
       read(4,nml=mp_sqom) 
@@ -410,6 +418,25 @@ C *** read Xray formfactor parameters
         write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
       enddo atom_loop
       close(4)
+
+      string_in = subst_name
+      write(*,*) 'Substance name (confirm, &append or replace): ', string_in
+      read(*,*) string_in
+      string = trim(adjustl(string_in))
+      if(string_in/=subst_name) then
+        if(string_in(1:1)=='&') then
+          subst_name = trim(subst_name)//string_in(2:)
+        else
+          subst_name = string_in
+        endif
+      endif
+
+      write(*,*) 
+      write(*,*) 'Substance name: ', subst_name
+			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
+			
+
+
 
 C *** write overview of atom data
 			write(*,*)
@@ -591,22 +618,28 @@ C *** set the time and frequency constants and the time-integration window
 			endif
 			
 			if(t_step/=.0) then
-				if(n_int==0) n_int = nfile/2
-				if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd				
-				if(j_verb==1) write(*,*) 'Time integration window set to nfile/2:',n_int
-
-				f_max_plot = .5/t_step
-				freq_step = 1./((n_int-1)*t_step)
-				n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step
 				write(*,*) 'MD time sequence:  t_total [ps]',t_tot,'t_step [ps]',t_step
-				write(*,'("Maximum energy [THz]            ",f6.2,"      energy step [THz]",f6.2)') f_max_plot,freq_step
-		
-				t_width = .5*(n_int-1)*t_step		!effective width
-				f_width = 1./t_width				!resolution= 4*f_max_plot/n_int
-				
-				write(*,'("Time-integration (BN) window FWHM [ps]",f8.2)') t_width
-				write(*,'("Energy resolution FWHM [THz]            ",f8.2)') f_width
-				write(*,*) 
+
+				if(j_sq==1) then        !for S(Q,w)
+          if(n_int==0) n_int = nfile/2
+          if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd				
+ 				  freq_step = 1./((n_int-1)*t_step)
+				  n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step		
+				  f_max_plot = n_freq_max*freq_step
+          t_width = .5*(n_int-1)*t_step		!effective width
+          f_width = 1./t_width				!resolution= 4*f_max_plot/n_int
+
+          if(j_verb==1) write(*,*) 'Time integration window set to nfile/2:',n_int
+          write(*,'("Maximum energy [THz]            ",f6.2,"      energy step [THz]",f6.2)') n_freq_max*freq_step,freq_step				
+          write(*,'("Time-integration (BN) window FWHM [ps]",f8.2)') t_width
+          write(*,'("Energy resolution FWHM [THz]            ",f8.2)') f_width
+          write(*,*) 
+				else
+				  n_freq_max = nfile					!for I(Q,t)
+				  n_int = 1
+				  f_max_plot = n_freq_max*t_step
+				endif
+ 			  n_freq_plot = n_freq_max
 			endif
 
       allocate(t_wind(n_int),SOURCE=0.0)
@@ -840,12 +873,16 @@ CC        endif
             enddo
 
             i_rec = n_head	
-            do j=1,n_rec-1
+            if(jfile==nfile_min) then
+              do j=1,n_rec-1
+                i_rec = i_rec+1
+                read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			!only needed for 1_phonon with CELL 
+              enddo	
               i_rec = i_rec+1
-              if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			!only needed for 1_phonon with CELL 
-            enddo	
-            i_rec = i_rec+1
-            if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
+              read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)
+            else
+              i_rec = i_rec+n_rec
+            endif			
       
             do j=1,n_rec-1
               i_rec = i_rec+1
@@ -1096,8 +1133,7 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 					f_plot = 0.
 					n_plot = 1
 					i_step = 1
-					n_freq_plot = 1
-					n_freq_min  = n_freq_plot
+					n_freq_min  = 1
 					write(*,*) 'Total scattering (instant integration range)'
 
 				elseif(abs(j_plot)==2) then
@@ -1123,11 +1159,16 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 
 				elseif(abs(j_plot)==4.or.abs(j_plot)==5) then
 					do
-CC						write(*,*) 'ev,q_v',ev,q_v					
-						write(*,*) 'E(Q) map: initial and final points Q1, Q2 [hkl]:'
+CC						write(*,*) 'ev,q_v',ev,q_v
+            if(j_sq==1) then				
+						  write(*,*) 'E(Q) map: initial and final points Q1, Q2 [hkl]:'
+						else
+						  write(*,*) 'I(Q,t) map: initial and final points Q1, Q2 [hkl]:'
+						endif
 						read(*,*) q1_3d,q2_3d					
 						q1 =q1_3d-q_v
 						q2 =q2_3d-q_v	
+
 						if(dot_product(q1,ev).ne.0.)then
 							write(*,*) 'Q1 not in the Q-plane:',q1,(dot_product(q1,ev))
 							cycle
@@ -1141,13 +1182,11 @@ CC            write(*,*) 'q1,q2',q1,q2
 					enddo
 
 					j_disp = 1									! E(Q) "dispersion" map
-					n_freq_plot = n_freq_max
 					n_freq_min  = 1
 					n_plot = 1
 					i_step = 1
 					dq_p = .0
 					
-
 					if(abs(j_plot)==5) then
 						write(*,*) 'perpendicular Q_step length [rlu]:'
 						read(*,*) q_step
@@ -1256,21 +1295,26 @@ CC					write(*,*) 'n_q1x,n_q2x,n_q1y,n_q2y',n_q1x,n_q2x,n_q1y,n_q2y
 						n_qdisp = abs(n_q2x-n_q1x)
 						q_min = q1_x
 						q_max = q2_x
-						ax_label = 'Q_x [r.l.u.]'
-						if(input_method=='BULK') ax_label = 'Q_x [1/Å]'
-CC						if(j_verb==1) write(*,*) ax_label,n_q1x,n_q2x,n_qdisp
+						x_label = 'Q_x [r.l.u.]'
+						if(input_method=='BULK') x_label = 'Q_x [1/Å]'
+CC						if(j_verb==1) write(*,*) x_label,n_q1x,n_q2x,n_qdisp
 					else
 						n_qdisp = abs(n_q2y-n_q1y)
 						q_min = q1_y
 						q_max = q2_y
-						ax_label = 'Q_y [r.l.u.]'
-						if(input_method=='BULK') ax_label = 'Q_y [1/Å]'
-CC						if(j_verb==1) write(*,*) ax_label,n_q1y,n_q2y,n_qdisp
+						x_label = 'Q_y [r.l.u.]'
+						if(input_method=='BULK') x_label = 'Q_y [1/Å]'
+CC						if(j_verb==1) write(*,*) x_label,n_q1y,n_q2y,n_qdisp
 					endif
 					q_nx = (n_q2x-n_q1x)/(1.*n_qdisp)			
 					q_ny = (n_q2y-n_q1y)/(1.*n_qdisp)			
 CC					write(*,*) 'n_qdisp,q_nx,q_ny,q_min,q_max',n_qdisp,q_nx,q_ny,q_min,q_max
 
+          if(j_sq==1) then
+            y_label ='f [THz]'
+          else
+            y_label ='t [ps]'
+          endif        
 				endif !if(j_disp>0)
 
 				CALL SYSTEM_CLOCK (COUNT = sc_c1)
@@ -1321,42 +1365,44 @@ CCCCCCC!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs
 				  deallocate(cs3)
 								
 				elseif(j_disp==1) then							!for dispersion
-					allocate(cs_plot(n_freq_plot,n_qdisp),cs_out(n_freq_plot,n_qdisp),qq(n_qdisp),ff(n_freq_plot))
-					allocate(cs2(n_int),cs3(n_int),cs4(n_int,n_qdisp))
+					allocate(cs_plot(n_freq_max,n_qdisp),cs_out(n_freq_max,n_qdisp),qq(n_qdisp),ff(n_freq_max))
+					allocate(cs2(n_int),cs3(n_int),cs4(n_freq_max,n_qdisp))
 
 					cs4 = (.0,.0)
-!$omp parallel shared(cs,cs4,t_wind,nfile,n_int,n_qdisp,n_qx,n_qy,n_q1x,n_q1y,q_nx,q_ny) private (cs1,cs2,cs3) 
+!$omp parallel shared(cs,cs4,t_wind,nfile,n_int,n_qdisp,n_qx,n_qy,n_q1x,n_q1y,q_nx,q_ny) private (cs2,cs3) 
 !$omp do
             do ifile = 1,nfile-n_int+1
               do ii = 1,n_qdisp
-                if(j_atc1==0) then
-                  if(j_sq==1)	then	      !j_sq=1 calculate S(Q,w)
+                if(j_sq==1)	then	      !j_sq=1 calculate S(Q,w) 
+                  if(j_atc1==0) then
                     do i=1,n_int																																		!our FT center is on n/2+1
                       cs2(i) = cs(ifile+i-1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))*t_wind(i)
                     enddo
                     cs3 = fft(cs2,inv=.false.)
-                  else                     !j_sq/=1 calculate I(Q,t)
-                    do i=1,n_int																																		!I(Q,t)  hence no FT
-                      cs3(i) = cs(ifile+i-1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
+                  else
+                    do i=1,n_int																																		!our FT center is on n/2+1
+                      cs2(i) =cs_atom(ifile+i-1,j_atc1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
+                      cs2(i) =cs2(i)+cs_atom(ifile+i-1,j_atc2,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
                     enddo
-                  endif
-                else
-                  do i=1,n_int																																		!our FT center is on n/2+1
-                    cs2(i) =cs_atom(ifile+i-1,j_atc1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
-                    cs2(i) =cs2(i)+cs_atom(ifile+i-1,j_atc2,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
-                  enddo
-                  cs2 = cs2*t_wind
-                  cs3 = fft(cs2,inv=.false.)
-                endif	
-                  cs4(:,ii) = cs4(:,ii)+cs3*conjg(cs3)			
-              enddo
+                    cs2 = cs2*t_wind
+                    cs3 = fft(cs2,inv=.false.)
+                  endif	
+                  cs4(:,ii) = cs4(:,ii)+cs3(1:n_freq_max)*conjg(cs3(1:n_freq_max))			 
+               else                     !j_sq/=1 calculate I(Q,t)
+                cs3(1) = cs(ifile,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
+                cs4(ifile,ii) = cs4(ifile,ii)+cs3(1)*conjg(cs3(1))			!now dim(cs3)=1
+              endif
+             enddo
             enddo
 !$omp end do
 !$omp end parallel
-					cs_plot(:,:) = cs4(1:n_freq_plot,:)
+CC					cs_plot(:,:) = cs4(1:n_freq_max,:)
+					cs_plot = cs4
 					deallocate(cs2,cs3,cs4)
 				endif		!j_disp
 
+CC        write(*,*) 'nfile,n_freq_plot,n_freq_max',nfile,n_freq_plot,n_freq_max
+        
 				CALL SYSTEM_CLOCK (COUNT = sc_c2)
 				call cpu_time(t2)
 				if(j_verb==1.and.(j_plot==2.or.j_plot==4))
@@ -1364,7 +1410,7 @@ CCCCCCC!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs
 
 				n_frame = nfile-n_int+1
 				
- 	     	if(j_disp.ge.1) cs_plot = transpose(cs_plot)			!from now on the shape is cs_plot(n_qdisp,n_freq_plot)
+ 	     	if(j_disp.ge.1) cs_plot = transpose(cs_plot)			!from now on the shape is cs_plot(n_qdisp,n_freq_max)
 				cs_plot = cs_plot/real(.5*n_frame*n_int)					!.5 comes for the integral of the time window profile
 			endif !(abs(j_plot)>1)													!E-resolved cases
 
@@ -1374,7 +1420,7 @@ C *** apply the speckle filter
 					if(j_disp==0) then
 						nq_tot = n_qx*n_qy
 					elseif(j_disp==1) then
-						nq_tot = n_qdisp*n_freq_plot					
+						nq_tot = n_qdisp*n_freq_max					
 					endif
 					allocate(csp(nq_tot))
 					if(j_disp==1) cs_plot = transpose(cs_plot)
@@ -1390,7 +1436,7 @@ C *** apply the speckle filter
 					if(j_disp==0) then
 						cs_plot = reshape(source=csp,shape=[n_qx,n_qy])
 					elseif(j_disp==1) then
-						cs_plot = reshape(source=csp,shape=[n_freq_plot,n_qdisp])
+						cs_plot = reshape(source=csp,shape=[n_freq_max,n_qdisp])
 					endif
 
 					if(j_disp==0) then				!2nd round perpendicular
@@ -1440,25 +1486,23 @@ CC				scale_loop: do
 					    plot_title1 = 'S(Q)/Q**2'//'  '//trim(subst_name)//'_'//trim(masks)
 					  endif
 					else
-  				  if(j_qsq==1) then
-					    plot_title1 = 'S(Q,ω)'//'  '//trim(subst_name)//'_'//trim(masks)
-					  else
-					    plot_title1 = 'S(Q,ω)/Q**2'//'  '//trim(subst_name)//'_'//trim(masks)
-					  endif
+            if(j_sq==1) then
+              if(j_qsq==1) then
+                plot_title1 = 'S(Q,ω)'//'  '//trim(subst_name)//'_'//trim(masks)
+              else
+                plot_title1 = 'S(Q,ω)/Q**2'//'  '//trim(subst_name)//'_'//trim(masks)
+              endif
+            else
+              plot_title1 = 'I(Q,t)'//'  '//trim(subst_name)//'_'//trim(masks)
+            endif           
 					endif
+
           if(j_oneph<=0)then
             mode = 'NU_FFT'
           else
             mode = 'Single_ph'
           endif
-	
-				if(j_logsc==1) then
-				  wedge_label = 'Log_scale'
-				else
-				  wedge_label = 'Lin_scale'
-				endif	
-
-				
+					
         if(j_disp==0) then
           n_qxp = n_qx
           n_qyp = n_qy
@@ -1467,6 +1511,12 @@ CC				scale_loop: do
           n_qyp = n_freq_plot       !could have been done already before 
         endif
         
+				if(j_logsc==1) then
+				  wedge_label = 'Log_scale'
+				else
+				  wedge_label = 'Lin_scale'
+				endif	
+
 
 				scale_loop: do
           if(j_logsc==1) then
@@ -1536,7 +1586,13 @@ C *** intercalate zeros for interpolation
 
 C **** Draw the plot  
 				f_min = 0.
-				if(f_max==.0) f_max = f_max_plot
+			  if(j_sq==1) then
+			    f_max = (n_qyg-1)*freq_step
+			  else
+					f_max = (n_qyg-1)*t_step
+				endif
+				
+CC				write(*,*) 'n_qxg,n_qyg,f_max,freq_step',n_qxg,n_qyg,f_max,freq_step
 				
 				if(c_min_save==0..and.c_max_save==0.) then
 					c_min = anint(minval(cs_pgplot)-1.)
@@ -1566,7 +1622,8 @@ CC					TR(2) = (q_max-q_min)/(n_qdisp)
 					TR(3) = 0.0
 					TR(5) = 0.0
 CC					TR(6) = f_max/(n_freq_plot-1.)
-					TR(6) = f_max/(n_qyg)
+					TR(6) = f_max/(n_qyg-1)
+CC          if(j_sq==0) TR(6) = 1.
 					TR(4) = -TR(6)
 				endif
 
@@ -1605,7 +1662,7 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						call PGSLCT(map_unit(i_plot))
 						CALL PGPAP(p_size,1.)     ! define the plot area as a rectangle
 						CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
-						CALL PGLAB(trim(ax_label),'f [THz]',' ')  !put the axis labels
+						CALL PGLAB(trim(x_label),y_label,' ')  !put the axis labels
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
 						CALL PGSCH(.7)					!set character height					
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
@@ -1763,7 +1820,7 @@ C **** Output the intensity map to a text file (linear scale)
 							write(3,*) 'Plot size Y (columns):',n_qy,qy_min,qy_min+(n_qy-1.)*(qy_max-qy_min)/(n_qy)
 							write(3,*)
 							do i=1,n_qx
-								write(3,109) (cs_out(i,j),j=1,n_qy)
+								write(3,109) (cs_plot(i,j),j=1,n_qy)
 							enddo
 						elseif(j_disp==1) then
 							write(3,*) 'Energy resolution [THz]',f_width
@@ -1776,7 +1833,7 @@ C **** Output the intensity map to a text file (linear scale)
 							write(3,*) 	 'Plot size Y (columns, f):',n_freq_plot,f_min,f_max
 							write(3,*)
 							do i=1,n_qdisp
-								write(3,109) (cs_out(i,j),j=1,n_freq_plot)
+								write(3,109) (cs_plot(i,j),j=1,n_freq_plot)
 							enddo
 						endif
 						close(3)
@@ -1824,7 +1881,7 @@ CC					IF (PGOPEN(trim(file_ps)//'/PNG').LE.0) STOP
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					elseif(j_disp==1) then
 						CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
-						CALL PGLAB(trim(ax_label),'f [THz]',' ')  !put the axis labels
+						CALL PGLAB(trim(x_label),'f [THz]',' ')  !put the axis labels
 						CALL PGSCH(.7)					!set character height					
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title))			!put plot title on 2 lines
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
@@ -1922,7 +1979,7 @@ CC							write(*,*) cs_pgplot(1:n_qxg,j_freq)
 								CALL PGSCI (1)  !white
 								CALL PGSLS (1)  !full
 								CALL PGENV(qq(1),qq(n_qdisp),c_min,c_max,0,1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
-								CALL PGLAB(trim(ax_label), 'cts',trim(scan_title))  !put the axis labels
+								CALL PGLAB(trim(x_label), 'cts',trim(scan_title))  !put the axis labels
 								CALL PGSCI (ii+1)  !red-green-blue
 CC								CALL PGLINE(n_qdisp,qq,cs_pgplot(1:n_qdisp,j_freq))  !plots the curve
 								CALL PGLINE(n_qxg,qq,cs_pgplot(1:n_qxg,j_freq))  !plots the curve
@@ -2027,7 +2084,11 @@ CC						write(*,*) 'Choose a plot option (',trim(pg_out),'/TXT file output is ',
 						if(t_step>.0) then			
 							write(*,*) '       2  explore E=const maps         (-2 edit atom masks)'
 							write(*,*) '       3  make a stack of E=const maps (-3 reset atom masks)'
-							write(*,*) '       4  explore E(Q) maps            (-4 edit atom masks)'
+							if(j_sq==1)then
+							  write(*,*) '       4  explore E(Q) maps            (-4 edit atom masks)'
+							else
+							  write(*,*) '       4  explore I(Q,t) maps            (-4 edit atom masks)'
+							endif
 							write(*,*) '       5  make a stack of E(Q) maps    (-5 reset atom masks)'
 						endif
 							write(*,*) '       6  change the HKL plane, range and centre (BZ)'
@@ -2083,13 +2144,22 @@ CC							if(j_ps==1) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT outpu
 						write(*,*) 
      1			'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
 						write(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
-						if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd				
-						n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step
-						t_width = .5*n_int*t_step
-						f_width = 1./t_width
-						freq_step = 1./(n_int*t_step)
-						write(*,*) 'Time-integration (BN window FWHM) [ps]',t_width
-						write(*,*) 'Energy resolution [THz]',f_width
+						if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd	
+						if(f_max>f_max_plot) then
+						  write(*,*) 'Setting f_max =',f_max_plot
+						  f_max = f_max_plot
+						endif			
+						if(j_sq==1) then
+              n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step
+              t_width = .5*n_int*t_step
+              f_width = 1./t_width
+              if (n_int/=1) freq_step = 1./((n_int-1)*t_step)
+              n_freq_plot = f_max/freq_step+1
+              write(*,*) 'Time-integration (BN window FWHM) [ps]',t_width
+              write(*,*) 'Energy resolution [THz]',f_width
+            else
+              n_freq_plot = f_max/t_step+1
+            endif
 
             if(j_interp>0) then
               j_interp_x = 1
