@@ -1,9 +1,9 @@
       
-      program mp_bin54
+      program mp_dbin55
 
 C *************************************************************************************
 C *****
-C *****  %%%%%%%%%%%%%%%%   		  program MP_BIN 1.54   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%   		  program MP_BIN 1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C *****
 C *****   converts MD trajectory data (DL_POLY or equivalent) to the MP_TOOLS binary form
 C *****
@@ -20,7 +20,7 @@ C**	This program is distributed in the hope that it will be useful, but WITHOUT 
 C**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 C**	See the GNU General Public License for more details.
 C**
-C *****   %%%%%%%%%%%%%%%%   			program MP_BIN 1.54  				 %%%%%%%%%%%%%%%%%%%%%%%%
+C *****   %%%%%%%%%%%%%%%%   			program MP_BIN 1.55  				 %%%%%%%%%%%%%%%%%%%%%%%%
 C *****
 C *****		!!!! incompatible with the old MD 1.4 file format because of N_ROW(3) !!!!
 C *****
@@ -96,28 +96,29 @@ C *****
 			logical :: found,found_txt,t_single
       character(4)   :: at_name_in,at_name_in2,at_name_in3,head,sim_type_lc,pos_units,pg_out
       character(10)  :: c_date,c_time,c_zone,ext,number
-      character(16)  :: string,section
+      character(16)  :: filter_name
+      character(40)  :: subst_name,string,section
       character(128) :: line,cwd_path,data_path,time_stamp,rec_str
       character(128) :: file_master,file_master_out,file_dat,file_trajectory,file_inp,file_log
       character(4*l_rec) :: header_record
 
-      integer ::  i_dom,i_dom_rec,n_dom,n_tot_in,j_struct,n_tot,i_atom,i_save
-      integer ::  at_no,at_ind_base(3),at_ind_shift(3),at_ind_in(3)
+      integer ::  i_dom,i_dom_rec,n_dom,n_tot_in,j_struct,n_tot,i_save
+      integer ::  at_no,at_ind_base(3),at_ind_shift(3),at_ind_in(3),at_ind_in2(3)
       integer ::  j_yes,nskip,nfile_min,nfile_max,nfile_step,i_time(8),n_save_min,izero,indzero(3)
       integer ::  ios,ios_t,i,j,k,ii,i2,i3,jl,jat,j_step,j_label,n_label,j_first,j_read,j_verb,j_proc,j_shrec,j_test
-      integer ::  i_rec,jrec,nrec,l_rec4,ifile,ncell,nsuper,nrow,nlayer,n_site,j_shell
+      integer ::  inrec,jrec,nrec,i_rec,l_rec4,ifile,ncell,nsuper,nrow,nlayer,n_site,j_shell
       integer ::  sc_c1,sc_c2,sc_m,nt_min,nt_max,nt_step,i_traj,j_mult,j_basis,j_centred
 
       real :: at_mass_in,at_mass_in2,at_charge_in,at_charge_in2,at_displ_in,sc_r
-      real ::	at_pos_in(3),at_pos_in2(3),at_veloc_in(3),at_veloc_in2(3),at_force_in(3),at_force_in2(3)
+      real ::	at_pos_in(3),at_pos_in2(3),at_veloc_in(3),at_veloc_in2(3),at_force_in(3),at_force_in2(3),at_base_shift(3)
       real ::	dummy,at_pos2(3),at_pos3(3),at_veloc2(3),a_cell(3,3),a_cell_par(3),a_cell_half(3),at_pos_centre(3)
-      real :: t1,t2,t_step,zero,at_zero(3),pos_inp(3),temp_par,eps_x,temp_r_s,temp_r_c
+      real :: t1,t2,filter_fwhm,t_step,zero,at_zero(3),pos_inp(3),temp_par,eps_x,temp_r_s,temp_r_c
 
       character(4),allocatable :: at_name(:),at_label(:)
-      integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:),ind_rec(:)
+      integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:)
       integer,allocatable,target :: i_series(:),at_ind_out(:)
       integer,pointer ::  jr(:)
-      real,allocatable ::  sum_pos(:,:,:),ord(:),e_kin(:,:),e_kin_s(:,:),x_pos(:,:),at_occup(:)
+      real,allocatable ::  sum_pos(:,:,:),ord(:),e_kin(:,:),e_kin_s(:,:),at_base_in(:,:),at_base(:,:),at_occup(:)
 
 C **** the following variables MUST have the following 32bit sizes or multiples because of alignement in the binary output file
 C
@@ -127,19 +128,21 @@ C
       real(4),allocatable ::	at_pos_c(:,:),at_veloc_c(:,:),at_force_c(:,:),at_occup_r(:)
       real(4),allocatable ::	at_pos_s(:,:),at_veloc_s(:,:),at_force_s(:,:)
 
-      character(16)  :: sim_type,input_method,dat_type,dat_source,file_par,subst_name
-      integer(4)     :: n_row(3),n_atom,n_eq,j_shell_out,n_traj,n_cond,idum,n_rec,n_head,n_head_in
+      character(16)  :: sim_type,input_method,dat_type,dat_source,file_par
+      integer(4)     :: n_row(3),n_atom,n_eq,j_shell_out,n_traj,n_cond,idum,n_rec,n_head,n_head_in1,n_head_in2
       real(4)        :: rec_zero(l_rec),t_ms,t_dump,a_par(3),angle(3),temp
 
-      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
-     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
-      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
       										!general rule: namelists of tools should only contain their local parameters
                           !what is of global interest they should pass into data_header
 			namelist /mp_bin/ subst_name,sim_type,dat_type,input_method,pos_units,data_path,ext,rec_str,
-     1			j_mult,n_head_in,n_tot_in,n_atom,n_row,j_basis,j_centred,j_test,j_shrec,a_cell_par,eps_x,temp_par,t_step
+     1					j_mult,n_head_in1,n_head_in2,n_tot_in,n_atom,n_row,j_basis,j_centred,j_test,j_shrec,
+     2          a_cell_par,at_base_shift,eps_x,temp_par,t_step
+
 !     namelist /mp_sqom/ n_int,s_trig,j_oneph,j_qsq
 !     namelist /mp_pdf/ n_pdf,pdf_step,j_gauss,n_h,j_weight,j_smooth,n_corr
 
@@ -148,10 +151,10 @@ C
 C
 C *****************************************************************************************
 C
-			write(*,*) '*** Program MP_BIN 1.54 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***'
+			write(*,*) '*** Program MP_BIN 1.55 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***'
       write(*,*)
       dat_source = 'MP_TOOLS'
-      version = '1.54'
+      version = '1.55'
 
 C ********************* Get a time stamp and open a .LOG file *******************************
       call getcwd(cwd_path)
@@ -168,8 +171,33 @@ C ********************* Get a time stamp and open a .LOG file ******************
 		  endif
 
 			write(9,*) 
-			write(9,*) trim(time_stamp),'  MP_BIN 1.54  ',trim(cwd_path)
+			write(9,*) trim(time_stamp),'  MP_BIN 1.55  ',trim(cwd_path)
+C		  write(*,*) trim(time_stamp),'  MP_BIN 1.55  ',trim(cwd_path)
 			write(9,*) 
+
+C *** diverse initialisations
+			l_rec4 = l_rec/4
+			t_single = .true.
+			nt_min = 1
+			nt_max = 1
+			j_test = 1
+			n_head = 3
+			n_head_in1 = 0
+			n_head_in2 = 0
+			rec_str = ''
+			idum = 0
+			j_label = 0
+			n_site = 0
+			n_eq = 1								!later introduce sites, basis etc.
+			i_dom = 0
+			n_cond = 0
+			n_tot_in = 0
+      t_ms = .0
+      temp_par = .0
+      at_base_shift = .0
+			filter_name = 'nn'
+			filter_fwhm = .0
+
       
 C *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
       write(*,*) 'Parameter file name (.par will be added)'
@@ -188,6 +216,7 @@ C *** read auxiliary file <file_par.par> with structure parameters, atom names a
 
       j_test = 1
       data_path = './data/'
+      ext = ''
       rewind(4)
       read(4,nml=mp_bin)
       call up_case(sim_type)
@@ -197,19 +226,25 @@ C *** read auxiliary file <file_par.par> with structure parameters, atom names a
       if(ext=='ext'.or.ext=='EXT') ext=''
       if(ext/=''.and.index(ext,'.')==0) ext='.'//ext
 
+      string = subst_name
+      write(*,*) 'Substance name (confirm, &append or replace): ', string
+      read(*,*) string
+      string = trim(adjustl(string))
+      if(string/=subst_name) then
+        if(string(1:1)=='&') then
+          subst_name = trim(subst_name)//string(2:)
+        else
+          subst_name = string
+        endif
+      endif
+
+      write(*,*) 
+      write(*,*) 'Substance name: ', subst_name
 			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
 			
-			allocate(at_name_par(n_atom),at_label(n_atom),x_pos(n_atom,3))
+			allocate(at_name_par(n_atom),at_label(n_atom),at_base_in(n_atom,3),at_base(n_atom,3))   !at_base would include at_base_shift & saved in data file header
 			allocate(ind_l(n_atom),i_site(n_atom,n_atom),at_occup(n_atom))
 
-			l_rec4 = l_rec/4
-			t_single = .true.
-			nt_min = 1
-			nt_max = 1
-			ind_l = 0
-			n_eq = 1									!for future use with multiplicities
-			j_label = 0
-			n_site = 0
 			nsuper = n_row(1)*n_row(2)*n_row(3)
 			nlayer = n_row(1)*n_row(2)						!to be used for record number calculation for CELL data
 			
@@ -226,7 +261,7 @@ C *** Read the atom positions
       enddo
 
       do j=1,n_atom
-        read(4,*) string,at_name_par(j),x_pos(j,:),at_occup(j)
+        read(4,*) string,at_name_par(j),at_base_in(j,:),at_occup(j)
         found = .false.
         do i=1,j_label
           if(trim(string).eq.at_label(i)) then
@@ -243,6 +278,11 @@ C *** Read the atom positions
         i_site(j_label,ind_l(i)) = j
       enddo
       close(4)
+      
+      do j=1,n_atom
+        at_base(j,:) = at_base_in(j,:)+at_base_shift
+      enddo
+      
       n_label = j_label
       write(*,*) 'Atom labels ',n_label
       do j=1,n_label
@@ -252,7 +292,7 @@ C *** Read the atom positions
       write(*,*) trim(subst_name),' structure info (atoms): '	  
       do j=1,n_atom
         if(input_method=='CELL'.or.input_method=='FAST') then
-          write(*,*) j,at_name_par(j),x_pos(j,:)
+          write(*,*) j,at_name_par(j),at_base_in(j,:)
         else
           write(*,*) j,at_name_par(j)
         endif
@@ -446,7 +486,7 @@ C *** handle the supercell parameters and the origin of the supercell coordinate
 				at_ind_base = n_row/2+1-at_ind_shift
 			endif
 
-      allocate (ind_rec(n_tot),at_ind(4,n_tot),SOURCE=0)
+      allocate (at_ind(4,n_tot),SOURCE=0)
 			allocate(at_name(n_tot),SOURCE='    ')
 			allocate(e_kin(n_atom,3),at_occup_r(n_atom))
 			allocate(nsuper_r(n_atom),SOURCE=0) !atom number jat is the first of the four indices
@@ -560,6 +600,20 @@ C *** take fresh lattice parameters for each snapshot - they may evolve
 					endif			
 				endif
 
+C *** get the actual time step of the sequence
+				if(ifile==nfile_min) then
+				  t_step = t_dump
+				elseif(ifile==nfile_min+1) then
+				  t_step = t_dump-t_step
+				  t_dump = t_dump-t_step !get the old t_dump for the old frame          
+C *** correct t_step in the first snapshot				  
+				  open(2,file=file_dat,access='direct',form='unformatted',recl=4*l_rec)		! l_rec is in 32 bit words = 4 bytes, thus the factor 4
+          write(header_record,nml=data_header_1)	
+          write(2,rec=2) header_record
+          close(2)
+				  t_dump = t_dump+t_step !get the right t_dump for the present frame          
+				endif
+				
 C ***  read-in the text of a snapshot in one go
 				if(ifile==nfile_min) write(*,*) 'reading the 1st snapshot (takes a few seconds) ...'
 
@@ -577,7 +631,7 @@ C ***  read-in the text of a snapshot in one go
 				
         call cpu_time(t1)				
 
-        read_loop: do  i_atom=1,n_tot_in        !swallow the snapshot
+        read_loop: do  inrec=1,n_tot_in        !swallow the snapshot
 
 C *** first read the CORE data  
 
@@ -594,8 +648,8 @@ CC          	backspace(1)
           read(1,*) at_pos_in
           if(n_traj>=1) read(1,*,iostat=ios_t) at_veloc_in
           if(ios_t/=0) then
-          	write(*,*) 'Input problem: ios_t,i_atom,ifile,at_name_in,head',ios_t,i_atom,ifile,at_name_in,head
-						endif
+          	write(*,*) 'Input problem: ios_t,inrec,ifile,at_name_in,head',ios_t,inrec,ifile,at_name_in,head
+					endif
           if(n_traj==2) read(1,*) at_force_in
 
 C
@@ -603,7 +657,7 @@ C *** now read the SHELL data if needed
           if(j_shell.eq.1) then
           	read(1,*) at_name_in2,at_no,at_mass_in2,at_charge_in2,at_displ_in
 						if(trim(at_name_in)//'s'.ne.at_name_in2) then
-							write(*,*)'wrong core-shell sequence',i_atom,at_name(i_atom),at_name_in
+							write(*,*)'wrong core-shell sequence',inrec,at_name(inrec),at_name_in
 							stop
 						endif
 						read(1,*) at_pos_in2
@@ -636,78 +690,108 @@ C ***  treat the CORE data and get the right labels & positions
               write(*,*) 'atom ',at_name_in,' not found in .PAR'
               stop
             endif
-         endif
+          endif
 
-        if(input_method=='BULK') then         !jl identifes label (chem species), jat basis position in CELL
-          jrec = i_atom
-          jat = jl	
-          at_ind(1,jrec) = jrec
-          at_ind(2:3,jrec) = 0
-          at_ind(4,jrec) = jat
+C *** treat BULK data 
+          if(input_method=='BULK') then         !jl identifes label (chem species), jat basis position in CELL
+            jat = jl	
+            at_ind(1,inrec) = inrec
+            at_ind(2:3,inrec) = 0
+            at_ind(4,inrec) = jat
 
-        elseif(input_method=='CELL'.or.input_method=='FAST')then		
-          at_pos_in = at_pos_in/a_par
-          at_pos_in2 = at_pos_in2/a_par
-          at_pos_in = at_pos_in-at_ind_shift						         !now the supercell will be centred, if it wasn't originally
-          if(j_shell_out.eq.1) at_pos_in2 = at_pos_in2-at_ind_shift
+            at_pos_in = at_pos_in-at_pos_centre
+            do k=1,3
+              if(at_pos_in(k)<-a_cell_half(k)) at_pos_in(k) = at_pos_in(k)+a_cell(k,k)   
+              if(at_pos_in(k)>=a_cell_half(k)) at_pos_in(k) = at_pos_in(k)-a_cell(k,k)
+            enddo
+            if(nsuper/=1) at_pos_in = at_pos_in/a_par   !otherwise at_pos stay in Å
+
+            if(j_shell_out==1) then
+              at_pos_in2 = at_pos_in2-at_pos_centre
+              do k=1,3
+                if(at_pos_in2(k)< -a_cell_half(k)) at_pos_in2(k) = at_pos_in2(k)+a_cell(k,k)
+                if(at_pos_in2(k)>= a_cell_half(k)) at_pos_in2(k) = at_pos_in2(k)-a_cell(k,k)
+              enddo
+              if(nsuper/=1) at_pos_in2 = at_pos_in2/a_par
+            endif
+		
+C *** treat CELL data 
+          elseif(input_method=='CELL'.or.input_method=='FAST')then		
+            at_pos_in = at_pos_in/a_par
+            at_pos_in2 = at_pos_in2/a_par
       
-C *** FIRST FRAME: identify atoms and obtain cell indices ix,iy,iz from atomic positions shifted to cell origin 
-C ***              in the rest use the atom indices AT_NO from the data  
-          if(i_traj==nt_min.and.ifile==nfile_min) then    
             if(j_basis==1) then
               jat = jl        !atom site was identified by name
-          	else
-          		if(input_method=='FAST') then
-          			if(at_no<=2*nsuper) jat = (at_no-1)/nsuper+1
-          			if(at_no>2*nsuper) jat = mod((at_no-2*nsuper-1),3)+3
-          		else													!'CELL'
-								if(ind_l(jl).eq.1) then
-									jat = i_site(jl,1)	!identify atom site by fractional position 
-								else
-									do ii=1,ind_l(jl)
-										pos_inp = at_pos_in-x_pos(i_site(jl,ii),:)
-										jat = i_site(jl,ii)
-										if(maxval(abs(pos_inp-anint(pos_inp))).lt.eps_x) exit !atom found
-									enddo
-								endif
-							endif
-            endif                          
+            else
+              if(input_method=='FAST') then
+                if(at_no<=2*nsuper) jat = (at_no-1)/nsuper+1
+                if(at_no>2*nsuper) jat = mod((at_no-2*nsuper-1),3)+3
+              else													!'CELL'
+                if(ind_l(jl).eq.1) then
+                  jat = i_site(jl,1)	!identify atom site by fractional position 
+                else
+                  do ii=1,ind_l(jl)
+                    pos_inp = at_pos_in-at_base_in(i_site(jl,ii),:)
+                    jat = i_site(jl,ii)
+                    if(maxval(abs(pos_inp-anint(pos_inp))).lt.eps_x) exit !atom found
+                  enddo
+                  if(maxval(abs(pos_inp-anint(pos_inp))).gt.eps_x) then
+                    write(*,*) 'Identification by position not succeeded: atom, record ',at_label(jl),inrec
+                    write(*,*) 'Possible solutions (modify the .PAR file):'
+                    write(*,*) '  1/check the ATOMS basis, 2/ try to slightly increase EPS, 3/ use the BULK input method '
+                    stop
+                  endif
+                endif
+              endif     
+            endif     !j_basis
 
-CC							if(jat/=((at_no-1)/nsuper+1)) then
-CC							write(*,*) at_no,at_pos_in
-CC							read(*,*)
-CC							endif
-            at_ind_in = anint(at_pos_in-x_pos(jat,:))+n_row/2+1  !they will serve as pointers to the right order of atom records
+CC *** calculate cell indices ix,iy,iz from atomic positions shifted to cell origin
+
+            at_ind_in = anint(at_pos_in-at_base_in(jat,:))+at_ind_base  !they will serve as pointers to the right order of atom records
+            at_pos_in = at_pos_in-at_ind_shift+at_base_shift			!now the supercell will be centred & basis origin in at_base_shift
+C           if(j_shell_out.eq.1) at_pos_in2 = at_pos_in2-at_ind_shift+at_base_shift
                                                                    !both at_ind_base and at_ind_shift are now based on j_centred (line 417) 
             do k=1,3
               if(at_ind_in(k)==0) then
                 at_ind_in(k) = at_ind_in(k)+n_row(k)
                 at_pos_in(k) = at_pos_in(k)+n_row(k)
-                if(j_shell_out.eq.1) at_pos_in2(k) = at_pos_in2(k)+n_row(k)
-              endif
-              if(at_ind_in(k)==n_row(k)+1) then
+C               if(j_shell_out.eq.1) at_pos_in2(k) = at_pos_in2(k)+n_row(k)
+C             endif
+              elseif(at_ind_in(k)==n_row(k)+1) then
                 at_ind_in(k) = at_ind_in(k)-n_row(k)
                 at_pos_in(k) = at_pos_in(k)-n_row(k)
-                if(j_shell_out.eq.1) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+C               if(j_shell_out.eq.1) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
               endif
             enddo
-        
+
+            if(j_shell_out.eq.1) then
+              at_ind_in2 = anint(at_pos_in2-at_base_in(jat,:))+at_ind_base  !they will serve as pointers to the right order of atom records
+              at_pos_in2 = at_pos_in2-at_ind_shift+at_base_shift
+
+              do k=1,3
+                if(at_ind_in2(k)==0) then
+                  at_ind_in2(k) = at_ind_in2(k)+n_row(k)
+                  at_pos_in2(k) = at_pos_in2(k)+n_row(k)
+                elseif(at_ind_in2(k)==n_row(k)+1) then
+                  at_ind_in2(k) = at_ind_in2(k)-n_row(k)
+                  at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+                endif
+              enddo
+            endif     !'SHELL'
+       
             jrec = nsuper*(jat-1)+nlayer*(at_ind_in(3)-1)+n_row(1)*(at_ind_in(2)-1)+at_ind_in(1)
           
             if(jrec>n_tot.or.jat<1.or.jat>n_atom) then
+						  write(*,*) 'JREC wrong:',jrec,' > ',n_tot,' check n_tot_in, n_row and j_centred in the .PAR'
               write(*,*) 'jrec,at_ind_in',jrec,at_ind_in
               write(*,*) 'at_pos_in',at_pos_in,at_pos_in2
               write(*,*) 'n_tot,nsuper,nlayer,n_row',n_tot,nsuper,nlayer,n_row
+						  stop
             endif
 
             at_ind(1:3,jrec) = at_ind_in
             at_ind(4,jrec) = jat
-            ind_rec(at_no) = jrec
-          else
-            jrec = ind_rec(at_no)     !for subsequent frames JREC comes from AT_NO
-            jat =  at_ind(4,jrec)
-          endif					
-        endif		!input_method
+          endif		!input_method CELL
 				
 					at_pos_c(1:3,jrec) = at_pos_in
 					at_pos_c(4,jrec) = at_charge_in															 
@@ -737,28 +821,6 @@ C *** accumulate the occupation number and the kinetic energy to refine the real
           endif
 				enddo read_loop
 				
-C *** centre bulk data and flip them into the box if needed
-				if(input_method=='BULK') then
-          do i =1, n_tot
-					  at_pos_c(1:3,i) = at_pos_c(1:3,i)-at_pos_centre
-					  do k=1,3
-					    if(at_pos_c(k,i)<-a_cell_half(k)) at_pos_c(k,i) = at_pos_c(k,i)+a_cell(k,k)   
-					    if(at_pos_c(k,i)>=a_cell_half(k)) at_pos_c(k,i) = at_pos_c(k,i)-a_cell(k,k)
-					  enddo
-					  if(nsuper/=1) at_pos_c(1:3,i) = at_pos_c(1:3,i)/a_par
-          enddo
-          if(j_shell_out==1) then
-            do i =1, n_tot
-              at_pos_s(1:3,i) = at_pos_s(1:3,i)-at_pos_centre
-              do k=1,3
-                if(at_pos_s(k,i)< -a_cell_half(k)) at_pos_s(k,i) = at_pos_s(k,i)+a_cell(k,k)
-                if(at_pos_s(k,i)>= a_cell_half(k)) at_pos_s(k,i) = at_pos_s(k,i)-a_cell(k,k)
-              enddo
-					    if(nsuper/=1) at_pos_s(1:3,i) = at_pos_s(1:3,i)/a_par
-            enddo
-					endif
-				endif 
-		
 C *** indexing for the output
 				allocate(at_ind_out(n_tot),at_name_out(n_atom),ind_at(n_atom))
 				if(input_method=='BULK') then
@@ -779,10 +841,10 @@ C *** indexing for the output
 
         call cpu_time(t2)
 				if(i_traj==nt_min.and.ifile==nfile_min) then												!analyze in detail the 1st snapshot
-					write(*,*) '1st snapshot: total of',i_atom,' atoms read in',t2-t1,' sec'
+					write(*,*) '1st snapshot: total of',jrec,' atoms read in',t2-t1,' sec'
 				endif
  				
-  				
+C *** normalize the kinetic energy and get the true temperature  				
 				if(n_traj>=1) then
 					do j=1,n_atom
 						e_kin(j,:) = e_kin(j,:)/(nsuper_r(j))
@@ -843,12 +905,13 @@ C *** get the atom position occupation numbers and compare them with those from 
 					endif
 				endif 		!i_traj==nt_min.and.ifile==nfile_min
 
+        
 
 C *** define the record structure
 				n_rec = (n_tot/l_rec4)														!for each position there are 4 components
 				if(mod(n_tot,l_rec4)/=0) n_rec = n_rec+1
 																
-				if(j_verb==1.and.ifile==nfile_min) write(*,*) 'n_tot,l_rec4,n_rec',n_tot,l_rec4,n_rec			
+CC				if(j_verb==1.and.ifile==nfile_min) write(*,*) 'n_tot,l_rec4,n_rec',n_tot,l_rec4,n_rec			
 
 C *** generate output filename
         if(i_save<=9999) then
@@ -982,7 +1045,6 @@ CC				write(*,*) 'End frame_loop, i_traj',i_traj
 			enddo trajectory_loop
 			deallocate(at_name,at_ind,e_kin,at_occup_r,nsuper_r,i_series)
 				if(j_shell.eq.1) deallocate(e_kin_s)
-			deallocate(ind_rec)
 			
 			CALL SYSTEM_CLOCK (COUNT = sc_c2)
       write(*,*) 'Trajectory files finished: ',i_save-n_save_min,' .dat files written in',(sc_c2-sc_c1)/sc_r,' sec (SYS)'
@@ -990,7 +1052,7 @@ CC				write(*,*) 'End frame_loop, i_traj',i_traj
       write(9,*) 
 
       stop
-      end program mp_bin54
+      end program mp_dbin55
    
    
    

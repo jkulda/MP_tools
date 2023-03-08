@@ -1,9 +1,9 @@
      
-      program mp_insp53
+      program mp_insp55
 
 C *************************************************************************************
 C *****
-C *****  %%%%%%%%%%%%%%%%   		  program MP_INSP 1.53   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%   		  program MP_INSP 1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C *****
 C *****   inspects single atom properties in a binary MP_TOOLS data file  
 C *****
@@ -20,7 +20,7 @@ C**	This program is distributed in the hope that it will be useful, but WITHOUT 
 C**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 C**	See the GNU General Public License for more details.
 C**
-C ***** %%%%%%%%%%%%%%%%           program MP_INSP 1.53   					 %%%%%%%%%%%%%%%%%%%%%%%%
+C ***** %%%%%%%%%%%%%%%%           program MP_INSP 1.55   					 %%%%%%%%%%%%%%%%%%%%%%%%
 C *****
 C ***** Ver. 1.1 - original version
 C ***** Ver. 1.2  
@@ -59,14 +59,14 @@ C *****
       
       character(4),allocatable      :: at_name_out(:)
       character(4)			:: version
-      character(16)     :: sim_type,file_par,subst_name,dat_type,dat_source,input_method,string
-      character(40)     :: file_master,string_in
+      character(16)     :: sim_type,file_par,dat_type,dat_source,input_method,string,filter_name
+      character(40)     :: subst_name,file_master,string_in
       character(60) 		:: file_dat,file_out
       character(1024)    :: header_record
 
       logical           ::  nml_in
       integer(4),allocatable ::  at_ind(:),ind_at(:),nsuper_r(:)    
-      real(4),allocatable ::  at_pos_c(:),at_veloc_c(:),at_force_c(:),at_occup_r(:)      
+      real(4),allocatable ::  at_pos_c(:),at_veloc_c(:),at_force_c(:),at_occup_r(:),at_base(:,:)     
       real(4),allocatable ::  at_pos_s(:),at_veloc_s(:),at_force_s(:)      
       
       integer(4) ::  at_no,n_traj,n_cond,n_atom,n_eq,j_shell_out,jpos_in,jrec_in,jrec_save,n_rec,n2_rec,l_rec4,i_rec
@@ -74,11 +74,11 @@ C *****
       
       integer(4) :: j_name,n_head
 
-      real(4) :: a_par(3),angle(3),t_ms,t_dump,temp
+      real(4) :: a_par(3),angle(3),t_ms,t_step,t_dump,filter_fwhm,temp
 
-      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
-     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
-      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
 C ********************* Initialization *******************************      
 
@@ -92,6 +92,9 @@ C ********************* Initialization *******************************
 			dat_type = 'nn'
 			input_method = 'nn'
 			t_ms = .0
+			t_step = .0
+			filter_name = 'nn'
+			filter_fwhm = .0
 			
       write(*,*) 'Master filename: '
       read(*,*) file_master 
@@ -130,7 +133,8 @@ C **** open a t-snapshot file and read its header
    			  i_rec = i_rec+1   							
 					read(1,rec=i_rec) header_record
 					read(header_record,nml=data_header_1)			
-          allocate(at_name_out(n_atom*n_eq),at_occup_r(n_atom*n_eq),nsuper_r(n_atom*n_eq))
+          allocate(at_name_out(n_atom*n_eq),nsuper_r(n_atom*n_eq))
+          allocate(at_occup_r(n_atom*n_eq),at_base(n_atom,3),SOURCE=.0)
    			  i_rec = i_rec+1   							
 					read(1,rec=i_rec) header_record
 					read(header_record,nml=data_header_2)			!read the allocatables
@@ -155,11 +159,15 @@ C **** open a t-snapshot file and read its header
         							
 				write(*,*) 'Substance name:                        ',subst_name
 				write(*,*) 'Data & simulation type, input method:  ',dat_type,'  ',sim_type,'  ',input_method
-				write(*,*) 'Time structure t_ms,t_dump:         ',t_ms,t_dump
+				write(*,*) 'Time structure t_ms,t_step,t_dump:  ',t_ms,t_step,t_dump
+				if(filter_fwhm/=0.) write(*,*) 'Time filter name, fwhm:                ',trim(filter_name),filter_fwhm
 				write(*,*) 'Supercell & temperature:            ',n_row,temp
 				write(*,*) 'Unit cell parameter(3), angle(3):   ',a_par,angle
 				write(*,*) 'Atom numbers:                       ',n_atom,nsuper_r,n_tot
-				write(*,*) 'Atoms & occupancies:                   ',at_name_out,at_occup_r
+				write(*,*) 'Atoms & occupancies: '
+        do j=1,n_atom
+				  write(*,*) '                   ',at_name_out(j),at_base(j,:),at_occup_r(j)
+				enddo
 				write(*,*) 
 				
 				nrow = n_row(1)
@@ -256,12 +264,12 @@ CC						write(*,*) 'i_rec',i_rec
 				enddo master_loop
 				close(1)
 	
-				deallocate(at_name_out,at_occup_r,nsuper_r,ind_at,at_ind,at_pos_c,at_veloc_c,at_force_c)
+				deallocate(at_name_out,at_base,at_occup_r,nsuper_r,ind_at,at_ind,at_pos_c,at_veloc_c,at_force_c)
 				if(j_shell_out==1) deallocate(at_pos_s,at_veloc_s,at_force_s)
       enddo file_loop
 
       stop
-      end program mp_insp53
+      end program mp_insp55
       
 C **** string conversion to all upper case
 C     

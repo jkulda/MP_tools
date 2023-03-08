@@ -1,9 +1,9 @@
 
-      program mp_dos54
+      program mp_dos55
 			
 C *************************************************************************************
 C *****
-C *****  %%%%%%%%%%%%%%%%   		  program MP_DOS  1.54   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%   		  program MP_DOS  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C *****
 C ***** vibrational density of states (DOS) from the velocity autocorrelation function
 C *****
@@ -21,7 +21,7 @@ C**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTIC
 C**	See the GNU General Public License for more details.
 C**
 C**
-C *****  %%%%%%%%%%%%%%%%        program MP_DOS 1.54        %%%%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%        program MP_DOS 1.55        %%%%%%%%%%%%%%%%%%%%%%%%
 C ***** 
 C ***** Ver. 1.50 - start of a new series (identical to 1.45)
 C ***** 
@@ -71,14 +71,14 @@ C *****
       character(4),allocatable   :: at_label(:),at_name_par(:)
       character(4)   :: version,head,atom
       character(10)  :: string,section,ax_label,pg_out,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
-      character(16)  :: dat_source,string16
-      character(40)  :: file_master,file_inp,time_stamp,x_title,y_title,at_weight_scheme(2),x_file_name
+      character(16)  :: dat_source,string16,filter_name
+      character(40)  :: subst_name,file_master,file_inp,time_stamp,x_title,y_title,at_weight_scheme(2),x_file_name
       character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,string_in
       character(128) :: plot_title,plot_title_2,scan_title,cwd_path
       character(l_rec):: header_record
       
 			integer,allocatable :: i_site(:),at_mask(:)
-      real, allocatable :: at_base(:,:),b_coh(:),at_weight(:),conc(:)
+      real, allocatable :: at_base(:,:),b_coh(:),at_weight(:)
       real, allocatable :: cs_plot(:,:),cs_out(:,:),wind(:),ff(:)		
       complex, allocatable :: cs3(:,:,:),cs_inp(:)
 
@@ -91,7 +91,7 @@ C *****
       integer :: ind,j_site,j_q,j_en,n_en,n_int,n_frame,j_disp,j_logsc,j_grid,j_ps,j_freq,n_freq_plot,n_freq_min
       integer ::  j_atom,n_atom,j_weight,j_xray,j_txt,n_head
       real :: at_mass,at_charge,sc_r
-      real :: t2,t_dump,t_step,t_tot,at_weight_sum,wind_sum
+      real :: t2,t_dump,t_step,t_tot,filter_fwhm,at_weight_sum,wind_sum
       real :: f_plot,ff_plot,f_max_plot,freq_step,f_min,ff_min,f_max
       real :: c_min,c_max,c_min_save,c_max_save,x_plot,y_plot		
 
@@ -105,16 +105,16 @@ C **** the following variables MUST have the following type(4) or multiples beca
       real(4),allocatable,target ::	at_vel_in(:,:)
       real(4),pointer :: at_vel_file(:,:,:)
       
-      character(16)  :: sim_type,dat_type,input_method,file_par,subst_name
+      character(16)  :: sim_type,dat_type,input_method,file_par
       integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,idum
-      real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp
+      real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp,p_size
 
-      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
-     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
-      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
-      namelist /mp_out/ j_weight,j_xray,j_logsc,j_txt,j_grid,pg_out       
+      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out       
       										!general rule: namelists of tools should only contain their local parameters
                           !what is of global interest they should pass into data_header
 
@@ -125,10 +125,20 @@ C **** PGPLOT stuff
       REAL XTICK, YTICK
       INTEGER NXSUB, NYSUB					
 
+
+C *** Set my colors for line plots								  
+          CALL PGSHLS (20,.0,.3,.0)     !dark grey
+          CALL PGSHLS (21,.0,.4,.7)     !my blue
+          CALL PGSHLS (22,120.,.5,1.)   !my red
+          CALL PGSHLS (23,240.,.35,.8)  !my green
+          CALL PGSHLS (24,60.,.4,.9)    !my violet
+          CALL PGSHLS (25,170.,.5,.9)   !my yellow
+          CALL PGSHLS (26,320.,.4,.9)   !my turquoise
+          CALL PGSHLS (27,.0,.7,.0)     !light grey
 C
 C ********************* Initialization *******************************      
 
-			write(*,*) '*** Program MP_DOS 1.54 ** Copyright (C) Jiri Kulda (2022) ***'
+			write(*,*) '*** Program MP_DOS 1.55 ** Copyright (C) Jiri Kulda (2022) ***'
 			write(*,*)
 
 C ********************* Get a time stamp and open a .LOG file *******************************
@@ -147,13 +157,15 @@ C ********************* Get a time stamp and open a .LOG file ******************
                  
 			write(9,*)
 			write(9,*)
-			write(9,*) trim(time_stamp),'  MP_DOS 1.54  ',trim(cwd_path)
+			write(9,*) trim(time_stamp),'  MP_DOS 1.55  ',trim(cwd_path)
 			write(9,*) 
 
 
 C *** other initialisations
       j_head_in = 0		! if header found will become 1
       j_xserv = 0
+			filter_name = 'nn'
+			filter_fwhm = .0
 
 C *** Generate data file access
 			write(*,*) 'Input data file_master: '
@@ -215,7 +227,7 @@ CC        write(*,nml=data_header_1)
       
       allocate(at_name_out(n_atom),at_occup_r(n_atom),nsuper_r(n_atom))
 			allocate(at_label(n_atom),at_name_par(n_atom),at_base(n_atom,3),at_weight(n_atom),at_mask(n_atom))
-			allocate(conc(n_atom),b_coh(n_atom),SOURCE=.0)												!we need this to read .par
+			allocate(b_coh(n_atom),SOURCE=.0)												!we need this to read .par
       at_mask = 1
 
       if(nml_in) then      !new structure with namelist
@@ -270,7 +282,7 @@ C *** Read the atom positions
         if(string(1:6).eq.section) exit	!find the mp_simple part of the .par file
       enddo
 			do j=1,n_atom
-        read(4,*) at_label(j),at_name_par(j),at_base(j,:),conc(j)	!for BULK the at_base and conc are not significant
+        read(4,*) at_label(j),at_name_par(j)	!for BULK the at_base and conc are not significant
 			enddo
 			close(4)
 
@@ -303,11 +315,12 @@ C *** read neutron scattering lengths (always)
       enddo atom_loop
 
 			do j=1,n_atom
-				if(at_name_out(j)/=at_name_par(j)) then
-					write(*,*) 'Atom names in .DAT and .PAR do not match: ',j,at_name_out(j),at_name_par(j)
-					write(*,*) 'Prefer .PAR (1/0)'
+				if(at_name_par(j)/=at_name_out(j)) then
+					write(*,*) 'Atom names in .PAR and .DAT do not match: ',j,at_name_par(j),at_name_out(j)
+					write(*,*) 'Prefer .DAT? (1/0)'
 					read(*,*) ii
-					if(ii==1)  at_name_out(j) = at_name_par(j) 
+					if(ii==1) at_name_par = at_name_out
+					exit 
 				endif
 			enddo			
 
@@ -462,7 +475,7 @@ C *** read the input .dat file as a whole, only at_name_out, at_pos and idom are
 					write(9,*) '  temperature [K]',temp
         	write(9,121) (at_name_out(j),j=1,n_atom)
 121				format(' Atoms:        ',20(a,3x))
-        	write(9,122) (conc(j),j=1,n_atom)
+        	write(9,122) (at_occup_r(j),j=1,n_atom)
 122				format(' Occupations:',20f7.3)
         	write(9,123) (b_coh(j),j=1,n_atom)
 123				format(' b_coh:      ',20f7.3)
@@ -556,7 +569,7 @@ CC				write(*,*) 'Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT
 				endif
 
 				at_weight = at_weight*at_mask
-				at_weight_sum = sum(conc(1:n_atom)*at_weight(1:n_atom)*nsuper_r(1:n_atom))*wind_sum**2			
+				at_weight_sum = sum(at_occup_r(1:n_atom)*at_weight(1:n_atom)*nsuper_r(1:n_atom))*wind_sum**2			
 C
 C **** generate the plot data
 C	
@@ -616,7 +629,7 @@ C
 					 write(plot_title_2,115) at_name_out(j)
 115        format(a)   
 					 y_plot = (.9-.06*j)*c_max
-						CALL PGSCI (j+1)  !red-green-blue
+						CALL PGSCI (j+20)  !my red-green-blue
 						CALL PGLINE(n_freq_plot,ff,cs_out(1:n_freq_plot,j))  !plots the curve
 						CALL PGSTBG(0)																				 !erase graphics under text
           	CALL PGSLW(5)			!operates in steps of 5
@@ -680,14 +693,14 @@ CC					plot_title = trim(plot_title)//('  '//trim(file_ps))
 								
 C **** Output the DOS to a text file (linear scale)			
 					open (3,file=file_res)																		!open the output file
-					write(3,*) '*****    MP_DOS54: total and partial densities of vibrational states     *****'
+					write(3,*) '*****    MP_DOS55: total and partial densities of vibrational states     *****'
 					write(3,*) 
 					write(3,*) 'Input files:  ',trim(file_dat_t0),' to ',trim(file_dat)
 					write(3,*) '  t0,t_step,n_row,n_atom:',t0,t_step,n_row,n_atom
 					write(3,*) '  temperature [K]',temp
 					write(3,*) 
 					write(3,121) (at_name_out(j),j=1,n_atom)
-					write(3,122) (conc(j),j=1,n_atom)
+					write(3,122) (at_occup_r(j),j=1,n_atom)
 					write(3,123) (at_weight(j),j=1,n_atom)
 					write(3,*) 
 					write(3,124) (at_name_out(j),j=1,n_atom)
@@ -759,7 +772,7 @@ CC			deallocate(cs)				!,cross_sec
 			close(3)
 			close(9)
             
-      end program mp_dos54
+      end program mp_dos55
 
 
 C **** string conversion to all upper case

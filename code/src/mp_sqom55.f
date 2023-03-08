@@ -1,9 +1,9 @@
 
-      program mp_sqom54
+      program mp_sqom55
 
 C *************************************************************************************
 C *****
-C *****  %%%%%%%%%%%%%%%%   		 program MP_SQOM 1.54   		 %%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%   		 program MP_SQOM 1.55   		 %%%%%%%%%%%%%%%%%%%%%%
 C *****
 C *****   calculates and plots scattering functions (S(Q), S(Q,w)) from simulated data
 C *****
@@ -20,7 +20,7 @@ C**	This program is distributed in the hope that it will be useful, but WITHOUT 
 C**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 C**	See the GNU General Public License for more details.
 C**
-C *****  %%%%%%%%%%%%%%%%       program MP_SQOM 1.54      %%%%%%%%%%%%%%%%%%%%%%%%
+C *****  %%%%%%%%%%%%%%%%       program MP_SQOM 1.55      %%%%%%%%%%%%%%%%%%%%%%%%
 C ***** 
 C ***** Ver 1.51  - originates from mp_sqom49.f of 2022-01-16 16:57 
 C ***** 					- optimized algorithm using coherence profile integration w/o OMP 
@@ -75,7 +75,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
       character(40)  :: subst_name,file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
       character(40)  :: x_label,y_label,file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in
-      character(128) :: line,plot_title1,plot_title2,plot_title,scan_title,data_path,cwd_path,rec_str
+      character(128) :: line,plot_title1,plot_title2,plot_title,scan_title,interp_title,data_path,cwd_path,rec_str
       character(l_rec):: header_record
 
       character(4),allocatable   :: at_label(:),at_name_par(:),at_name_ext(:)
@@ -84,7 +84,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       integer, allocatable :: i_site(:)		!index attributing site number to atom number
       integer,allocatable ::  ind_at(:),at_mask(:),map_unit(:) 
  
-      real, allocatable :: at_base(:,:),conc(:),b_coh(:),x_ffpar(:,:),x_ffq(:,:,:),q2_norm(:,:)			!s_base(:,:),q(:,:,:),at_vel_file(:,:)		!atom basis, site basis fractional coordinates
+      real, allocatable :: at_base(:,:),b_coh(:),x_ffpar(:,:),x_ffq(:,:,:),q2_norm(:,:)			!s_base(:,:),q(:,:,:),at_vel_file(:,:)		!atom basis, site basis fractional coordinates
  			real, allocatable :: csp(:),qq(:),ff(:),t_wind(:) 								!q_at_pos(:),q_at_vel(:),at_pos_perp(:),rq_fft(:)
 			complex, allocatable :: u_x(:,:),u_y(:,:),u_qx(:,:),u_qy(:,:)
 			 			
@@ -102,7 +102,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       integer :: j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,jm,j1m,j2m,j_bc,j_exit,j_sq
       integer :: i,ii,iii,j,jj,i1,i2,i3,k,kk,l,ll,ios,ier,iflag,j_at,i_rec,nrec,nsuper,nrow,nlayer,n_r1,n_r2,n_row_save(3)
       integer :: j_basis,j_centred,j_test,j_mult,nfile,nfile_0,nfile_min,nfile_max,nfile_mem,ifile,jfile,nfile_step,nqx_min,nqy_min
-      integer :: n_site,j_dir,i_shift,i_time(8),j_weight,j_wind,j_qsq
+      integer :: n_site,j_plane,i_shift,i_time(8),j_weight,j_wind,j_qsq
       integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max,n_q1,n_q2,n_qxg,n_qyg,n_qxp,n_qyp
       integer :: e1(3),e2(3),ev(3),j_scan,j_freq,i_plot,j_plot,n_plot,i_step
       integer :: sc_c1,sc_c2,sc_m,j_proc,proc_num,proc_num_in,thread_num,thread_num_max
@@ -111,7 +111,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
 
       real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn,bz_n,eps_x,box_volume,cut_x,cut_y
       real :: at_displ,at_pos(3),at_veloc(3),at_pos_min(3),at_pos_max(3),at_pos_centre(3),a_cell_par(3)
-      real :: t2,t3,t4,t_sum,t_dump,t_step,t_dump0,t_tot,tt0,tt,xx,f_width,t_width,temp_par
+      real :: t2,t3,t4,t_sum,t_dump,t_step,t_step_in,t_tot,tt0,tt,f_width,t_width,temp_par
       real :: f_plot,ff_plot,f_max_plot,freq_step,f_min,ff_min,f_max,ff_max,f_map_min,f_map_max,f_map_step,f_phase
       real :: arg,q1_x,q1_y,q2_x,q2_y,qx_min,qx_max,qy_min,qy_max,q_min,q_max,qq_min,qq_max,qq_plot,dq(3),dq_p(3),q_step
       real :: tr_shift_x,tr_shift_y,d_x,d_y,q_x,q_y,cut_off
@@ -131,9 +131,9 @@ C
  			real(4), pointer :: at_pos_file(:,:,:)
  			real(4), pointer :: at_pos_file_bulk(:,:)
 
-      character(16)  :: sim_type,dat_type,input_method,file_par,dat_source,string16
+      character(16)  :: sim_type,dat_type,input_method,file_par,dat_source,string16,filter_name
       integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
-      real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp
+      real(4)        :: rec_zero(l_rec),filter_fwhm,t_ms,t0,t1,a_par(3),angle(3),temp
 
 C *** PGPLOT stuff
 			integer :: PGOPEN,C1,C2,NC,plot_unit,n_plot_max
@@ -142,9 +142,9 @@ C *** PGPLOT stuff
       REAL XTICK, YTICK
       INTEGER NXSUB, NYSUB					
 
-      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_dump,temp,a_par,angle,
-     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot                         !scalars & known dimensions
-      namelist /data_header_2/at_name_out,at_occup_r,nsuper_r           !allocatables
+      namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
+     1    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
+      namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
       namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out       
@@ -157,7 +157,7 @@ CC     1      j_basis,j_centred,j_test,j_mult,j_shrec,  n_tot_in,a_cell_par,temp
 C
 C ********************* Initialization *******************************      
 
-			write(*,*) '*** Program MP_SQOM 1.54 ** Copyright (C) Jiri Kulda (2022) ***'
+			write(*,*) '*** Program MP_SQOM 1.55 ** Copyright (C) Jiri Kulda (2022) ***'
 			write(*,*)
 
 C ********************* Get a time stamp and open a .LOG file *******************************
@@ -176,7 +176,7 @@ C ********************* Get a time stamp and open a .LOG file ******************
 
 			write(9,*) 
 			write(9,*) 
-			write(9,*) trim(time_stamp),'  MP_SQOM 1.54  ',trim(cwd_path)
+			write(9,*) trim(time_stamp),'  MP_SQOM 1.55  ',trim(cwd_path)
 			write(9,*) 
 
 C *** other initialisations
@@ -258,6 +258,7 @@ C *** Read the header record
 				read(1,rec=i_rec) header_record
 				read(header_record,nml=data_header_1)	
 				t0 = t_dump
+				t_step_in = t_step
 CC        write(*,nml=data_header_1)
 			elseif(head.eq.'TIME'.or.head.eq.'STAT') then                                  !old w/o structure
 				write(*,*)		'Input data:  ','old header format'
@@ -277,7 +278,7 @@ CC        write(*,nml=data_header_1)
 
       allocate(at_name_out(n_atom),at_occup_r(n_atom),nsuper_r(n_atom),n_sup(n_atom),ind_at(n_atom))
 			allocate(at_label(n_atom),at_name_par(n_atom),at_name_ext(n_atom),at_base(n_atom,3),at_mask(n_atom))
-			allocate(conc(n_atom),b_coh(n_atom),x_ffpar(n_atom,9),SOURCE=.0)												!we need this to read .par
+			allocate(b_coh(n_atom),x_ffpar(n_atom,9),SOURCE=.0)												!we need this to read .par
       at_mask = 1
 
       if(nml_in) then      !new structure with namelist
@@ -292,6 +293,47 @@ CC        write(*,nml=data_header_1)
      		if (head.eq.'STAT') sim_type = 'STATIC'
       endif 
       close(1)
+
+C **** for a TIMESTEP snapshot sequence open a second data file to check the time step between recorded snapshots
+
+			if(sim_type/='TIMESTEP') then
+			  if(t_step_in/=.0) then
+			    write(*,*) ' Time step in data is',t_step
+			    write(*,*) ' For simulation type ',trim(sim_type),' putting t_step = .0 '
+				  t_step = .0						!for total scattering (unrelated snapshots)
+				endif
+			elseif(sim_type=='TIMESTEP') then
+        if((nfile_min+nfile_step)<=9999) then     ! check real t_step from t_dump
+          write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
+        elseif((nfile_min+nfile_step)>=10000) then
+          write(string,'(i8)') nfile_min+nfile_step
+          file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        endif
+
+				open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
+				if(ios.ne.0) then
+					write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
+					stop
+				endif
+
+        if(nml_in) then      !new structure with namelist
+          read(1,rec=2) header_record
+          read(header_record,nml=data_header_1)	
+          t1 = t_dump
+        else                                  !old w/o structure
+          read(1,rec=1) string16,string16,t_ms,t1						!char(16): sim_type,file_par, char(4): at_name
+        endif 
+				close(1)
+				t_step = t1-t0						!this is the "macroscopic" time step between recorded snapshots
+
+        if(abs(t_step-t_step_in)>.01*abs(t_step_in)) then
+				  write(*,*) 'Not-matching values of t_step from data header and from t_dump difference :',t_step_in,t_step
+				  write(*,*) '    prefer the 1st or the 2nd value? (1/2)'
+				  read(*,*) jj
+				  if(jj==1) t_step = t_step_in
+				endif
+			endif
+			t_tot = (nfile-1)*t_step
  
       nlayer = n_row(1)*n_row(2) 
       nsuper = n_row(1)*n_row(2)*n_row(3) 
@@ -350,10 +392,20 @@ C *** Read the atom positions
         if(string(1:5).eq.section) exit	!find the mp_simple part of the .par file
       enddo
 			do j=1,n_atom
-        read(4,*) at_label(j),at_name_par(j),at_base(j,:),conc(j),at_name_ext(j)	!for BULK the at_base and conc are not significant
+        read(4,*) at_label(j),at_name_par(j),arg,arg,arg,arg,at_name_ext(j)	!at_base & conc come from the header, for BULK the at_base and conc are not significant
         if(at_name_ext(j)=='n'.or.at_name_ext(j)=='N') at_name_ext(j)=''
 			enddo
 			close(4)
+			
+			do j=1,n_atom
+				if(at_name_par(j)/=at_name_out(j)) then
+					write(*,*) 'Not-matching  atom names in .PAR and .DAT: ',j,at_name_par(j),at_name_out(j)
+					write(*,*) 'Prefer .DAT? (1/0)'
+					read(*,*) ii
+					if(ii==1) at_name_par = at_name_out
+					exit 
+				endif
+			enddo			
 
 C *** read neutron scattering lengths
       open(4,file='neutron_xs.txt',action='read',status ='old',iostat=ios)
@@ -434,17 +486,13 @@ C *** read Xray formfactor parameters
       write(*,*) 
       write(*,*) 'Substance name: ', subst_name
 			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
-			
-
-
 
 C *** write overview of atom data
 			write(*,*)
-      write(*,*) 'Substance name: ',subst_name	  
 			write(*,*) 'Atoms from ',trim(file_inp)
       do j=1,n_atom
-        write(*,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),conc(j),b_coh(j)
-        write(9,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),conc(j),b_coh(j)
+        write(*,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
+        write(9,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
       enddo								
 
       if(j_verb==1) then
@@ -454,48 +502,7 @@ C *** write overview of atom data
           write(*,*) at_label(j),x_ffpar(j,:)
         enddo	
       endif		
- 
-C **** for an MD snapshot sequence open a second data file to see the time step between recorded snapshots
-			if(sim_type=='TIMESTEP') then
 
-        if((nfile_min+nfile_step)<=9999) then
-          write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
-        elseif((nfile_min+nfile_step)>=10000) then
-          write(string,'(i8)') nfile_min+nfile_step
-          file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
-        endif
-
-				open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
-				if(ios.ne.0) then
-					write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
-					stop
-				endif
-
-        if(nml_in) then      !new structure with namelist
-          read(1,rec=2) header_record
-          read(header_record,nml=data_header_1)	
-          t1 = t_dump
-        else                                  !old w/o structure
-          read(1,rec=1) string16,string16,t_ms,t1						!char(16): sim_type,file_par, char(4): at_name
-        endif 
-				close(1)
-
-				t_step = t1-t0						!this is the "macroscopic" time step between recorded snapshots
-				t_tot = (nfile-1)*t_step
-			else
-				t_step = .0						!for total scattering (unrelated snapshots)
-				t_tot = .0
-			endif
-
-			do j=1,n_atom
-				if(at_name_par(j)/=at_name_out(j)) then
-					write(*,*) 'Atom names in .PAR and .DAT do not match: ',j,at_name_par(j),at_name_out(j)
-					write(*,*) 'Prefer .DAT? (1/0)'
-					read(*,*) ii
-					if(ii==1) at_name_par(j) = at_name_out(j) 
-				endif
-			enddo			
-			
 
 C *********************  OpenMP initialization start  *******************************      
 C
@@ -695,20 +702,20 @@ C *** modify the active frame range
 C *** define the momentum space range          
           if(nsuper==1) then
             write(*,*) 'Q-range [Å-1] (0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
-            read(*,*) bz_n,j_dir
+            read(*,*) bz_n,j_plane
 					else
             write(*,*) 'Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
-            read(*,*) n_bz,j_dir
+            read(*,*) n_bz,j_plane
             bz_n = real(n_bz)
 					endif
 		
 					if(bz_n==0.) exit map_loop	
 					
-					if(j_dir==1)then
+					if(j_plane==1)then
 						e1 = (/1,0,0/)
 						e2 = (/0,1,0/)
 						exit
-					elseif(j_dir==2)then
+					elseif(j_plane==2)then
 						e1 = (/1,1,0/)
 						e2 = (/0,0,1/)
 						exit
@@ -917,7 +924,7 @@ CC	  	  	nrow = n_row(1)					!!!!!!!!!!! modify to N_ROW
   					  u_x = (.0,.0)
   					  u_y = (.0,.0)
 
-              if(j_dir==1)then											!(hk0) plane - vertical [0 0 1]
+              if(j_plane==1)then											!(hk0) plane - vertical [0 0 1]
 							ii = 0
               do i=1,nsuper
               	if(at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0) then
@@ -930,7 +937,7 @@ CC	  	  	nrow = n_row(1)					!!!!!!!!!!! modify to N_ROW
  								endif
               enddo
 
-              elseif(j_dir==2) then     ! the (h h l) plane
+              elseif(j_plane==2) then     ! the (h h l) plane
 
               do i=1,nsuper
               	if(at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0) then
@@ -946,7 +953,7 @@ CC                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
  								endif
               enddo
 
-            endif		!j_dir				
+            endif		!j_plane				
 
               u_qx = fft(u_x,inv=.false.)/(1.*n_row(1))     !in fact 1/sqrt(nrow**2)
               u_qy = fft(u_y,inv=.false.)/(1.*n_row(2))     !FT in 0th Bz possibly with a q_z component
@@ -961,9 +968,9 @@ CC                  k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,nrow)+1
                       ll = modulo(nqy_min+l,n_row(2))                 
                       if(kk==0) kk = n_row(1)                 
                       if(ll==0) ll = n_row(2) 
-                      if(j_dir==1) then               
+                      if(j_plane==1) then               
                         phase_bz = cexp((0.,-1.)*twopi_s*(q_x*at_base(j,1)+q_y*at_base(j,2)))
-                      elseif(j_dir==2) then               
+                      elseif(j_plane==2) then               
                         phase_bz = cexp((0.,-1.)*twopi_s*(q_x*(at_base(j,1)+at_base(j,2))+q_y*at_base(j,3)))
                       endif
                       cs_atom(ifile,j,(ii-1)*n_row(1)+k,(jj-1)*n_row(2)+l) = phase_bz*(q_x*u_qx(kk,ll)+q_y*u_qy(kk,ll))
@@ -1126,9 +1133,13 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 					enddo
 				endif
 
-				write(masks,'(50i1.1)') (at_mask(i),i=1,n_atom)			!to be used in plot titles
+        if(minval(at_mask(1:n_atom))==1) then  !if all masks =1 don't put them into plot title
+          masks = ''
+        else
+				  write(masks,'("  Mask: ",50i1.1)') (at_mask(i),i=1,n_atom)			!to be used in plot titles
+				endif
 				
-				if(abs(j_plot)<=1)then			!t_step=0. identifies total scattering
+				if(abs(j_plot)<=1)then			
 					j_disp = 0								!E = const map
 					f_plot = 0.
 					n_plot = 1
@@ -1141,6 +1152,7 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 					read(*,*) f_map_min
 						j_disp = 0									! E = const map
 						n_freq_min  = nint(f_map_min/freq_step)+1
+					  i_step = 1
 						n_plot =1
 
 					elseif(abs(j_plot)==3) then
@@ -1456,8 +1468,13 @@ C *** apply the speckle filter
 					deallocate(csp)
 				endif				!s_trig>0.
 
-C *** normalise to the box volume and make a copy of CS_PLOT for .TXT output and linear plots
-				cs_plot = cs_plot/box_volume
+C *** normalise to the box volume and make a copy of CS_PLOT for .TXT output and linear plots			
+ 			if(abs(j_plot)<=1.or.j_sq/=1) then
+ 			  cs_plot = cs_plot/box_volume     !for total scattering and intermediate functions microscopic time scale doesn't enter the norm
+ 			else
+ 			  cs_plot = cs_plot*t_step/box_volume    !for energy resolved (FT_based) spectra t_step [ps] to stay on the DAPS scale
+ 			endif
+C			write(*,*) 't_step,box_volume,cs_plot(10,10)',t_step,box_volume,cs_plot(10,10)
 
 
 CC				scale_loop: do
@@ -1481,19 +1498,19 @@ CC				scale_loop: do
 
 					if(abs(j_plot)<=1) then
 					  if(j_qsq==1) then
-					    plot_title1 = 'S(Q)'//'  '//trim(subst_name)//'_'//trim(masks)
+					    plot_title1 = 'S(Q)'//'  '//trim(file_master)//trim(masks)
 					  else
-					    plot_title1 = 'S(Q)/Q**2'//'  '//trim(subst_name)//'_'//trim(masks)
+					    plot_title1 = 'S(Q)/Q**2'//'  '//trim(file_master)//trim(masks)
 					  endif
 					else
             if(j_sq==1) then
               if(j_qsq==1) then
-                plot_title1 = 'S(Q,ω)'//'  '//trim(subst_name)//'_'//trim(masks)
+                plot_title1 = 'S(Q,ω)'//'  '//trim(file_master)//trim(masks)
               else
-                plot_title1 = 'S(Q,ω)/Q**2'//'  '//trim(subst_name)//'_'//trim(masks)
+                plot_title1 = 'S(Q,ω)/Q**2'//'  '//trim(file_master)//trim(masks)
               endif
             else
-              plot_title1 = 'I(Q,t)'//'  '//trim(subst_name)//'_'//trim(masks)
+              plot_title1 = 'I(Q,t)'//'  '//trim(file_master)//trim(masks)
             endif           
 					endif
 
@@ -1562,7 +1579,7 @@ CC            write(*,*) 'Smoothing factor (1=NO SMOOTH, try 2,3,...)',j_cut
               allocate(cs_pgplot(n_qxg,n_qyg))
             endif
 
-            cs4 = fft((1.,.0)*cs_out)
+            cs4 = fft((1.,.0)*cs_out,inv=.false.)
 
 C *** intercalate zeros for interpolation
             cs_plot2 = (.0,.0)
@@ -1600,6 +1617,7 @@ CC				write(*,*) 'n_qxg,n_qyg,f_max,freq_step',n_qxg,n_qyg,f_max,freq_step
 				endif
 				if(j_logsc==1.and.c_min<-8.) c_min = -8.
 				write(*,*) 'c_min,c_max',c_min,c_max
+C			write(*,*) 'cs_pgplot',cs_pgplot(10:15,10)
 			
 C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel number.
 				if(j_disp==0) then
@@ -1629,13 +1647,18 @@ CC          if(j_sq==0) TR(6) = 1.
 
 					if(j_disp==0) then
 						if(abs(j_plot)<=1) then
-							write(plot_title2,113) q_center,trim(at_weight_scheme(j_weight)),trim(mode),j_interp_x,j_interp_y,cut_x,cut_y,cut_off
+							write(plot_title2,113) q_center,trim(at_weight_scheme(j_weight)),trim(mode)
 						else 
-							write(plot_title2,114) q_center,f_plot,trim(at_weight_scheme(j_weight)),trim(mode),j_interp_x,j_interp_y,cut_x,cut_y,cut_off
+							write(plot_title2,114) q_center,f_plot,f_width,trim(at_weight_scheme(j_weight)),trim(mode)
 						endif
-CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)   
-113   			format('  Q = [',3f6.2,']   Total scattering  ',a,'  ',a,'  Map: ',2i2,3f5.1)   
-114   			format('  Q = [',3f6.2,']   Energy =',f6.3,' [THz]  ',a,'  ',a,'  Map: ',2i2,3f5.1)  
+113   			format('  Q = [',3f6.2,']  Total scattering  ',a,'  ',a)   
+114   			format('  Q = [',3f6.2,']  E =',f6.3,' [THz]  dE =',f6.3,' [THz] ',a,'  ',a)  
+
+            if(j_interp/=0) then
+               write(interp_title,'("  PT: ",2i2,3f5.1)') j_interp_x,j_interp_y,cut_x,cut_y,cut_off
+               plot_title2 = trim(plot_title2)//trim(interp_title)
+            endif
+
             if(input_method=='BULK') then
               write(x_title,130)e1
               write(y_title,130)e2
@@ -1649,11 +1672,12 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						CALL PGPAP(p_size,e2_norm/e1_norm)     ! define the plot area as a square
 						CALL PGENV(qx_min,qx_max,qy_min,qy_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 						CALL PGLAB(trim(x_title),trim(y_title),' ')  					!put the axis labels
-						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
-						CALL PGSCH(.7)					!set character height					
-						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
+						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
+						CALL PGSCH(.6)					!set character height					
+						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
+						CALL PGSCH(1.)					!set character height					
 						CALL PGWEDG('RI', 1., 3., c_min, c_max,trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					elseif(j_disp==1) then
 						write(plot_title2,115) q1_3d+(i_plot-n_plot/2-1)*dq_p,q2_3d+(i_plot-n_plot/2-1)*dq_p,
@@ -1663,12 +1687,13 @@ CC112   			format('  Q = [',3f6.2,']   Elastic scattering  ',a,'  ',a)
 						CALL PGPAP(p_size,1.)     ! define the plot area as a rectangle
 						CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 						CALL PGLAB(trim(x_label),y_label,' ')  !put the axis labels
+						CALL PGSCH(1.)					!set character height					
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
-						CALL PGSCH(.7)					!set character height					
+						CALL PGSCH(.6)					!set character height					
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
-CC						CALL PGIMAG(cs_pgplot(1:n_qdisp,1:n_freq_plot),n_qdisp,n_freq_plot,1,n_qdisp,1,n_freq_plot,c_min,c_max,TR)
 						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
+						CALL PGSCH(1.)					!set character height					
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
 				
@@ -1759,7 +1784,7 @@ C **** make an optional hardcopy and .txt output
 					write(9,*) '  temperature [K]',temp
         	write(9,121) (at_name_par(j),j=1,n_atom)
 121				format(' Atoms:        ',20(a,3x))
-        	write(9,122) (conc(j),j=1,n_atom)
+        	write(9,122) (at_occup_r(j),j=1,n_atom)
 122				format(' Occupations:',20f7.3)
         	write(9,123) trim(at_weight_scheme(j_weight)),(b_coh(j),j=1,n_atom)
 123				format(a,' b_coh:      ',20f7.3)
@@ -1802,7 +1827,7 @@ C **** Output the intensity map to a text file (linear scale)
 						write(3,*) '  t0,t_step,n_row(3),n_atom:',t0,t_step,n_row,n_atom
 						write(3,*) '  temperature [K]',temp
 						write(3,121) (at_name_par(j),j=1,n_atom)
-						write(3,122) (conc(j),j=1,n_atom)
+						write(3,122) (at_occup_r(j),j=1,n_atom)
         		write(3,123) trim(at_weight_scheme(j_weight)),(b_coh(j),j=1,n_atom)
         		write(3,125) (at_mask(j),j=1,n_atom)
         		write(3,126) j_atc1,j_atc2
@@ -2099,7 +2124,7 @@ CC						write(*,*) 'Choose a plot option (',trim(pg_out),'/TXT file output is ',
 							endif
 CC							if(j_ps==0) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output ON (mind the TXT switch in PAR)'
 CC							if(j_ps==1) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output OFF (mind the TXT switch in PAR)'
-							write(*,*) '       8  toggle the FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the TXT switch in PAR)'
+							write(*,*) '       8  toggle the FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
 							if(j_qsq==0) write(*,*) '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
 							if(j_qsq==1) write(*,*) '       9  toggle the S(Q) scaling to S(Q)/Q^2'
 							write(*,*) '      10  options: change the time integration window width, weighting etc.'		!include here the straight FT option
@@ -2263,7 +2288,7 @@ C        -- JK rainbow
       END IF
       END
 
-      end program mp_sqom54
+      end program mp_sqom55
 
 
 cc Copyright (C) 2004-2009: Leslie Greengard and June-Yub Lee 
