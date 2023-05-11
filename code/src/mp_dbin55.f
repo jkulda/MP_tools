@@ -190,7 +190,7 @@ C *** diverse initialisations
 			n_site = 0
 			n_eq = 1								!later introduce sites, basis etc.
 			i_dom = 0
-			n_cond = 0
+			n_cond = 2               !orthorhombic periodic bound_cond by default
 			n_tot_in = 0
       t_ms = .0
       temp_par = .0
@@ -388,7 +388,7 @@ C      194.2110000000        0.0000000000        0.0000000000
 C        0.0000000000      194.2110000000        0.0000000000          
 C        0.0000000000        0.0000000000      194.2110000000          
 
-      read(1,*) string,j_step,n_tot_in,n_traj,n_cond,t_ms,t_dump		!t_ms is MD microstep, t_dump is the snapshot time
+      read(1,*) string,j_step,n_tot_in,n_traj,n_cond,t_ms,t_dump		!t_ms is MD microstep, t_dump is the snapshot time; n_cond=0 non-periodic bound_cond (all others are periodic)
 																																			!n_tot_in total number of atoms in cells n_atom*nrow**3
 			do j=1,3
 				read(1,*) a_cell(j,:)
@@ -733,13 +733,21 @@ C *** treat CELL data
                   do ii=1,ind_l(jl)
                     pos_inp = at_pos_in-at_base_in(i_site(jl,ii),:)
                     jat = i_site(jl,ii)
-                    if(maxval(abs(pos_inp-anint(pos_inp))).lt.eps_x) exit !atom found
+                    if(maxval(abs(pos_inp-anint(pos_inp))).le.eps_x) exit !atom found
                   enddo
                   if(maxval(abs(pos_inp-anint(pos_inp))).gt.eps_x) then
-                    write(*,*) 'Identification by position not succeeded: atom, record ',at_label(jl),inrec
-                    write(*,*) 'Possible solutions (modify the .PAR file):'
-                    write(*,*) '  1/check the ATOMS basis, 2/ try to slightly increase EPS, 3/ use the BULK input method '
-                    stop
+                    write(*,*) 'Identification by position not succeeded: frame, record, atom ',ifile,inrec,at_label(jl)
+                    write(*,*) 'Input position ',at_pos_in
+                    write(*,*) 'Candidates (JAT, ATOM, BASIS POSITION, MAX_DIFF,EPS_X): '
+                    do ii=1,ind_l(jl)
+                      pos_inp = at_pos_in-at_base_in(i_site(jl,ii),:)
+                      write(*,*) i_site(jl,ii),at_name_par(i_site(jl,ii)),at_base_in(i_site(jl,ii),:),maxval(abs(pos_inp-anint(pos_inp))),eps_x
+                    enddo
+                    write(*,*) 'Type JAT and confirm/modify AT_POS_IN:'
+                    read(*,*) jat,at_pos_in
+                    write(*,*) 'Other possible solutions:'
+                    write(*,*) '  1/check the ATOMS basis, 2/ try to slightly increase EPS_X, 3/ use the BULK input method, 4/edit the trajectory file '
+                    write(*,*) '      (working ...) '
                   endif
                 endif
               endif     

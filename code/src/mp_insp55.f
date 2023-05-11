@@ -158,8 +158,9 @@ C **** open a t-snapshot file and read its header
         endif
         							
 				write(*,*) 'Substance name:                        ',subst_name
-				write(*,*) 'Data & simulation type, input method:  ',dat_type,'  ',sim_type,'  ',input_method
+				write(*,*) 'Data & simulation type, input method:',dat_type,sim_type,input_method
 				write(*,*) 'Time structure t_ms,t_step,t_dump:  ',t_ms,t_step,t_dump
+				write(*,*) 'Shells, trajectory type, boundary cnd: ',j_shell_out,'  ',n_traj,'  ',n_cond
 				if(filter_fwhm/=0.) write(*,*) 'Time filter name, fwhm:                ',trim(filter_name),filter_fwhm
 				write(*,*) 'Supercell & temperature:            ',n_row,temp
 				write(*,*) 'Unit cell parameter(3), angle(3):   ',a_par,angle
@@ -241,7 +242,7 @@ CC						write(*,*) 'i_rec',i_rec
 					endif
 
 					jj = 4*(jpos_in-1)
-					write(*,*) 'Atom, type, mass, charge    ',at_name_out(at_ind(jj+4)),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)
+					write(*,*) 'Atom, type, mass, charge    ',at_name_out(jat),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)   !at_ind(jj+4)=0 for unoccupied
 					if(input_method=='CELL'.or.input_method=='FAST')	then
 						write(*,*) 'Cell index            ',at_ind(jj+1:jj+3)
 					else
@@ -254,7 +255,7 @@ CC						write(*,*) 'i_rec',i_rec
 						if(n_traj==2) write(*,*) 'Atom force                ',at_force_c(jj+1:jj+3)
 						write(*,*)
 						if(j_shell_out==1) then
-							write(*,*) trim(at_name_out(at_ind(jj+4)))//'_s',at_veloc_s(jj+4),at_pos_s(jj+4)
+							write(*,*) trim(at_name_out(jat))//'_s',at_veloc_s(jj+4),at_pos_s(jj+4)
 							write(*,*) 'Shell position                ',at_pos_s(jj+1:jj+3)
 							if(n_traj>=1) write(*,*) 'Shell velocity                ',at_veloc_s(jj+1:jj+3)
 							if(n_traj==2) write(*,*) 'Shell force               ',at_force_s(jj+1:jj+3)

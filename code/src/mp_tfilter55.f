@@ -1,9 +1,9 @@
   
-      program mp_filter55
+      program mp_tfilter55
 
 C *************************************************************************************
 C *****
-C ***** %%%%%%%%%%%%%%%%   		  program MP_PDF  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+C ***** %%%%%%%%%%%%%%%%   		  program MP_TFILTER  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C *****
 C *****   calculates the pair distribution functions (PDF) for simulated supercell data
 C *****
@@ -20,7 +20,7 @@ C**	This program is distributed in the hope that it will be useful, but WITHOUT 
 C**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 C**	See the GNU General Public License for more details.
 C**
-C ***** %%%%%%%%%%%%%%%%   		  program MP_FILTER  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+C ***** %%%%%%%%%%%%%%%%   		  program MP_TFILTER  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C *****
 
 C ***** Ver. 1.50	- start of new series (identical to mp_pdf 1.42) as MP_PDF
@@ -95,7 +95,7 @@ C **** the following variables MUST have the following type(4) or multiples beca
       namelist /data_header_2/at_name_out,at_base,at_occup_r,at_base,nsuper_r           !allocatables
      
 CC      namelist /mp_gen/ j_verb,j_proc       
-CC      namelist /mp_out/ j_weight,j_xray,j_logsc,j_txt,j_grid,pg_out       
+CC      namelist /mp_out/ j_weight,j_xray,j_logsc,j_txt,j_grid,pg_out,j_pgc       
 CC      										!general rule: namelists of tools should only contain their local parameters
 CC                          !what is of global interest they should pass into data_header
 CC			namelist /mp_pdf/ n_pdf,pdf_step,a_par_pdf,n_h,j_acc,j_smooth,n_corr
@@ -103,7 +103,7 @@ CC
 
 C ********************* Initialization *******************************      
 
-			write(*,*) '*** Program MP_FILTER 1.55 ** Copyright (C) Jiri Kulda (2023) ***'
+			write(*,*) '*** Program MP_TFILTER 1.55 ** Copyright (C) Jiri Kulda (2023) ***'
 			write(*,*)
 			
 C ********************* Get a time stamp and open a .LOG file *******************************
@@ -122,7 +122,7 @@ C ********************* Get a time stamp and open a .LOG file ******************
 
 			write(9,*) 
 			write(9,*) 
-			write(9,*) trim(time_stamp),'  MP_FILTER 1.55  ',trim(cwd_path)
+			write(9,*) trim(time_stamp),'  MP_TFILTER 1.55  ',trim(cwd_path)
 			write(9,*) 
       
 C *** Generate data file access
@@ -467,7 +467,7 @@ C *** do the rest
       write(*,*) 'Finished: ',file_dat_out
       write(*,*) 'Total of',i_save,' files written'  
         		            
-      end program mp_filter55
+      end program mp_tfilter55
    
   
 C **********************************************************************************************************

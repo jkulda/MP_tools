@@ -106,7 +106,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       integer :: n_qx,n_qy,n_qz,n_qdisp,n_q1x,n_q2x,n_q1y,n_q2y,nq_tot,n_bz,n_freq_plot,n_freq_min,n_freq_max,n_q1,n_q2,n_qxg,n_qyg,n_qxp,n_qyp
       integer :: e1(3),e2(3),ev(3),j_scan,j_freq,i_plot,j_plot,n_plot,i_step
       integer :: sc_c1,sc_c2,sc_m,j_proc,proc_num,proc_num_in,thread_num,thread_num_max
-      integer :: ind,j_site,j_q,n_int,n_frame,j_disp,j_mask,j_logsc,j_grid,j_txt,j_ps
+      integer :: ind,j_site,j_q,n_int,n_frame,j_disp,j_mask,j_logsc,j_grid,j_txt,j_ps,j_out
       integer :: j_shrec,j_atom,n_atom,at_no,j_atc1,j_atc2,j_ft,j_coh,j_zero,j_oneph,j_fft,n_head,j_interp,j_interp_x,j_interp_y,j_cut
 
       real :: at_mass,at_charge,bc_in,s_trig,q_sq,rn,bz_n,eps_x,box_volume,cut_x,cut_y
@@ -132,7 +132,7 @@ C
  			real(4), pointer :: at_pos_file_bulk(:,:)
 
       character(16)  :: sim_type,dat_type,input_method,file_par,dat_source,string16,filter_name
-      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
+      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_pgc
       real(4)        :: rec_zero(l_rec),filter_fwhm,t_ms,t0,t1,a_par(3),angle(3),temp
 
 C *** PGPLOT stuff
@@ -147,9 +147,9 @@ C *** PGPLOT stuff
       namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
-      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out       
+      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out,j_ps,j_out,j_pgc        
       										!general rule: namelists of tools should only contain their local parameters
-                          !what is of global interest they should pass into data_header
+                          !what is data-related should pass into data_header
 CC      namelist /mp_bin/ sim_type,dat_type,input_method,subst_name,data_path,ext,eps_x,n_atom,n_row,
 CC     1      j_basis,j_centred,j_test,j_mult,j_shrec,  n_tot_in,a_cell_par,temp_par,rec_str
       namelist /mp_sqom/ nfile_mem,nfile_step,n_int,s_trig,j_oneph,j_sq,j_qsq,j_wind,j_interp
@@ -183,7 +183,8 @@ C *** other initialisations
 			ps_out = (/'OFF ','ON  '/)			!PGPLOT
 			plot_unit = 0
 			n_plot_max = 7
-			p_size = 7.											!PGPLOT
+			p_size = 7.	                  !PGPLOT - screen plot size
+			j_pgc = 6 										!PGPLOT - JK printer-friendly rainbow for colormaps (no black)
 			eps_fft = 1.e-6						!finufft
 			iflag = -1						!finufft			
       j_head_in = 0		! if header found will become 1
@@ -224,6 +225,7 @@ C *** Generate data file access
 			if(t_single)then
 				nfile_min = 1		!for conformity with loop control conventions
 				nfile_max = 1
+        nfile_step = 1
 			endif
 			
       nfile = ((nfile_max-nfile_min)/nfile_step)+1
@@ -356,6 +358,7 @@ C **** Read the auxiliary file <file_title.par> with structure parameters, atom 
       read(4,nml=mp_gen)
       rewind(4)
       read(4,nml=mp_out)
+C     if(j_sq==0) j_logsc=0  !linear scale for I(Q,t)
       
       call down_case(pg_out) 
       if(index(pg_out,'png')/=0) then
@@ -627,10 +630,11 @@ C *** set the time and frequency constants and the time-integration window
 			if(t_step/=.0) then
 				write(*,*) 'MD time sequence:  t_total [ps]',t_tot,'t_step [ps]',t_step
 
+        if(n_int==0) n_int = nfile/2
+ 
 				if(j_sq==1) then        !for S(Q,w)
-          if(n_int==0) n_int = nfile/2
           if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd				
- 				  freq_step = 1./((n_int-1)*t_step)
+				  freq_step = 1./((n_int-1)*t_step)
 				  n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step		
 				  f_max_plot = n_freq_max*freq_step
           t_width = .5*(n_int-1)*t_step		!effective width
@@ -642,9 +646,10 @@ C *** set the time and frequency constants and the time-integration window
           write(*,'("Energy resolution FWHM [THz]            ",f8.2)') f_width
           write(*,*) 
 				else
-				  n_freq_max = nfile					!for I(Q,t)
-				  n_int = 1
+				  n_freq_max = nfile-n_int+1					!for I(Q,t)
+C			  n_int = 1
 				  f_max_plot = n_freq_max*t_step
+				  freq_step = t_step
 				endif
  			  n_freq_plot = n_freq_max
 			endif
@@ -1173,9 +1178,9 @@ CC			j_plot = 0									!j_plot=0 identifies 1st pass: we start with a total sca
 					do
 CC						write(*,*) 'ev,q_v',ev,q_v
             if(j_sq==1) then				
-						  write(*,*) 'E(Q) map: initial and final points Q1, Q2 [hkl]:'
+						  write(*,*) 'E(Q) map: type/confirm initial and final points Q1, Q2 [hkl]:'
 						else
-						  write(*,*) 'I(Q,t) map: initial and final points Q1, Q2 [hkl]:'
+						  write(*,*) 'I(Q,t) map: type/confirm initial and final points Q1, Q2 [hkl]:'
 						endif
 						read(*,*) q1_3d,q2_3d					
 						q1 =q1_3d-q_v
@@ -1363,11 +1368,14 @@ CCCCCCC!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs
                     enddo									
                   endif
                   cs3 = cs3*conjg(cs3)											
-                else                                   !calculate the I(Q,t)
-                  cs_p1 => cs(1:nfile-j_freq,ii,jj)					!point to a subsection with negative shift in time
-                  cs_p2 => cs(j_freq+1:nfile,ii,jj)								!point to a subsection with positive shift in time
+                else                                   !calculate the I(Q,t), n_int should be nfile/2
+C                 cs_p1 => cs(1:nfile-j_freq,ii,jj)					!point to a subsection with negative shift in time
+C                 cs_p2 => cs(j_freq+1:nfile,ii,jj)								!point to a subsection with positive shift in time
+                  cs_p1 => cs(1:n_int,ii,jj)					!point to a subsection with negative shift in time
+                  cs_p2 => cs(j_freq+1:j_freq+n_int,ii,jj)								!point to a subsection with positive shift in time
                   cs3 = cs_p2*(conjg(cs_p1)) 
-                  cs3 = cs3*(1./(nfile-j_freq))               
+C                 cs3 = cs3*(1./(nfile-j_freq))               
+                  cs3 = cs3*(1./n_int)               
                 endif
 							  cs_plot(ii,jj) = sum(cs3)
 							enddo												
@@ -1401,8 +1409,11 @@ CCCCCCC!$omp parallel shared(cs_plot,om_phase,nfile,n_int,n_qx,n_qy) private (cs
                   endif	
                   cs4(:,ii) = cs4(:,ii)+cs3(1:n_freq_max)*conjg(cs3(1:n_freq_max))			 
                else                     !j_sq/=1 calculate I(Q,t)
-                cs3(1) = cs(ifile,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))
-                cs4(ifile,ii) = cs4(ifile,ii)+cs3(1)*conjg(cs3(1))			!now dim(cs3)=1
+
+                cs_p1 => cs(1:n_int,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))					!point to a subsection with negative shift in time
+                cs_p2 => cs(ifile:ifile+n_int-1,n_q1x+nint((ii-1)*q_nx),n_q1y+nint((ii-1)*q_ny))								!point to a subsection with positive shift in time
+
+                cs4(ifile,ii) = sum(cs_p2*(conjg(cs_p1)))			!now dim(cs3)=1
               endif
              enddo
             enddo
@@ -1413,7 +1424,7 @@ CC					cs_plot(:,:) = cs4(1:n_freq_max,:)
 					deallocate(cs2,cs3,cs4)
 				endif		!j_disp
 
-CC        write(*,*) 'nfile,n_freq_plot,n_freq_max',nfile,n_freq_plot,n_freq_max
+C       write(*,*) 'nfile,n_freq_plot,n_freq_max',nfile,n_freq_plot,n_freq_max
         
 				CALL SYSTEM_CLOCK (COUNT = sc_c2)
 				call cpu_time(t2)
@@ -1423,7 +1434,8 @@ CC        write(*,*) 'nfile,n_freq_plot,n_freq_max',nfile,n_freq_plot,n_freq_max
 				n_frame = nfile-n_int+1
 				
  	     	if(j_disp.ge.1) cs_plot = transpose(cs_plot)			!from now on the shape is cs_plot(n_qdisp,n_freq_max)
-				cs_plot = cs_plot/real(.5*n_frame*n_int)					!.5 comes for the integral of the time window profile
+
+				if(j_sq==1)cs_plot = cs_plot/real(.5*n_frame*n_int)					!.5 comes for the integral of the time window profile
 			endif !(abs(j_plot)>1)													!E-resolved cases
 
 C *** apply the speckle filter
@@ -1485,7 +1497,7 @@ CC				scale_loop: do
 							CALL PGASK(.FALSE.)     ! would not ask for <RET>
 							BRIGHT = 0.5
 							CONTRA  = 1.0
-							CALL PALETT(6, CONTRA, BRIGHT)
+							CALL PALETT(j_pgc, CONTRA, BRIGHT)    !default j_gc=6 - JK rainbow
 							CALL PGSCRN(0, 'white', IER)	!sets the color index of background to WHITE
 							CALL PGSCRN(1, 'black', IER)
 							CALL PGSCH(1.)					!set character height					
@@ -1528,19 +1540,17 @@ CC				scale_loop: do
           n_qyp = n_freq_plot       !could have been done already before 
         endif
         
-				if(j_logsc==1) then
-				  wedge_label = 'Log_scale'
-				else
-				  wedge_label = 'Lin_scale'
-				endif	
-
-
 				scale_loop: do
-          if(j_logsc==1) then
+          if(j_plot==0.or.j_plot>1.and.j_sq==1.and.j_logsc==1) then
             cs_out = log10(cs_plot)
+			      wedge_label = 'Log_scale'
           else
             cs_out = cs_plot
+ 				    wedge_label = 'Lin_scale'
           endif	
+
+C      write(*,*)'cs_out(21,:)'
+C      write(*,*) cs_out(21,:)
 
 C *** interpolate or smooth CS_PLOT by FFT for a more presentable graphical resolution (best in Log_scale)
         if(j_interp/=0) then            !do post-treatment
@@ -1611,12 +1621,18 @@ C **** Draw the plot
 				
 CC				write(*,*) 'n_qxg,n_qyg,f_max,freq_step',n_qxg,n_qyg,f_max,freq_step
 				
+				  write(*,*) 'c_min_save',c_min_save,c_max_save
 				if(c_min_save==0..and.c_max_save==0.) then
-					c_min = anint(minval(cs_pgplot)-1.)
-					c_max = anint(maxval(cs_pgplot)+1.)
+				  if(j_sq==1) then
+            c_min = anint(minval(cs_pgplot)-1.)
+            c_max = anint(maxval(cs_pgplot)+1.)
+          else
+            c_min = minval(cs_pgplot)
+            c_max = maxval(cs_pgplot)
+          endif
+				  write(*,*) 'c_min,c_max',c_min,c_max
 				endif
-				if(j_logsc==1.and.c_min<-8.) c_min = -8.
-				write(*,*) 'c_min,c_max',c_min,c_max
+				if(j_logsc==1.and.c_min<-16.) c_min = -16.
 C			write(*,*) 'cs_pgplot',cs_pgplot(10:15,10)
 			
 C *** PGPLOT: set the coordinate transformation matrix: world coordinate = pixel number.
@@ -1670,13 +1686,14 @@ CC          if(j_sq==0) TR(6) = 1.
 131					format('[',i1,2i2,']',' [r.l.u.]')
 						call PGSLCT(map_unit(i_plot))
 						CALL PGPAP(p_size,e2_norm/e1_norm)     ! define the plot area as a square
-						CALL PGENV(qx_min,qx_max,qy_min,qy_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
+ 					  CALL PGENV(qx_min,qx_max,qy_min,qy_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 						CALL PGLAB(trim(x_title),trim(y_title),' ')  					!put the axis labels
 						CALL PGSCH(1.)					!set character height					
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
 						CALL PGSCH(.6)					!set character height					
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
+C					CALL PGENV(qx_min,qx_max,qy_min,qy_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 						CALL PGSCH(1.)					!set character height					
 						CALL PGWEDG('RI', 1., 3., c_min, c_max,trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					elseif(j_disp==1) then
@@ -1685,7 +1702,7 @@ CC          if(j_sq==0) TR(6) = 1.
 115   			format('  Q_1 = [',3f6.2,']','  Q_2 = [',3f6.2,'] ',a,' ',a)   
 						call PGSLCT(map_unit(i_plot))
 						CALL PGPAP(p_size,1.)     ! define the plot area as a rectangle
-						CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
+ 		  			CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 						CALL PGLAB(trim(x_label),y_label,' ')  !put the axis labels
 						CALL PGSCH(1.)					!set character height					
 						CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
@@ -1693,6 +1710,7 @@ CC          if(j_sq==0) TR(6) = 1.
 						CALL PGMTXT ('T', 1., .5, .5, trim(plot_title2))
 						CALL PGSCH(1.)					!set character height					
 						CALL PGIMAG(cs_pgplot(1:n_qxg,1:n_qyg),n_qxg,n_qyg,1,n_qxg,1,n_qyg,c_min,c_max,TR)
+C					CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
 						CALL PGSCH(1.)					!set character height					
 						CALL PGWEDG('RI', 1., 3., c_min, c_max, trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 					endif
@@ -1719,7 +1737,7 @@ CC          if(j_sq==0) TR(6) = 1.
 							write(*,'("Modify intensity scale: min,max (0 0 change Q1,Q2, 2 2 linear scans, 9 9 EXIT)",2f8.1)') c_min,c_max
 						endif
 
-						read(*,*)c_min,c_max								!,j_grid
+						read(*,*)c_min,c_max								
 						if(c_min==c_max) exit scale_loop
 
 					enddo scale_loop
@@ -1938,21 +1956,27 @@ C **** generate linear scan profiles
 C				
 				if(j_scan.ge.1)then
 					scan_loop: do
-						if(plot_unit==0) then
+C					if(plot_unit==0) then
 							plot_unit = PGOPEN('/xserv')
 							write(*,*) 'plot_unit',plot_unit
+C					else
+C						call PGSLCT(plot_unit)
+C					endif
+
 							CALL PGASK(.FALSE.)     ! would not ask for <RET>
 							CALL PGPAP(7.0,1.5)     ! define the plot areaCC						CALL PGERAS
 							call PGSUBP(1,4)
 							CALL PGSCRN(0, 'white', IER)	!sets the color index of background to WHITE
 							CALL PGSCRN(1, 'black', IER)
-						else
-							call PGSLCT(plot_unit)
-						endif
 
 						page_loop:do ii=1,4
-							write(*,*) 'Q_plot, E_plot [THz]? (0 0 = END; Q = -9: E = const; Q=const: E = -9 ) '
-							read(*,*) qq_plot,ff_plot
+						  if(j_sq==1) then
+                write(*,*) 'Q [rlu], E [THz]? (0 0 = END; Q = -9: E = const; Q=const: E = -9 ) '
+                read(*,*) qq_plot,ff_plot
+              else
+                 write(*,*) 'Q [rlu], t [ps]? (0 0 = END; Q = -9: t = const; Q=const: t = -9 ) '
+                read(*,*) qq_plot,ff_plot
+             endif
 
 C
 C **** check the limits
@@ -1962,13 +1986,14 @@ C
 							endif
 							
 							if(qq_plot.eq.-9.and.(ff_plot.lt.0..or.ff_plot.gt.f_max))then !E_const: E out of range
+							  write(*,*) 'Plot position out of range'
 								cycle page_loop	
 							endif	
 
 							if(ff_plot.eq.-9.and.(qq_plot.lt.min(q_min,q_max).or.qq_plot.gt.max(q_min,q_max))) then
-							 cycle page_loop 																							!Q=const: Q out of range
+							  write(*,*) 'Plot position out of range'
+							  cycle page_loop 																							!Q=const: Q out of range
 							endif
-
 C
 C **** do the plots
 C
@@ -1978,6 +2003,7 @@ C
 									qq(j) = q_min+(j-1)*(q_max-q_min)/real(n_qdisp)
 								enddo
 								j_freq = nint(ff_plot/freq_step)+1
+								write(*,*) 'j_freq,ff_plot,freq_step',j_freq,ff_plot,freq_step
 								if(ii==1)then
 CC									c_min = minval(cs_out(1:n_qdisp,j_freq))
 CC									c_max = maxval(cs_out(1:n_qdisp,j_freq))
@@ -1997,8 +2023,13 @@ CC							write(*,*) 'n_qxg,j_freq,qq,cs_pgplot(j_q,1:j_freq):',n_qyg,j_freq
 CC							write(*,*) qq
 CC							write(*,*) cs_pgplot(1:n_qxg,j_freq)
 
-							write(scan_title,105) trim(plot_title1),ff_plot
+              if(j_sq==1) then
+							  write(scan_title,105) trim(plot_title1),ff_plot
+							else
+							  write(scan_title,1051) trim(plot_title1),ff_plot
+							endif
 105       		format(a,'   E =',f5.2,' [THz]')   
+1051       		format(a,'   t =',f5.2,' [ps]')   
 							do
 								CALL PGSCH(2.)					!set character height					
 								CALL PGSCI (1)  !white
@@ -2036,6 +2067,7 @@ CC								write(*,*) 'ii',ii
 							ff_min = 0.
 							ff_max = f_max
 							j_freq = nint(ff_max/freq_step)+1
+								write(*,*) 'j_q,j_freq,ff_plot,freq_step',j_q,j_freq,ff_plot,freq_step
 							do j=1,n_freq_plot
 								ff(j) = ff_min+(j-1)*(ff_max-ff_min)/real(n_freq_plot-1)
 							enddo
@@ -2054,13 +2086,17 @@ CC							write(*,*) ff
 CC							write(*,*) cs_pgplot(j_q,1:j_freq)
 							
 							write(scan_title,106) trim(plot_title1),qq_plot
-106       		format(a,'   q = ',f5.2,' [r.l.u.]')   
+106       		format(a,'   Q = ',f5.2,' [r.l.u.]')   
 							do
 								CALL PGSCH(2.)					!set character height					
 								CALL PGSCI (1)  !white
 								CALL PGSLS (1)  !full
 								CALL PGENV(ff_min,ff_max,c_min,c_max,0,1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
-								CALL PGLAB('E [THz]', 'cts',trim(scan_title))  !put the axis labels
+                if(j_sq==1) then
+								  CALL PGLAB('E [THz]', 'cts',trim(scan_title))  !put the axis labels
+								else
+								  CALL PGLAB('t [ps]', 'I(Q,t)',trim(scan_title))  !put the axis labels
+								endif
 								CALL PGSCI (ii+1)  !red-green-blue
 CC								CALL PGLINE(n_freq_plot,ff,cs_pgplot(j_q,1:j_freq))  !plots the curve
 								CALL PGLINE(n_qyg,ff,cs_pgplot(j_q,1:j_freq))  !plots the curve
@@ -2283,7 +2319,7 @@ C        -- weird IRAF
 C        -- AIPS
          CALL PGCTAB(AL, AR, AG, AB, 20, CONTRA, BRIGHT)
       ELSE IF (TYPE.EQ.6) THEN
-C        -- JK rainbow
+C        -- JK rainbow (printer friendly)
          CALL PGCTAB(JKL, JKR, JKG, JKB, 9, CONTRA, BRIGHT)
       END IF
       END

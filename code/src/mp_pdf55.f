@@ -7,7 +7,7 @@ C ***** %%%%%%%%%%%%%%%%   		  program MP_PDF  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%
 C *****
 C *****   calculates the pair distribution functions (PDF) for simulated supercell data
 C *****
-C**********					Copyright (C) 2022  Jiri Kulda, Grenoble/Prague          **********
+C**********					Copyright (C) 2023  Jiri Kulda, Grenoble/Prague          **********
 C**	
 C** This file is part MP_TOOLS developed and maintained by Jiri Kulda <jkulda@free.fr>
 C**
@@ -22,9 +22,9 @@ C**	See the GNU General Public License for more details.
 C**
 C ***** %%%%%%%%%%%%%%%%   		  program MP_PDF  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 C *****
-C ***** Ver. 1.1 The correlation is asymmetric: N_HSUM random cell against the complete supercell
+C ***** Ver. 1.1 The correlation is asymmetric: n_int random cell against the complete supercell
 C ***** Ver. 1.2 the whole supercell is read into memory once for ever
-C ***** Ver. 1.21 the correlation is symmetric N_HSUM random cells against N_HSUM random cells
+C ***** Ver. 1.21 the correlation is symmetric n_int random cells against n_int random cells
 C *****
 C ***** Ver. 1.31 between two delayed snapshot frame uses the 1.21 symmetric algorithm
 C ***** Ver. 1.31 now the delay may be 0, so 1.31 replaces also ver. 1.21 and will override it
@@ -41,7 +41,7 @@ C ***** 				 	- use of auxiliary <file_title.par> file (correlation pairs etc.)
 C ***** Ver. 1.41	- corrected inconsistency in output <rdf>.txt file name
 C *****						- correct histogram identification by j_hist_type
 C ***** 
-C ***** Ver. 1.42	- lighter & parallelied version (no correlation histograms, no IDOM)
+C ***** Ver. 1.42	- lighter & parallelised version (no correlation histograms, no IDOM)
 C *****						- integrates the PGPLOT graphics of mp_rplot.f
 C ***** 					- only PDF
 C ***** 					- for correlation histograms (refer to mp_corr)
@@ -83,46 +83,56 @@ C ***** atom positions are converted from reduced lattice coordinates (x) to rea
 C ***** 
   
   		use omp_lib
+			use singleton
+
+C *** notes on FT & SINGLETON:
+C                 - check whether automatic scaling by 1/sqrt(N) inside SINGLETON is blocked or not - now it is!
+C                 - if YES  you need to do it explicitly within the code	
+C                 - the scaled FT transform restitutes properly f(x) after going forth and back
+C                 - NEVERTHELESS the FT value will depend on the sampling frequency as SQRT(N)
+C                 - if the FT value itself is important and should be invariant w.r.t. the sampling frequency the sample sequence has to be scaled by 1/SQRT(N) as well
   		
 CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and link together with the module mp_nopgplot.f
 
       integer,parameter :: l_rec  =  1024		    !record length in real(4)
+      integer,parameter :: n_mc  =  1e6		    !record length in real(4)
       real,parameter    :: pi = 3.14159
+      character(4),allocatable  ::	at_name_par(:),at_label(:),at_name_ext(:),at_name_pseudo(:),at_name_plot(:),pdf_out(:)
+      character(10),allocatable ::	corr_name(:),curve_label(:),x_label(:),y_label(:)
 
-      character(4),allocatable  ::	at_name_par(:),at_label(:),at_name_ext(:),at_name_pseudo(:),at_name_plot(:)
-      character(10),allocatable ::	corr_name(:)
+      integer,allocatable ::  at_mask(:),ind_part(:,:),ind_pseudo(:,:),numbers(:),ind_hist(:,:,:),ind_pdf(:,:,:),ind_at1(:) 
 
-      integer,allocatable ::  at_ind_file(:,:,:),at_mask(:),j_corr(:,:),mult_corr(:),ind_pseudo(:,:),numbers(:) 
-
-			real,allocatable ::  at_pos_file(:,:,:),rdf_tot(:),rdf_tot_plot(:),r(:),rdf_p2(:,:,:),rdf_p2_n(:,:,:,:),rdf_p2_plot(:,:,:),rdf_err(:)
-      real,allocatable ::  b_coh(:),at_weight(:),at_weight_matrix(:,:),at_base(:,:),at_pos(:,:),at_pos2(:,:)
+			real,allocatable ::  w(:),rdf_p2(:,:,:),rdf_p2_n(:,:,:,:),rdf_p2_ws(:,:,:),rdf_p2_plot(:,:,:),rdf_err(:),rdf_fft(:)
+      real,allocatable ::  at_base(:,:),b_coh(:),at_weight(:),x_ffpar(:,:),x_ffq(:,:),at_weight_matrix(:,:),f_smooth(:)
+      real,allocatable,target ::  r(:),q(:)
+      real,pointer ::      x(:)
 	  
-			integer ::       i_rdf,n_pdf,j_acc,n_int,n_int2,n_pseudo,i_ref,j_pdf,j_rand
-      real    ::       rdf_dist,rdf_range,rdf_sum,rdf_tot_sum,rdf_norm,at_weight_sum
-      real 		:: 			 arg,c_min,c_max,c_max2,c1,c2,r_start,r_end,pdf_step,c_smooth,f_smooth(51)
+			integer ::       i_rdf,n_pdf,j_acc,n_int,n_pseudo,i_ref,j_pdf,j_rand,n_ind(3),n_skip1,n_skip2
+      real    ::       rdf_dist,pdf_range,rdf_sum,rdf_tot_sum,rdf_norm,at_weight_av,at_pos(3),at_pos2(3)
+      real 		:: 			 arg,c_min,c_max,c_max2,c1,c2,x_start,x_end,pdf_step,q_step,ro_0,c_smooth,rnd(5)
       
-      character(4)   :: c_int(2),c_fil(2),version,head,atom,ps_out(2),size_out(2)
+      character(4)   :: version,head,atom,ps_out(2),size_out(2)
       character(10)  :: at_weight_scheme(3),pg_out,string,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
       character(16)  :: sim_type_par,data_type,string16,filter_name
       character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name
-      character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,line,masks
+      character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,line,masks,smooth
       character(128) :: cwd_path,plot_header,plot_title
       character(l_rec):: header_record
       
 			logical ::  nml_in,found,found_txt,found_ps,t_single
 
-      integer(8) ::  n_in,n_out,n_inbox,n_outbox,n_pdf_range(3),n_mc,n_mc_max,n_norm
-      integer ::  j_proc,proc_num,proc_num_in,thread_num,thread_num_max,m,j_name,jm,j1m,j2m,j_mode
-      integer ::  i_start,i_end,ind_part(2,4),n_step,nfile_step,n_hsum,n_h,j_head_in,hist_ind(3),j_verb,n_tot,n_head
-      integer ::  i,j,k,ii,jj,ind,ind2,jat,i_rec,ind_rec,nrec,ncell,nrow,nlayer,nsuper,nfile,nfile_t0,nfile_min,nfile_max,jfile
-      integer ::  j1,j2,j_plane,j_grid,j_logsc,j_ps,j_out,j_txt,i_seed,i_r1,i_r11,i_r12,i_time(8),j_sr,j_pb,j_sr2,j_pb2
-      integer ::  at_no,at_ind(3),at_ind2(3),d_ind(3),j_dom,j_base(3),n_plot,n_smooth,n_smooth_fwhm,n_part,n_part_max,n_atom_tot,n_pseudo_max
-      integer ::  j_atom,j_weight,j_xray,j_edit,j_mask,ifile,ifile0,jfil_step,jint,jint2,n_atom,sc_c2,sc_c1,ier,ios
+      integer(8) ::  n_pdf_range(3),n_norm,n_mc_max                !this number may be biiiiig!   
+      integer ::  j_proc,proc_num,proc_num_in,thread_num,thread_num_max,m,j_name,jm,j1m,j2m,j_mode,n_mode
+      integer ::  i_start,i_end,n_step,nfile_step,n_h,j_head_in,hist_ind(3),j_verb,n_tot,n_head
+      integer ::  i,j,k,ii,jj,ind,ind2,jat,i_rec,ind_rec,nrec,nfile,nfile_min,nfile_max,jfile,i_at1
+      integer ::  j1,j2,j_plane,j_grid,j_logsc,j_ps,j_out,j_txt,i_seed,i_r1,i_r11,i_r12,i_time(8)
+      integer ::  at_ind(3),at_ind2(3),d_ind(3),d_ind_shift(3),j_dom,j_base(3),n_plot,n_smooth,n_smooth_fwhm,n_part,n_part_max,n_atom_tot,n_pseudo_max,n_pdf_grid(3)
+      integer ::  j_atom,j_weight,j_xray,j_edit,j_mask,ifile,jint,n_atom,sc_c2,sc_c1,ier,ios,n_pix_step
       
-      real :: t_dump,filter_fwhm,tt0,tt,b_sum,rand1,rand2,sc_r,at_displ,p_size
+      real :: t_dump,filter_fwhm,tt0,tt,b_sum,at_sum,rand1,rand2,sc_r,at_displ,p_size,rdf_tot_err,pdf_pix,pdf_pix_shift(3),a_par_grid(3)
       integer :: rand1_seed(8),rand2_seed(8),seed_size
 
-      real :: diff_pos(3),x_plot,y_plot,part_scale(4)
+      real :: pdf_grid_min(3),pdf_grid_max(3),diff_pos(3),diff_pos_norm,x_plot,y_plot,part_scale(4),d_pos(3)
 
 C **** the following variables MUST have the following type(4) or multiples because of alignement in the binary output file
       character(4),allocatable :: at_name_out(:)
@@ -131,7 +141,7 @@ C **** the following variables MUST have the following type(4) or multiples beca
       real(4),allocatable ::	at_pos_in(:),at_occup_r(:)
 
       character(16)  :: sim_type,dat_type,input_method,file_par,dat_source
-      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,iran0
+      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,idum,iran0,mult,j_pgc
       real(4)        :: rec_zero(l_rec),t_ms,t_step,t0,t1,a_par(3),angle(3),a_par_pdf(3),temp
 
       namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
@@ -139,15 +149,16 @@ C **** the following variables MUST have the following type(4) or multiples beca
       namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
-      namelist /mp_out/ j_weight,j_logsc,j_ps,j_txt,p_size,j_grid,pg_out       
+      namelist /mp_out/ j_weight,j_logsc,j_ps,j_txt,p_size,j_grid,pg_out,j_out,j_pgc       
       										!general rule: namelists of tools should only contain their local parameters
                           !what is of global interest they should pass into data_header
-			namelist /mp_pdf/ n_pdf,pdf_step,a_par_pdf,j_rand,n_mc,j_acc,j_pdf,n_part_max,n_pseudo_max,j_out
+			namelist /mp_pdf/ pdf_range,pdf_step,x_end,a_par_pdf,pdf_pix,pdf_pix_shift,j_rand,n_h,j_acc,j_pdf,n_part_max,n_pseudo_max,n_cond    !j_acc not used
 			
 C **** PGPLOT stuff
       INTEGER :: PGOPEN,j_xserv
 
-
+      j_xserv = 0
+      
 CCC ********************* Test of RANDOM_NUMBER generator (start) *******************************      
 CCC        
 CCC        - remove the CC to check possible local and processor-dependent effects
@@ -204,7 +215,7 @@ CCC ********************* Test of RANDOM_NUMBER generator (end) ****************
 
 C ********************* Initialization *******************************      
 
-			write(*,*) '*** Program MP_PDF 1.55 ** Copyright (C) Jiri Kulda (2019,2021,2022) ***'
+			write(*,*) '*** Program MP_PDF 1.55 ** Copyright (C) Jiri Kulda (2019-2023) ***'
 			write(*,*)
 			
 C ********************* Get a time stamp and open a .LOG file *******************************
@@ -233,10 +244,14 @@ C
 C ********************* OpenMP initialization end *******************************      
 
 C *** other initialisations
-			c_int = (/'GS','MC'/)
-			c_fil = (/'g','m'/)
+      n_mode = 3
+      allocate(pdf_out(n_mode),curve_label(n_mode),x_label(n_mode),y_label(n_mode))
+      curve_label = (/'g_tot','G_tot','S_tot'/) 
+			pdf_out = (/'g(r)','G(r)','S(Q)'/)			
+      y_label = pdf_out
+      x_label = (/'r[A]  ','r[A]  ','Q[A-1]'/)
 			ps_out = (/'OFF ','ON  '/)			!PGPLOT
-			size_out = (/'S   ','XXL '/)			!PGPLOT
+			size_out = (/'S   ','XXL '/)		!PGPLOT
 			
 C *** Generate data file access
 			write(*,*) 'Input data file_master: '
@@ -252,8 +267,6 @@ C *** Generate data file access
 				nfile_max = 1
 			endif
 			
-      nfile = ((nfile_max-nfile_min)/nfile_step)+1
-      
 			if(t_single)then
 				write(file_dat_t0,'("./data/",a,".dat")') trim(file_master)
 			else
@@ -302,15 +315,10 @@ CC        write(*,nml=data_header_1)
       	stop
       endif 
       
-      if(input_method == 'BULK') then
-        write(*,*) 'BULK data are not suitable for this PDF algorithm, works with CELL data only.'
-        stop
-      endif
-
       allocate(at_name_out(n_atom),at_occup_r(n_atom),nsuper_r(n_atom))
 			allocate(at_label(n_atom),at_name_par(n_atom),at_name_ext(n_atom))
 			allocate(at_base(n_atom,3),at_weight(n_atom),at_weight_matrix(n_atom,n_atom),at_mask(n_atom),rdf_err(n_atom))
-			allocate(b_coh(n_atom),SOURCE=.0)												!we need this to read .par
+			allocate(b_coh(n_atom),x_ffpar(n_atom,9),SOURCE=.0)												!we need this to read .par
       at_mask = 1
 
       if(nml_in) then      !new structure with namelist
@@ -344,35 +352,48 @@ C **** Read the auxiliary file <file_par.par> with structure parameters, atom na
       j_proc = 0
       read(4,nml=mp_gen)
 
-      j_ps = 0               !defaults for &mp_out
-      j_txt = 0
+      j_pdf = 0
+      j_txt = 0               !defaults for &mp_out
+      j_out = 0
       j_weight = 1
       j_logsc = 0
       j_grid = 0
+      j_ps = 0 
       pg_out = 'ps'
       p_size = 7.
       rewind(4)
       read(4,nml=mp_out)
+      
+      if(j_weight==3) then
+        write(*,*) 'Xray weights not yet implemented, setting to Uniform'
+        j_weight = 1
+      endif
 
       at_weight_scheme(1) = 'Uniform'
 			at_weight_scheme(2) = 'Neutron'
 			at_weight_scheme(3) = 'Xray'
 
-      n_pdf = 1024
-      pdf_step = 0.06
+      n_h = 0
+      pdf_step = 0.02
+      pdf_pix = 1.
       a_par_pdf = 1.
       n_part_max = 4         !defaults for &mp_pdf
-      n_pseudo_max = 4
-      j_out = 0
+      n_pseudo_max = 0
       j_rand = 1
-			n_mc = 1000000					!unit for counting MC cycles (n_h)
+      x_end = 10.
       rewind(4)
       read(4,nml=mp_pdf)
-
-      allocate(ind_pseudo(n_atom,n_pseudo_max),at_name_pseudo(n_pseudo_max),ind_part(2,n_part_max))
+      
+      allocate(ind_pseudo(n_atom,n_atom+n_pseudo_max+1),at_name_pseudo(n_pseudo_max+1),ind_part(2,n_part_max))       !1st pseudo is TOT by default
       ind_pseudo = 0
       ind_part = 0
       at_name_pseudo = ''
+      at_name_pseudo(1) = 'TOT'
+      ind_pseudo = 0
+      do j=1,n_atom
+        ind_pseudo(j,j) = 1
+      enddo
+      ind_pseudo(:,n_atom+1) = 1
 
 C *** Read the atom positions       
       rewind(4)
@@ -426,7 +447,7 @@ C *** Read the pseudo atom definitions
           read(4,'(a)',iostat=ios) string
           if(ios/=0) then
             write(*,*) 'Section title: PSEUDO_ATOMS not found (can be added in dialogue)'
-            n_pseudo = 0
+            n_pseudo = 1
             found = .false.
             exit
           endif
@@ -435,8 +456,8 @@ C *** Read the pseudo atom definitions
         enddo
         
         if(found) then
-          do j=1,n_pseudo_max
-            read(4,*,iostat=ios) at_name_pseudo(j),ind_pseudo(1:n_atom,j)	              ! pseudo_atom name and indeces
+          do j=2,n_pseudo_max
+            read(4,*,iostat=ios) at_name_pseudo(j),ind_pseudo(1:n_atom,n_atom+j)	              ! pseudo_atom name and indices
             if(ios/=0) then
               n_pseudo = j-1
               exit
@@ -445,9 +466,12 @@ C *** Read the pseudo atom definitions
           enddo
         endif
       endif
-
 			close(4)
 			
+C     do i=1,n_pseudo
+C       write(*,*) trim(at_name_pseudo(i)),i,'  masks:',ind_pseudo(:,n_atom+i)
+C     enddo
+
 C *** Check the .PAR input       
 			do j=1,n_atom
 				if(at_name_par(j)/=at_name_out(j)) then
@@ -473,56 +497,51 @@ C *** read neutron scattering lengths (always)
           enddo
         endif
       endif
-      atom_loop: do j=1,n_atom
+      bc_loop: do j=1,n_atom
         rewind(4)
         do i=1,210
           read(4,*) atom
           if(atom==trim(at_label(j))) then
             backspace(4)
             read(4,*) atom,b_coh(j)
-            cycle atom_loop
+            cycle bc_loop
           endif
         enddo
         write(*,*) 'b_coh for ',trim(at_label(j)),' not found,'
         write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
-      enddo atom_loop
+      enddo bc_loop
       close(4)
       b_coh = .1*b_coh  !convert b_coh from FM to 10^12 cm
-CC      write(*,*)
-CC      write(*,*) 'Neutron scattering lengths:'
-CC      do j=1,n_atom
-CC        write(*,*) at_label(j),b_coh(j)
-CC      enddo			
-
+            
 C *** read Xray formfactor parameters 
-C     open(4,file='xray_ff.txt',action='read',status ='old',iostat=ios)
-C     if(ios.ne.0) then
-C       open(4,file='/usr/local/mp_tools/ref/xray_ff.txt',action='read',status ='old',iostat=ios)
-C       if(ios.ne.0) then
-C         do
-C           write(*,*) 'File xray_ff.txt not found, type valid access path/filename'
-C           read(*,'(a)') x_file_name
-C           open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
-C           if(ios==0) exit
-C           write(*,*) 'File',trim(x_file_name),' not found, try again ...'
-C         enddo
-C       endif
-C     endif
-C     atom_loop: do j=1,n_atom
-C       rewind(4)
-C       do i=1,210
-C         read(4,*) atom
-C         if(atom==trim(at_label(j))//trim(at_name_ext(j))) then
-C           backspace(4)
-C           read(4,*) atom,x_ffpar(j,1:9)
-C           cycle atom_loop
-C         endif
-C       enddo
-C       write(*,*) 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
-C       write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
-C     enddo atom_loop
-C     close(4)
-C
+      open(4,file='xray_ff.txt',action='read',status ='old',iostat=ios)
+      if(ios.ne.0) then
+        open(4,file='/usr/local/mp_tools/ref/xray_ff.txt',action='read',status ='old',iostat=ios)
+        if(ios.ne.0) then
+          do
+            write(*,*) 'File xray_ff.txt not found, type valid access path/filename'
+            read(*,'(a)') x_file_name
+            open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
+            if(ios==0) exit
+            write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+          enddo
+        endif
+      endif
+      xff_loop: do j=1,n_atom
+        rewind(4)
+        do i=1,210
+          read(4,*) atom
+          if(atom==trim(at_label(j))//trim(at_name_ext(j))) then
+            backspace(4)
+            read(4,*) atom,x_ffpar(j,1:9)
+            cycle xff_loop
+          endif
+        enddo
+        write(*,*) 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
+        write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+      enddo xff_loop
+      close(4)
+ 
 
 C *** write overview of atom data
 			write(*,*)
@@ -533,39 +552,63 @@ C *** write overview of atom data
         write(9,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
       enddo
       b_sum = sum(at_occup_r(1:n_atom)*b_coh(1:n_atom))
+      at_sum = sum(at_occup_r(1:n_atom))
 
 			write(*,*) 
 
 C **** use the .PAR value of a_par in case of input in LATTICE units      
-      if(a_par(1)*a_par(2)*a_par(3)==1.and.a_par_pdf(1)*a_par_pdf(2)*a_par_pdf(3)/=0.) a_par = a_par_pdf
-      write(*,*) 'Setting a_par to',a_par
+      if(a_par(1)*a_par(2)*a_par(3)==1.and.a_par_pdf(1)*a_par_pdf(2)*a_par_pdf(3)/=0.) then
+        a_par = a_par_pdf
+        write(*,*) 'Setting a_par to',a_par
+      endif
+ 
+ 
+C **** check the PDF range    
+      if(n_cond>0) then                         !box with periodic bound_cond
+        if(pdf_range>minval(a_par*n_row)) then
+          write(*,*) 'PDF range',pdf_range,' exceeds box size',minval(a_par*n_row)
+          write(*,*) 'Setting PDF range to',minval(a_par*n_row)
+          pdf_range = minval(a_par*n_row)        
+        endif
+      else                                      !box with non-periodic bound_cond
+        write(*,*) 'ATTENTION: non-periodic boundary conditions!'
+        if(pdf_range> .4*minval(a_par*n_row)) then
+          write(*,*) 'Box with non-periodic boundary conditions:'
+          write(*,*) 'PDF range',pdf_range,' exceeds 40% box size',.4*minval(a_par*n_row)
+          pdf_range = int(.4*minval(a_par*n_row))        
+          write(*,*) 'Setting PDF range to',pdf_range
+        endif      
+      endif
       
-C *** define references for lattice search	
-			nrow = n_row(1)
-      nlayer = n_row(1)*n_row(2) 						! 48**2 gives   2304
-      nsuper = n_row(1)*n_row(2)*n_row(3) 	! 48**3 gives 110592  
-      n_tot = n_atom*nsuper   
-CC    	write(*,*) 'n_row',n_row
-      rdf_range = n_pdf*pdf_step
-      do j=1,3
-      	n_pdf_range(j) = min(nint(rdf_range/a_par(j)),n_row(j))		!clip the integration range for strongly anisotropic supercells
-      enddo
-      n_norm = 8*n_pdf_range(1)*n_pdf_range(2)*n_pdf_range(3)		!number of unit cells within the PDF reach from R1
-      n_mc_max = nsuper*(n_norm-1) !number of independent site correlation pairs
-CC      write(*,*) 'n_pdf_range,n_norm,n_mc_max',n_pdf_range,n_norm,n_mc_max
+      n_pdf = anint(pdf_range/pdf_step)
+      if(n_cond==0) then
+        n_mc_max =  real(n_tot)**2/(500.*n_mc)       !more exactly: (.008*n_tot)*n_atom*(4./3.)*pi*product(.4*n_row)=.00215*n_tot**2
+      else
+        n_mc_max = real(n_tot)**2/(2.*n_mc)    !(1+n_tot/n_mc)*n_atom*product(n_row)/2 product(n_row)/2 is roughly the volume of sphere with radius of pdf_range_max !n_mc=1e6
+      endif
+ 
+ 
+C **** establish the overlay PDF_GRID 
+      n_pdf_grid = anint(n_row/pdf_pix)     
+C     d_pos = pdf_pix/a_par               !d_pos is indexing mesh cell size in lattice units (default corresponding to 1Å)
+      d_pos = pdf_pix                     !d_pos is indexing mesh cell size in lattice units, has to be commensurate with the box size, should be commensurate with the cell size
+      a_par_grid = a_par*pdf_pix           !a_par_grid is its lattice parameter in Å
+!      pdf_pix_shift                      !pdf_pix_shift specified in .PAR is offset of pdf_grid to lattice to get most atoms in centres of its cells
 
+      if(j_verb==1) write(*,*) 'Fine grid size, step and offset:',n_pdf_grid,d_pos,pdf_pix_shift
+      if(j_verb==1) write(*,*) 
 
+      n_pix_step = anint(sqrt(3.)*pdf_pix/pdf_step)       !we shall avoid correlations within the 1st pixel range
+     
+      
 C *********************  OpenMP initialization start  *******************************      
 C
-C     write(*,*) 'proc_num_in?'
-C     read(*,*) proc_num_in
 			proc_num_in = j_proc
-C		write (*,*) 'OMP proc_num_in          = ',proc_num_in
-			thread_num_max = omp_get_max_threads( )								!this gives maximum number of threads available (limited by concurrent tasks??)
+			thread_num_max = omp_get_max_threads( )			!this gives maximum number of threads available (limited by concurrent tasks??)
 			proc_num = omp_get_num_procs( )							!this should give number of processors, but in reality gives threads (cf. other unix/linux process enquiries)
 			if(proc_num_in==0) proc_num_in = proc_num/2 !ask just for one thread per core	
 			call omp_set_num_threads(proc_num_in)
-			thread_num = omp_get_num_threads( )				!this gives threads available at this moment: here always = 1 as we are outside of a PARALLEL range
+			thread_num = omp_get_num_threads( )				  !this gives threads available at this moment: here always = 1 as we are outside of a PARALLEL range
 
 
  			if(proc_num_in.gt.1) then			
@@ -589,46 +632,58 @@ C			write(*,*) 'OMP threads allocated       = ', thread_num
 C
 C ********************* OpenMP initialization end *******************************      
 
-
-C *********************      Initial info output   ************************
-      
-CC *** for the moment the MC integration strategy is imposed!
-
-			j_acc = 2
-			
-C *** initialise the random_number initialisation
-      call random_seed(size=seed_size)               !Puts size of seed into K
+C *** initialise the random_number generator
+      call random_seed(size=seed_size)               !Puts size of seed into seed_size
       allocate(numbers(seed_size))
-      if(j_verb==1) then
+
+      if(j_rand==0) then                     
+        write(*,*) 'Random_number: j_rand =',j_rand,'  the system will supply unique, machine dependent seeds each time this code runs'
         call random_seed(get=numbers)               !Gets actual seeds 
-        write(*,*) 'random_number seed size:',seed_size
-        write(*,*) 'seeds:',numbers
-        write(*,*) 
+        if(j_verb==1) then
+          write(*,*) 'Random_number seed size:',seed_size
+          write(*,*) 'Random_seed:',numbers
+          write(*,*) 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
+        endif
+      elseif(j_rand==1) then                     !if j_rand>1 generate a seed for later reference & numerical reproducibility checks
+        write(*,*) 'Random_number: j_rand =',j_rand,'  the system will supply k-dependent standard seeds for each of the OMP threads (use only for testing the consistence of OMP_on/OMP_off results)'
+      elseif(j_rand>1) then                     !if j_rand>1 generate a seed for later reference & numerical reproducibility checks
+        write(*,*) 'Random_number: j_rand =',j_rand,'  this seeding reference can be used to exactly reproduce this MC-run later on'
+       idum = j_rand
+        numbers(1) = iran0(idum)            !a dry call to initialise ran0
+        do i=1,seed_size
+          numbers(i) = iran0(idum)          !use a trivial random number generator to produce the seeds (they could even be all the same small ones, but ...)
+        enddo
+        call random_seed(put=numbers)       !Produce a seed to start, this permits to reproduce exactly the same results on the same system 
+        do i=1,5
+          call random_number(rnd(i))
+        enddo
+        if(j_verb==1) then
+          write(*,*) 'Random_seed:',numbers
+          write(*,*) 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
+        endif
       endif
+      write(*,*)
 
 C *** initialise the MC integration
-			n_h = n_mc_max/1000000
-			write(string,"(i8)") n_h
-			write(*,*) 'MC sampling pairs per frame ([x 10^6], ',trim(adjustl(string)),' max)'
-			read(*,*)   n_h
-			n_hsum = n_h*n_mc !number of MC cycles per snapshot
-			if(n_hsum.gt.n_mc_max) then
-				write(*,*) 'WARNING: n_hsum exceeds max number of cell pairs ',n_mc_max
-				write(*,*) 'input reduced n_h (<',n_mc_max/n_mc,'):'
-				read(*,*)   n_h
-				n_hsum = n_h*n_mc !number of MC cycles per snapshot
-			endif
-			n_int = n_hsum	! for MC cycle over n_hsum randomly chosen cell pairs
-			n_int2 = 1      ! each MC step deals with a single R1-R2 site pair
-			call random_seed	!initiate the random number sequence for MC sampling
+			if(n_h==0) then
+        write(*,*) 'MC sampling pairs per frame ([x 10^6], ',trim(adjustl(string)),' max):'
+        read(*,*)   n_h
+      endif
+      if(n_h.gt.n_mc_max) then                   !n_mc_max is in units of n_mc to avoid overflow for large boxes
+        write(*,*) 'WARNING: n_h exceeds max number of 10^6 atom pairs ',n_mc_max
+        write(*,*) 'type in a reduced n_h (<',n_mc_max,'):'
+        read(*,*)   n_h
+      endif
+			n_int = n_h*n_mc                           !number of MC cycles per snapshot
 			int_mode = 'Monte Carlo'
-			write(*,*) 'Monte Carlo integration over',n_int*n_int2,'cell pairs'
-			
-C *** Allocate and clear the histogram arrays for accumulation across several snapshots	       
-			allocate (at_pos_file(4,nsuper,n_atom),at_ind_file(4,nsuper,n_atom),at_pos_in(4*n_tot),at_ind_in(4*n_tot))
-			allocate(at_pos(n_atom,3),at_pos2(n_atom,3))
-			allocate(r(n_pdf),rdf_tot(n_pdf),rdf_p2(n_atom,n_atom,n_pdf),rdf_p2_n(n_atom,n_atom,n_pdf,n_h))
+			write(*,*) trim(int_mode),' integration over',n_h,'*10^6 cell pairs'
 
+C *** Allocate and clear the histogram arrays for accumulation across several snapshots	       
+			allocate (at_pos_in(4*n_tot),at_ind_in(4*n_tot),ind_at1(n_tot))
+			allocate(ind_pdf(n_pdf_grid(1),n_pdf_grid(2),n_pdf_grid(3)))
+			allocate(rdf_p2(n_atom,n_atom,n_pdf),rdf_p2_n(n_atom,n_atom,n_pdf,n_h))
+
+      ind_pdf = 0
       rdf_p2 = .0
       rdf_p2_n = .0
 
@@ -642,90 +697,141 @@ C *** Allocate and clear the histogram arrays for accumulation across several sn
       
 C *************  the file loop: cycle over the tt files to augment statistics
       CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
-
+      
+      nfile = 0
+ 
       file_loop: do ifile=nfile_min,nfile_max,nfile_step									
 
+        n_skip1 = 0
+
 C ***  open the t0 file (binary MD snapshot file)
-			if(t_single)then
-				write(file_dat,'("./data/",a,".dat")') trim(file_master)
-			else
-        if(nfile_min<=9999) then
-          write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+(ifile-nfile_min)*nfile_step
-        elseif(nfile_min>=10000) then
-          write(string,'(i8)') nfile_min+(ifile-nfile_min)*nfile_step
-          file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+        if(t_single)then
+          write(file_dat,'("./data/",a,".dat")') trim(file_master)
+        else
+          if(nfile_min<=9999) then
+            write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+(ifile-nfile_min)*nfile_step
+          elseif(nfile_min>=10000) then
+            write(string,'(i8)') nfile_min+(ifile-nfile_min)*nfile_step
+            file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+          endif
         endif
-			endif
 
-      CALL SYSTEM_CLOCK (COUNT = sc_c2)
- 			write(*,*)
-			write(*,*)'input: ',trim(file_dat)
-			write(9,*)'input: ',trim(file_dat)
+C     CALL SYSTEM_CLOCK (COUNT = sc_c2)
+        write(*,*)
+        write(*,*)'Input: ',trim(file_dat)
+        write(9,*)'Input: ',trim(file_dat)
 
-		  open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
-			if(ios.ne.0) then
-				write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
-				write(*,*) 'Skip(1), stop execution(0)?'
-				read(*,*) jj
-				if(jj==1) exit file_loop
-				if(jj==0) stop
-			endif
+        open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
+        if(ios.ne.0) then
+          write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
+          write(*,*) 'Skip(1), stop execution(0)?'
+          read(*,*) jj
+          if(jj==1) exit file_loop
+          if(jj==0) stop
+        endif
+        nfile = nfile+1
 
-			i_rec = n_head	
-			do j=1,n_rec-1
-				i_rec = i_rec+1
-				read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			
-			enddo	
-			i_rec = i_rec+1
-			read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
-			
-			do j=1,n_rec-1
-				i_rec = i_rec+1
-				read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec)			
-			enddo	
-			i_rec = i_rec+1
-			read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot)	
-			
-			at_ind_file(:,:,:) = reshape(at_ind_in,(/4,nsuper,n_atom/))
-			
-			at_pos_file(:,:,:) = reshape(at_pos_in,(/4,nsuper,n_atom/))
-			
-			close(1)
-			
-			write(*,*) 'Accumulating the PDFs ...'     
+        i_rec = n_head	
+        do j=1,n_rec-1
+          i_rec = i_rec+1
+          read(1,rec=i_rec) at_ind_in((j-1)*l_rec+1:j*l_rec)			
+        enddo	
+        i_rec = i_rec+1
+        read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
+      
+        do j=1,n_rec-1
+          i_rec = i_rec+1
+          read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec)			
+        enddo	
+        i_rec = i_rec+1
+        read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot)				
+        close(1)
+C         write(*,*) 'Read finished'
 
+
+C **** searching for atom_1 candidates in a non-periodic box
+        if(n_cond==0) then
+          ind_at1 = 0
+          i_at1 = 0
+          do i=1,n_tot
+            if(abs(at_pos_in(4*(i-1)+1))<.1*n_row(1).and.abs(at_pos_in(4*(i-1)+2))<.1*n_row(2).and.abs(at_pos_in(4*(i-1)+3))<.1*n_row(3)) then
+              i_at1 = i_at1+1
+              ind_at1(i_at1) = i
+            endif
+          enddo
+          write(*,*) 'Atom_1 pool:',i_at1
+          if(n_h>nint((i_at1*1000)/1.e6)) then
+            write(*,*) 'WARNING: n_h exceeds max number of 10^6 atom pairs ',nint((i_at1*1000)/1.e6)
+            write(*,*) 'restart with an adequate n_h and use a larger number of frames'
+            stop
+          endif
+        endif
+
+C *** reindexing atoms on a finer atomary grid	
+        ii =1		
+        do i=1,n_tot
+          if(maxval(abs(at_pos_in(4*(i-1)+1:4*(i-1)+3)))>.0) then
+            d_ind = 1+anint((at_pos_in(4*(i-1)+1:4*(i-1)+3)-pdf_pix_shift+n_row/2)/d_pos)   !+d_ind_shift
+C           if(j_verb==1.and.i==ii)then
+C             write(*,*)'i,at_pos_in',i,at_ind_in(4*(i-1)+1:4*(i-1)+3),at_pos_in(4*(i-1)+1:4*(i-1)+3)
+C             write(*,*)'d_ind convert',d_ind
+C           endif
+
+            do j=1,3                                                  !handle basis atoms displaced out of the nominal box
+              if(d_ind(j)<=0) then
+                d_ind(j) = d_ind(j)+n_pdf_grid(j)
+                at_pos_in(4*(i-1)+j) = at_pos_in(4*(i-1)+j)+n_row(j)
+              endif
+              if(d_ind(j)>n_pdf_grid(j)) then
+                d_ind(j) = d_ind(j)-n_pdf_grid(j)
+                at_pos_in(4*(i-1)+j) = at_pos_in(4*(i-1)+j)-n_row(j)
+              endif
+            enddo
+C           if(j_verb==1.and.i==ii)then
+C             write(*,*)'d_ind shift',d_ind,'next ii?'
+C             read(*,*)ii
+C           endif
+           
+           if(ind_pdf(d_ind(1),d_ind(2),d_ind(3))/= 0) then
+              write(*,*) 'Fine grid cell already taken (you can accept a few by RETURN, else modify pdf_pix in .PAR):'
+              write(*,*) 'at_ind_in,at_pos_in',at_ind_in(4*(i-1)+1:4*(i-1)+4),'  ',at_pos_in(4*(i-1)+1:4*(i-1)+3)
+C             write(*,*) 'i,d_ind,ind_pdf(d_ind(1),d_ind(2),d_ind(3))',i,d_ind,ind_pdf(d_ind(1),d_ind(2),d_ind(3))
+C             write(*,*) 'OLD: at_ind_in,at_pos_in',at_ind_in(4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+1:4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+4),
+C    1              '  ',at_pos_in(4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+1:4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+3)
+             read(*,*)
+             n_skip1 = n_skip1+1
+            endif
+            ind_pdf(d_ind(1),d_ind(2),d_ind(3)) = i
+            at_ind_in(4*(i-1)+1:4*(i-1)+3) = d_ind            !re-use at_ind_in(:,1:3) to store the new indices		
+          endif	
+        enddo
+
+        CALL SYSTEM_CLOCK (COUNT = sc_c2)
+        write(*,*) 
+        if(j_verb==1) write(*,*) 'Input finished         ',(sc_c2-sc_c1)/sc_r,' sec'
+        
+        if(n_skip1>10) then
+          write(*,*) 'Number of atoms skipped due to fine grid double occupancy:', n_skip1
+          write(*,*) 'Modify .PAR pdf_pix (0), continue (1)?'
+          read(*,*) jj
+          if(jj==0) stop
+        endif
+ 			
 C *************  the integration loop: cycle over the site pairs to accumulate the PDFs ******************
 
-			n_inbox = 0
-			n_outbox = 0
-			n_in = 0
-			n_out = 0
-
-                                            !if j_rand=0 do nothing, the system will supply unique, machine dependent seeds each time this code runs
-      if(j_rand>1) then                     !if j_rand>1 generate a seed for later reference & numerical reproducibility checks
-        idum = j_rand
-        numbers(1) = iran0(idum)            !a dry call to initialise ran0
-        do i=1,seed_size
-          numbers(i) = iran0(idum)          !use a trivial random number generator to produce the seeds (they could even be all the same small ones, but ...)
-        enddo
-        call random_seed(put=numbers)       !Produce a seed to start, this permits to reproduce exactly the same results on the same system 
-        do i=1,5
-          call random_number(r(i))
-        enddo
-        if(j_verb==1) then
-          write(*,*) 'Random_seed:',numbers
-          write(*,*) 'Reference 1st 5 random numbers:',(r(i),i=1,5)
-        endif
-      endif
-
+        write(*,*) 'Accumulating the PDFs ...'     
+        n_skip1 = 0
+        n_skip2 = 0
 
 C *** MonteCarlo integration
 
-!$omp parallel shared(at_pos_file,rdf_p2_n,a_par,pdf_step,nsuper,nlayer,n_row,n_atom,n_pdf_range,n_h,j_rand) private(at_pos,at_pos2,diff_pos,at_ind,at_ind2,d_ind,j_base,ind2,i_r1,i_rdf,rand1,rand2,numbers,r)
+CCCCCCC OMP continuation line must have a valid character in column 6  CCCCCCC
+!$omp parallel shared(at_pos_in,at_ind_in,ind_pdf,rdf_p2_n,a_par,pdf_step,n_tot,n_pdf_grid,n_row,n_atom,n_h,j_rand,n_skip1,n_skip2,i_at1)
+!$omp& private(at_pos,at_pos2,diff_pos,diff_pos_norm,at_ind,at_ind2,d_ind,j_base,i_r1,i_rdf,idum,rand1,rand2,numbers,r,jint,m,ii,jj)
 !$omp do
 
-				do k=1,n_h
-				  if(j_rand==1) then                 ! if j_rand=1 produce k-dependent standard seeds for each of the threads and cycles to test consistence of OMP_on and OMP_off results
+        do k=1,n_h                           ! runs over 1000*1000 atom pairs for each k
+          if(j_rand==1) then                 ! if j_rand=1 produce k-dependent standard seeds for each of the threads and cycles to test consistence of OMP_on and OMP_off results
             idum = j_rand+k
             numbers(1) = iran0(idum)            !a dry call to initialise ran0
             do i=1,seed_size
@@ -740,168 +846,230 @@ C *** MonteCarlo integration
               write(*,*) 'Random_seed:',numbers
               write(*,*) 'Reference 1st 5 random numbers:',(r(i),i=1,5)
             endif
-				  endif
+          endif
+        
+          jint = 0
+          integration_loop_2: do              !runs over 1000 "first atoms"
+            call random_number(rand1)			!the first cell
+            if(n_cond>0) then
+              i_r1 = n_tot*rand1+1	!i_r1 may become 1 to n_tot
+              at_pos(:) = at_pos_in(4*(i_r1-1)+1:4*(i_r1-1)+3)       !randomly select first atom
+              if(sum(abs(at_pos(:)))==.0) cycle
+              at_ind = at_ind_in(4*(i_r1-1)+1:4*(i_r1-1)+3)   !at_ind_in(:,1:3) has been re-used to store the fine-grid indices
+              ii = at_ind_in(4*(i_r1-1)+4)
+            else
+              i_r1 = i_at1*rand1+1	!i_r1 may become 1 to i_at1
+              if(ind_at1(i_r1)<=0) write(*,*) i_at1,rand1,i_r1,'?'
+              if(ind_at1(i_r1)<=0) read(*,*)
+              at_pos(:) = at_pos_in(4*(ind_at1(i_r1)-1)+1:4*(ind_at1(i_r1)-1)+3)       !randomly select first atom among their shortlist
+              if(sum(abs(at_pos(:)))==.0) cycle
+              at_ind = at_ind_in(4*(ind_at1(i_r1)-1)+1:4*(ind_at1(i_r1)-1)+3)   !at_ind_in(:,1:3) has been re-used to store the fine-grid indices
+              ii = at_ind_in(4*(ind_at1(i_r1)-1)+4)
+            endif 
           
-					integration_loop_2: do jint = 1,n_mc/1000
-						call random_number(rand1)			!the first cell
-						i_r1 = nsuper*rand1+1	!i_r1 may become 1 to nsuper
 
-						do j = 1,n_atom
-							at_pos(j,:) = at_pos_file(1:3,i_r1,j)
-						enddo
+C           write(*,*) 'jint,at_ind,at_pos',jint,at_ind,at_pos
+            m = 0
+            m_cycle: do                 !runs over 1000 "second atoms"
+              do
+                do i=1,3
+                  call random_number(rand2)		!generate the position within a cube [-1,1]; only points within the unit sphere will be retained
+                  diff_pos(i) = 2.*rand2-1.
+                enddo
+                diff_pos_norm = norm2(diff_pos)
+                if(diff_pos_norm>.0.and.diff_pos_norm<=1.) exit     !only diff_pos within unit sphere is kept !throwing away also the unlikely event of diff_pos=.0, not d_ind=0!
+              enddo
 
-						at_ind(3) = (i_r1-1)/nlayer+1
-						at_ind(2) = mod((i_r1-1),nlayer)/n_row(1)+1
-						at_ind(1) = mod(i_r1-1,n_row(1))+1
-					
-					do m=1,1000
-            do i=1,3
-              call random_number(rand2)		!find the second cell within a cube of 2*n_pdf_range around the first one
-              d_ind(i) = anint(2.*n_pdf_range(i)*(rand2-.5))
-              if(n_pdf_range(i)==1) d_ind(i) = 0
-            enddo
+              diff_pos = diff_pos/diff_pos_norm             !now we project random points onto spherical surface by d_ind/norm2(d_ind) ....
+              call random_number(rand2)
+              diff_pos = pdf_range*rand2*diff_pos     ! .... and select a random point on their radius (rand2) to emulate scaling 1/i**2, diff_pos is in Å now
 
-C *** skip selfcorrelations
-            if(d_ind(1)==0.and.d_ind(2)==0.and.d_ind(3)==0) then
-C					n_outbox = n_outbox+25
-C					n_out = n_out+13
-              cycle
-            endif
+              d_ind = anint(diff_pos/a_par_grid)       ! .... and select a random point on their radius (rand2) to emulate scaling 1/i**2   (we needn't switch to l.u. and back)
 
-            at_ind2 = at_ind+d_ind
-          
+              at_ind2 = at_ind+d_ind          !all of them are on the fine grid
+
 C *** treat atoms out of the supercell by applying cyclic boundary conditions
-            j_base = 0
-            do ii =1,3
-              if(at_ind2(ii).lt.1) then
-                at_ind2(ii) = at_ind2(ii)+n_row(ii)
-                j_base(ii) = -n_row(ii)
-              endif
+              j_base = 0
+              do j =1,3                                !n_pdf_grid is the supercell size on the fine grid
+                if(at_ind2(j).lt.1) then
+                  at_ind2(j) = at_ind2(j)+n_pdf_grid(j)
+                  j_base(j) = -n_row(j)
+                endif
 
-              if(at_ind2(ii).gt.n_row(ii)) then
-                at_ind2(ii) = at_ind2(ii)-n_row(ii)
-                j_base(ii) = n_row(ii)
-              endif
-            enddo
+                if(at_ind2(j).gt.n_pdf_grid(j)) then
+                  at_ind2(j) = at_ind2(j)-n_pdf_grid(j)
+                  j_base(j) = n_row(j)
+                endif
+              enddo
 
-C *** retrieve the atom positions
-            ind2 = nlayer*(at_ind2(3)-1)+n_row(1)*(at_ind2(2)-1)+at_ind2(1)
-            if(ind2<1.or.ind2>nsuper) then
-              write(*,*) 'out of range: at_ind,at_ind2,ind2,nsuper',at_ind,at_ind2,ind2,nsuper
-            endif
-          
-            do j = 1,n_atom
-              at_pos2(j,:) = at_pos_file(1:3,ind2,j)
-              if(at_pos2(j,1)/=.0.and.at_pos2(j,2)/=.0.and.at_pos2(j,3)/=0.) at_pos2(j,:) = at_pos2(j,:)+j_base	
-            enddo
+C *** retrieve the 2nd atom positions
+              i = ind_pdf(at_ind2(1),at_ind2(2),at_ind2(3))
+              if(i==0) then
+                n_skip1 = n_skip1+1             
+C               if(n_skip1 == 100*(n_skip1/100)) write(*,*) 'n_skip1=',n_skip1,at_ind2
+                cycle                                !cycle over void indexing mesh cells
+              endif
+              at_pos2 = at_pos_in(4*(i-1)+1:4*(i-1)+3)             
+              
+              if(at_pos2(1)/=.0.and.at_pos2(2)/=.0.and.at_pos2(3)/=0.) at_pos2(:) = at_pos2(:)+j_base	!handle possible PBC effects
+              jj = at_ind_in(4*(i-1)+4)
+
+              at_pos2 = at_pos2-at_pos
 
 C *** accumulate all the PDF at once
-            do ii=1,n_atom
-              if(sum(abs(at_pos(ii,:)))==.0) cycle     !handle unoccupied positions
-              do jj=1,n_atom
-                if(sum(abs(at_pos2(jj,:)))==.0) cycle
-                diff_pos = at_pos(ii,:)-at_pos2(jj,:) 
-                i_rdf = anint(norm2(diff_pos*a_par)/pdf_step)
+              i_rdf = anint(norm2(at_pos2*a_par)/pdf_step)+1     !we need 0 in the 1st channel for FT
               
-                if(i_rdf.ge.1.and.i_rdf.le.n_pdf) then
-                  rdf_p2_n(ii,jj,i_rdf,k) = rdf_p2_n(ii,jj,i_rdf,k)+1								
-C 							n_inbox = n_inbox+1
-                else
-C							n_outbox = n_outbox+1
-                endif
-              enddo	!jj
-            enddo		!ii
-					enddo !m
+C             write(*,*)'d_at_pos2,i_rdf',at_pos2,i_rdf
 
+              if(i_rdf>n_pix_step.and.i_rdf<=n_pdf) then         !we are avoiding the low-R range of self-correlations
+                rdf_p2_n(ii,jj,i_rdf,k) = rdf_p2_n(ii,jj,i_rdf,k)+1.      
+                m = m+1
+                if(m<=0.or.m>1000) then 
+                  write(*,*) 'Trouble: m=',m
+                  read(*,*)
+                endif
+              else
+                n_skip2 = n_skip2+1             
+C               write(*,*) 'skip2',jint,m,d_ind,at_pos,at_pos2,i_rdf,n_skip2
+C               read(*,*)
+                cycle
+              endif
+                if(m==1000) exit
+            enddo m_cycle   !m
+            jint = jint+1
+C           if(jint == 100*(jint/100)) write(*,*) 'jint=',jint
+            if(jint==n_mc/1000) exit integration_loop_2
 					enddo integration_loop_2
 				enddo		!k=1,n_h
 !$omp end do
 !$omp end parallel
 
+        write(*,*)'MC hits to empty fine grid cells [%]:',(100.*n_skip1)/(real(n_h*n_mc)+real(n_skip1))
+        write(*,*)'MC hits out of PDF range [%]:',(100.*n_skip2)/(real(n_h*n_mc))
+
 C *** sum up contributions from individual cycles and estimate statistical error at the a_par(1) position
         do k=1,n_h                     
           rdf_p2 = rdf_p2 + rdf_p2_n(:,:,:,k)
         enddo
-        rdf_p2_n = .0        
+        
+C       if(j_verb==1) write(*,*) 'n_pdf,n_int,sum(rdf_p2)',n_pdf,n_int,sum(rdf_p2)
+        
+        rdf_p2_n = .0
+        ind_pdf = 0
       enddo file_loop
 
- 			CALL SYSTEM_CLOCK (COUNT = sc_c2)
+ 			CALL SYSTEM_CLOCK (COUNT = sc_c1)
  			write(*,*) 
- 			write(*,*) 'Accumulation finished         ',(sc_c2-sc_c1)/sc_r,' sec'
+ 			write(*,*) 'Accumulation finished         ',(sc_c1-sc_c2)/sc_r,' sec'
+C       if(j_verb==1) write(*,*) 'n_skip2',n_skip2
  			write(*,*) 
 
-C *** estimate statistical error (Poisson statistics, sqrt(n)**1) at the a_par(1) position
-      i_ref = nint(a_par(1)/pdf_step)
-      do j=1,n_atom
-        rdf_err(j) = (1./sqrt(rdf_p2(j,j,i_ref)))
-      enddo
-C *** scale by 1/i**2 and normalise the accumulated PDF
+C *** normalise the accumulated PDF
+      rdf_norm = nfile*n_int/real(n_pdf-n_pix_step)          !PDF_STEP completes the 4*pi*r**2*dr volume element, PDF_RANGE goes with the MC scaling
+      rdf_p2 = rdf_p2/rdf_norm
 
-      do i=1,n_pdf
-        rdf_p2(:,:,i) = rdf_p2(:,:,i)/i**2     ! radial scaling
-        rdf_tot(i) = sum(rdf_p2(:,:,i))
-        rdf_p2(:,:,i) = rdf_p2(:,:,i)+transpose(rdf_p2(:,:,i))    ! transform to LD/UD form w/o putting zeros beneath/above diagonal, the SUM must
-        do ii=1,n_atom
-          rdf_p2(ii,ii,i) = rdf_p2(ii,ii,i)*.5
+      if(j_verb==1) then    
+        write(*,*) 'PDF_norm',rdf_norm
+C       write(*,*) 'rdf_tot mean',sum(rdf_p2(:,:,:)/real(n_pdf-n_pix_step))
+CC       write(*,*) 'rdf_tot mean1',sum(rdf_p2(:,:,n_pix_step/2+1:n_pdf/4)/real(n_pdf/4-n_pix_step))
+C       write(*,*) 'rdf_tot mean1',sum(rdf_p2(:,:,n_pix_step+1:n_pdf/4)/real(n_pdf/4-n_pix_step))
+C       write(*,*) 'rdf_tot mean2',sum(rdf_p2(:,:,n_pdf/4+1:n_pdf/2)/real(n_pdf/4))
+C       write(*,*) 'rdf_tot mean3',sum(rdf_p2(:,:,n_pdf/2+1:3*n_pdf/4)/real(n_pdf/4))
+C       write(*,*) 'rdf_tot mean4',sum(rdf_p2(:,:,3*n_pdf/4+1:n_pdf)/real(n_pdf/4))
+C       do i=1,n_atom
+C         write(*,*) 'rdf_tot mean4_diag i =',i,sum(rdf_p2(i,i,3*n_pdf/4+1:n_pdf)/real(n_pdf/4))
+C       enddo
+        write(*,*) 
+      endif
+
+C *** suppress termination effects in last pixels
+      do i=1,n_atom
+        do j=1,n_atom
+          rdf_p2(i,j,n_pdf-n_pix_step:n_pdf) = at_occup_r(i)*at_occup_r(j)/sum(at_occup_r)**2        !the asymptote is 1 for rdf_tot: we are generating directly g(r) with unit weights
         enddo
       enddo
 
-      rdf_norm = 4.*pi*pdf_step**3*n_int*nfile*(sum(at_occup_r))**2 /(n_norm*a_par(1)*a_par(2)*a_par(3)) ! PDF norm from "first principles" 
-                                                                          ! n_int*nfile/n_norm = density of MC events per Å^3
-                                                                          ! (sum(at_occup_r))**2/a_par(1)*a_par(2)*a_par(3) = ro_0 atomic/scatt density   
-      rdf_p2 = rdf_p2/rdf_norm
-      rdf_tot = rdf_tot/rdf_norm
-      
-C     write(*,*) 'rdf_tot(195:205)',rdf_tot(195:205)
-      
-C *** Accumulated! now plot PDFs with different atom at_weights
+C *** estimate statistical error (Poisson statistics, sqrt(n)^-1) at the a_par(1) position
+C     i_ref = nint(a_par(1)/pdf_step)
+      rdf_tot_err = 1./sqrt(rdf_norm)                      !rdf_norm is the average count rate in the flat part of g(r)
+      rdf_err = rdf_tot_err*n_atom/at_occup_r              ! each single-atom partial error is n_atom-times larger
+     
+C *** Accumulated! set initial weights, plot range and partial PDFs
 
+			allocate(r(n_pdf),q(n_pdf),w(n_pdf),x_ffq(n_atom,n_pdf))
+
+
+      do i=1,n_pdf
+        w(i) = .5*(1.+cos(pi*i/real(n_pdf)))       ! FT window == Hann profile
+CC					t_wind(i) = 0.355768-0.487396*cos(twopi*(i)/real(n_int+1))							!max is at n_int/2+1		Nuttall window
+CC					t_wind(i) = t_wind(i)+0.144232*cos(2.*twopi*(i)/real(n_int+1))						
+CC					t_wind(i) = t_wind(i)-0.012604*cos(3.*twopi*(i)/real(n_int+1))							
+C				w(i) = 0.355768+0.487396*cos(pi*(i)/real(n_pdf))							!max is at i=0		Nuttall window
+C				w(i) = w(i)+0.144232*cos(2.*pi*(i)/real(n_pdf))						
+C				w(i) = w(i)+0.012604*cos(3.*pi*(i)/real(n_pdf))							
+      enddo
+C     w = 1.
+C     write(*,*) 'w',w(1),w(n_pdf/2),w(n_pdf)
+      
+      q_step = 2.*pi/(n_pdf*pdf_step)
+      do i=1,n_pdf
+				r(i) = (i-1)*pdf_step
+				q(i) = (i-1)*q_step
+			enddo
+			q(1) = 1.e-8        !to avoid singularities 
+			r(1) = 1.e-8        !to avoid singularities 
+			
+C		write(*,*) 'q_step,q(1),q(n_pdf)',q_step,q(1),q(n_pdf)
+
+C *** generate the Xray form-factor table
+      if(j_weight==3) then
+        do i=1,n_pdf
+          do j=1,n_atom
+            x_ffq(j,i) = x_ffpar(j,9)
+            do ii=1,4
+              x_ffq(j,i) = x_ffq(j,i)+x_ffpar(j,2*ii-1)*exp(-.25*x_ffpar(j,2*ii)*q(i)**2)
+            enddo
+          enddo
+        enddo
+      endif
+
+C *** set atom weights
 			at_mask = 1
       if(j_weight==1) then
         at_weight(1:n_atom) = 1.
       elseif(j_weight==2) then
         at_weight(1:n_atom) = b_coh(1:n_atom)
+      elseif(j_weight==3) then
+        at_weight(1:n_atom) = x_ffq(1:n_atom,1)
       endif
 
-C *** set initial plot range and partial PDFs
 
-      do i=1,n_pdf
-				r(i) = i*pdf_step
-			enddo
-
-      r_start = pdf_step
-      r_end = 10.
-      i_start = (r_start-r(1))/pdf_step + 1
-      i_end = (r_end-r(1))/pdf_step+1
-      n_plot = i_end-i_start+1
-        
       if(n_part==0) ind_part = 0
       part_scale = 1.
       
-C     write(*,*) 'n_part,ind_part',n_part,ind_part
-      
-			at_weights_loop: do		
+ 			at_weights_loop: do		
 			
 C *** extend the RDF matrix by pseudo_atom rows&columns 
-       n_atom_tot = n_atom+n_pseudo             
-       allocate(rdf_p2_plot(n_atom_tot,n_atom_tot,n_pdf),rdf_tot_plot(n_pdf),at_name_plot(n_atom_tot)) 
+        n_atom_tot = n_atom+n_pseudo             
+        allocate(rdf_p2_ws(n_atom,n_atom,n_pdf),rdf_p2_plot(n_atom_tot,n_atom_tot,n_pdf),at_name_plot(n_atom_tot),rdf_fft(2*n_pdf)) 
 
-       rdf_p2_plot = .0
-       rdf_tot_plot = .0
+        rdf_p2_ws = .0
+        rdf_p2_plot = .0
 
-       at_name_plot(1:n_atom) = at_name_par       
-       if(n_pseudo>0) at_name_plot(n_atom+1:n_atom+n_pseudo) = at_name_pseudo(1:n_pseudo)
-				
-								
+        at_name_plot(1:n_atom) = at_name_par       
+        if(n_pseudo>0) at_name_plot(n_atom+1:n_atom_tot) = at_name_pseudo(1:n_pseudo)
+												
 				write(9,*)
-				write(*,'(1x,"Atoms:         ",50(1x,a8))')  (at_name_plot(i),i=1,n_atom_tot)
-				write(9,'(1x,"Atoms:         ",50(1x,a8))')  (at_name_plot(i),i=1,n_atom_tot)
-				write(*,'(1x,"Atoms no.:  ",50(1x,i8))') (i,i=1,n_atom_tot)
-				write(9,'(1x,"Atoms no.:  ",50(1x,i8))') (i,i=1,n_atom_tot)
-				write(*,113) trim(at_weight_scheme(j_weight)),(at_weight(i),i=1,n_atom),(sum(ind_pseudo(:,j)*at_weight),j=1,n_pseudo)
-				write(9,113) trim(at_weight_scheme(j_weight)),(at_weight(i),i=1,n_atom),(sum(ind_pseudo(:,j)*at_weight),j=1,n_pseudo)
+				write(*,'(1x,"Atoms:         ",51(1x,a8))')  (at_name_plot(i),i=1,n_atom+1)
+				write(9,'(1x,"Atoms:         ",51(1x,a8))')  (at_name_plot(i),i=1,n_atom+1)
+				write(*,'(1x,"Atoms no.:  ",51(1x,i8))') (i,i=1,n_atom+1)
+				write(9,'(1x,"Atoms no.:  ",51(1x,i8))') (i,i=1,n_atom+1)
+				write(*,'(1x,"Occupancy:       ",51(1x,f8.4))') (at_occup_r(i),i=1,n_atom),1.                      !1. for TOT
+				write(9,'(1x,"Occupancy:       ",51(1x,f8.4))') (at_occup_r(i),i=1,n_atom),1.
+				write(*,113) trim(at_weight_scheme(j_weight)),(sum(ind_pseudo(:,j)*at_weight),j=1,n_atom+1)
+				write(9,113) trim(at_weight_scheme(j_weight)),(sum(ind_pseudo(:,j)*at_weight),j=1,n_atom+1)
 113     format(1x,a,' weights: ',50(1x,f8.4))	
-        write(*,'(1x,"Rel_std_error:   ",50(1x,f8.4))') (rdf_err(i),i=1,n_atom)							
+        write(*,'(1x,"Mean rel_error:  ",50(1x,f8.4))') (rdf_err(i),i=1,n_atom),rdf_tot_err						
 				write(*,*) 
 				write(*,*) 'Actual masks:'
 				write(*,'((50i3))') (at_mask(i),i=1,n_atom)        
@@ -912,55 +1080,128 @@ C *** extend the RDF matrix by pseudo_atom rows&columns
         else
           write(masks,'("  Masks: ",50i1.1)') (at_mask(i),i=1,n_atom)			!to be used in plot titles
         endif
-         
-C			at_weight = at_weight*at_mask
-C			at_weight_sum = sum(at_weight*at_occup_r)/sum(at_occup_r*at_mask)
-				at_weight_sum = sum(at_weight*at_mask*at_occup_r)/sum(at_occup_r)
+
+ 			  at_weight_av = sum(at_weight*at_mask*at_occup_r)/sum(at_occup_r)     !average weight (scattering length) per atom
 				
         do jj=1,n_atom
           do ii=1,n_atom
 						at_weight_matrix(ii,jj) = at_weight(ii)*at_mask(ii)*at_weight(jj)*at_mask(jj)
 				  enddo
 				enddo
-				at_weight_matrix = at_weight_matrix/at_weight_sum**2
+ 			  at_weight_matrix = at_weight_matrix/at_weight_av**2
 				
-C			write(*,*) 'at_weight_matrix'
-C			do ii=1,n_atom
-C					write(*,*) ii,at_weight_matrix(ii,:) 
-C			enddo
+        if(j_verb==1) then
+          write(*,*) 'at_weight average',at_weight_av
+          write(*,*) 'at_weight matrix'
+          do ii=1,n_atom
+              write(*,*) ii,at_weight_matrix(ii,:) 
+          enddo      
+          write(*,*) 'sum at_weight_matrix',sum(at_weight_matrix)
+          write(*,*) 
+        endif
 				       
-C *** fill the normal atom part of the RDF matrix  
-        do i=1,n_pdf                                                                
-          rdf_p2_plot(1:n_atom,1:n_atom,i) = rdf_p2(:,:,i)*at_weight_matrix         !also puts zeros below diagonal
-        enddo
+        write(*,*) 'Gaussian smooth FWHM in pdf_steps (1 no smoothing, 4 - 20 useful)'
+        read(*,*) n_smooth_fwhm
+			
+				if(n_smooth_fwhm==1) then
+				  n_smooth=1			               !no smoothing
+				else
+  				n_smooth = 5*n_smooth_fwhm/2+1
+				endif
+				
+				allocate(f_smooth(n_smooth))
 
-        do j=1,n_atom
-          do i=1,j  
-             rdf_tot_plot(:) = rdf_tot_plot(:)+rdf_p2_plot(i,j,:)
+				do j=1,n_smooth
+					f_smooth(j) = 2.**(-((j-n_smooth/2-1)/(.5*n_smooth_fwhm))**2) 
+				enddo
+				f_smooth = f_smooth/sum(f_smooth(1:n_smooth))				!profile normalized to unit integral
+C			  write(*,*) 'f_smooth', (f_smooth(j),j=1,n_smooth)		
+
+				if(n_smooth>1) write(*,*) 'Applying Gaussian smoothing with FWHM=',n_smooth_fwhm,' steps of',pdf_step,'[A^]'
+        write(smooth,'("Smooth FWHM",f5.2," [A]")') pdf_step*n_smooth_fwhm
+
+        if(n_smooth==1) then
+          do i = n_pix_step,n_pdf
+            rdf_p2_ws(:,:,i) = rdf_p2(:,:,i)*at_weight_matrix         
+          enddo               
+        else
+          do i = n_pix_step,n_pdf
+            do j = 1,n_smooth
+              if (i-n_smooth/2+j-1.le.0) cycle  !zeros out of range
+              if (i-n_smooth/2+j-1.gt.n_pdf) then
+                rdf_p2_ws(:,:,i)=rdf_p2_ws(:,:,i)+f_smooth(j)*rdf_p2(:,:,n_pdf)     !replace out-of-range points by the asymptote, placed there at the normalisation
+              else
+                rdf_p2_ws(:,:,i)=rdf_p2_ws(:,:,i)+rdf_p2(:,:,i-n_smooth/2+j-1)*f_smooth(j)
+              endif
+            enddo 
+            rdf_p2_ws(:,:,i) = rdf_p2_ws(:,:,i)*at_weight_matrix            !now we allow for b_coh in the g(r), it won't change the overall norm, just redistribute intensity between poartials
           enddo
-        enddo
+        endif
 
-C *** fill the pseudo_atom part of the RDF matrix, rdf_tot is not concerned          
-        if(n_pseudo>0) then
-          do j=1,n_pseudo                               ! atom - pseudo_atom corr
-            do i=1,n_atom
-              do k=1,n_atom
-                rdf_p2_plot(i,n_atom+j,:) = rdf_p2_plot(i,n_atom+j,:)+ind_pseudo(k,j)*rdf_p2_plot(i,k,:)
-              enddo
+				deallocate(f_smooth)
+
+        ro_0 = sum(at_mask*at_occup_r)/product(a_par)                  !ro_0 is numeric density
+        write(*,*) 'Atom density ro_0 [Å-3]',ro_0
+        write(*,*) 
+
+        if(j_pdf>=2) then
+          do j=1,n_atom
+            do i=1,n_atom  
+              rdf_p2_ws(i,j,:) = 4.*pi*ro_0*at_mask(i)*at_occup_r(i)*at_mask(j)*at_occup_r(j)
+     1              *r*(rdf_p2_ws(i,j,:)-at_weight_matrix(i,j)/sum(at_weight_matrix))    !for j_pdf>=2 make it G(r)
             enddo
           enddo
+        endif
+
+C *** calculate S(Q) components & total
+        if(j_pdf==3) then
           
-          do j=1,n_pseudo                              ! pseudo_atom - pseudo_atom corr
-            do i=1,j
-              do k=1,n_atom
-                rdf_p2_plot(n_atom+i,n_atom+j,:) = rdf_p2_plot(n_atom+i,n_atom+j,:)+ind_pseudo(k,i)*rdf_p2_plot(k,n_atom+i,:)
-              enddo
+          do j=1,n_atom
+            do i=1,n_atom  
+                rdf_p2_ws(i,j,:) = fft((0.,1.)*w*rdf_p2_ws(i,j,:),inv=.false.)*pdf_step           !pdf_step = pdf_range/n_pdf with 1/sqrt(n_pdf) coming once from FT and and once from sampling norm
+                rdf_p2_ws(i,j,1:n_pdf/2) = at_weight_matrix(i,j)/sum(at_weight_matrix)+rdf_p2_ws(i,j,2:n_pdf/2+1)/q(2:n_pdf/2+1)      !skip Q=0
+                rdf_p2_ws(i,j,n_pdf/2+1:n_pdf) = at_weight_matrix(i,j)/sum(at_weight_matrix)
             enddo
           enddo
-        endif 
+        endif
 
+C *** produce rdf_p2_plot and sum up symmetric off-diagonal elements         
+
+        do i=1,n_pdf
+          rdf_p2_plot(:,:,i) = matmul(matmul(transpose(ind_pseudo(:,1:n_atom_tot)),rdf_p2_ws(:,:,i)),ind_pseudo(:,1:n_atom_tot))
+        enddo
+
+        do j=1,n_atom_tot
+          do i=1,j  
+            if(i/=j) rdf_p2_plot(i,j,:) = rdf_p2_plot(i,j,:)+rdf_p2_plot(j,i,:)
+            if(i/=j) rdf_p2_plot(j,i,:) = 0.
+            if(i/=j.and.i>n_atom.and.j>n_atom) rdf_p2_plot(i,j,:) = 0.
+           enddo
+        enddo
+
+C       if(j_verb==1) then
+C         do j=1,4
+C           write(*,*) 'rdf_tot_plot mean',j,sum(rdf_p2_plot(n_atom+1,n_atom+1,1+(j-1)*n_pdf/4:j*n_pdf/4)/real(n_pdf/4))
+C         enddo
+C       endif
+        
+        if(j_pdf<=2) then
+          x => r
+        else        
+          x => q
+        endif
+ 
+        x_start = x(1)
+        i_start = 1
+        i_end = (x_end-x(1))/(x(2)-x(1))
+        n_plot = i_end-i_start+1
+        
 C *** open the PGPLOT graphics window (X11)
-      j_xserv = PGOPEN('/xserv')   
+      if (j_xserv.LE.0) then          
+        j_xserv = PGOPEN('/xserv')
+      else
+        call PGSLCT(j_xserv)
+      endif   
       if (j_xserv.LE.0) then    
       	write(*,*) 'Could not open PGPLOT /xserv'
       	STOP
@@ -972,7 +1213,7 @@ C *** open the PGPLOT graphics window (X11)
 	  	CALL PGSCRN(0, 'white', IER)	!plot on white background
 	  	CALL PGSCRN(1, 'black', IER)
 	  	
-C *** Set my colors for line plots								  
+C *** Set JK colors for line plots								  
           CALL PGSHLS (20,.0,.3,.0)     !dark grey
           CALL PGSHLS (21,.0,.4,.7)     !my blue
           CALL PGSHLS (22,120.,.5,1.)   !my red
@@ -982,46 +1223,41 @@ C *** Set my colors for line plots
           CALL PGSHLS (26,320.,.4,.9)   !my turquoise
           CALL PGSHLS (27,.0,.7,.0)     !light grey
 
-
         c_min = .0
         c_max = .0
 
         plot_loop: do
  
-C *** Prepare the data to be plotted and smooth the PDF
         if(c_max==.0) then          !only do this at the real start of plot_loop
-          if(j_weight==1) then
-            c_min = .0
-          else
-            c_min = minval(rdf_tot_plot(i_start:i_end))
-            c_min = min(c_min,-.1)
-          endif
-          c_max = maxval(rdf_tot_plot(i_start:i_end))
+          c_min = minval(rdf_p2_plot(n_atom+1,n_atom+1,i_start+10:i_end))        !avoid maximum close to the origin
+          c_min = .1*(int(10*c_min)-1)
+          c_max = maxval(rdf_p2_plot(n_atom+1,n_atom+1,i_start+10:i_end))
           c_max = .1*(int(10*c_max)+1)
         endif
-      
-        write(*,*) 'c_min,c_max',c_min,c_max
+              
+        write(*,*) 'Vertical scale c_min,c_max',c_min,c_max
         
-        write(plot_header,'("PDF plot ",a,"    ",a," weights  ")') trim(file_dat_t0),trim(at_weight_scheme(j_weight))
-        plot_header = trim(plot_header)//trim(masks)
+        write(plot_header,'(a,"    ",a," weights  ")') trim(file_dat_t0),trim(at_weight_scheme(j_weight))
+        plot_header = trim(subst_name)//'  '//trim(pdf_out(j_pdf))//'  '//trim(plot_header)//trim(masks)//'  '//trim(smooth)
 
 				scale_loop: do
-          write(plot_title,114) trim(subst_name)
-114       format(a)   
+				   
 					CALL PGSLCT(j_xserv)
           CALL PGSCI (1)  !white
           CALL PGSCH(1.)
           CALL PGSLW(2)
           CALL PGSLS (1)  !full
-          CALL PGENV(r_start,r_end,c_min,c_max,0,j_grid+1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
-          CALL PGLAB('r(A)', 'g(r)',trim(plot_header))  !put the axis labels
+          CALL PGENV(x_start,x_end,c_min,c_max,0,j_grid+1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
+          CALL PGLAB(x_label(j_pdf),y_label(j_pdf),trim(plot_header))  !put the axis labels
           CALL PGSCI (1)  !white
           CALL PGSLW(5)			!operates in steps of 5
-          x_plot = r_start+.75*(r_end-r_start)
+          x_plot = x_start+.75*(x_end-x_start)
           y_plot = .9*c_max
-          CALL PGLINE(n_plot,r(i_start:i_end),rdf_tot_plot(i_start:i_end))  !plots the curve
+          CALL PGLINE(n_plot,x(i_start:i_end),rdf_p2_plot(n_atom+1,n_atom+1,i_start:i_end))  !plots the curve
+         
           CALL PGSTBG(0)																				 !erase graphics under text
-          CALL PGTEXT (x_plot,y_plot,plot_title)
+C         CALL PGTEXT (x_plot,y_plot,trim(curve_label(j_pdf))//'    x 1.0')
+          CALL PGTEXT (x_plot,y_plot,'Total     x 1.0')
           CALL PGSLW(2)
 
           do j=1,n_part
@@ -1030,69 +1266,54 @@ C *** Prepare the data to be plotted and smooth the PDF
           	y_plot = (.9-.06*j)*c_max
 115       	format(a,a,' x',f4.1)   
             CALL PGSCI (j+20)  !my red-green-blue
-            CALL PGLINE(n_plot,r(i_start:i_end),part_scale(j)*rdf_p2_plot(ind_part(1,j),ind_part(2,j),i_start:i_end))  !plots the curve
+            CALL PGLINE(n_plot,x(i_start:i_end),part_scale(j)*rdf_p2_plot(ind_part(1,j),ind_part(2,j),i_start:i_end))  !plots the curve
 						CALL PGSTBG(0)																				 !erase graphics under text
           	CALL PGSLW(5)			!operates in steps of 5
 						CALL PGTEXT (x_plot,y_plot,plot_title)
           	CALL PGSLW(2)			
           enddo
           
-          if(j_weight==1) then              !unit weights
-            write(*,*) 'Adjust vertical scale (max) (0 EXIT, -1 adjust horizontal scale)'
-            c_min = .0
-            c2 = c_max
-            read(*,*) c2
-            if(c2==.0) then
-              exit scale_loop
-            elseif(c2<.0) then
-              write(*,*) 'Confirm/adjust plot range r_1, r_2, max =',n_pdf*pdf_step
-              read(*,*) r_start,r_end 
-              if(r_start.lt.pdf_step) r_start = pdf_step
-              i_start = (r_start-r(1))/pdf_step + 1
-              i_end = (r_end-r(1))/pdf_step+1
-              n_plot = i_end-i_start+1
-            else
-              c_max = c2
-            endif
+          write(*,*) 'Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)'
+          c1 = c_min
+          c2 = c_max
+          read(*,*) c1,c2
+          if(c1==.0.and.c2==.0) then
+            exit
+          elseif(c1==-1.and.c2==-1) then              
+            write(*,*) 'Confirm/adjust plot range, max =',n_pdf*(x(2)-x(1))
+            write(*,'("x_start, x_end ",2f7.1,":  ")',advance='no') x_start,x_end 
+            read(*,*) x_start,x_end 
+            if(x_start.lt.pdf_step) x_start = x(1)
+            i_start = (x_start-x(1))/(x(2)-x(1)) + 1
+            i_end = anint((x_end-x(1))/(x(2)-x(1)))
+            n_plot = i_end-i_start+1
           else
-            write(*,*) 'Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 adjust horizontal scale)'
-            c1 = c_min
-            c2 = c_max
-            read(*,*) c1,c2
-            if(c1==.0.and.c2==.0) then
-              exit
-            elseif(c1==-1.and.c2==-1) then
-              write(*,*) 'Confirm/adjust plot range r_1, r_2, max =',n_pdf*pdf_step
-              read(*,*) r_start,r_end 
-              if(r_start.lt.pdf_step) r_start = pdf_step
-              i_start = (r_start-r(1))/pdf_step + 1
-              i_end = (r_end-r(1))/pdf_step+1
-              n_plot = i_end-i_start+1
-            else
-              c_min = c1
-              c_max = c2
-            endif
+            c_min = c1
+            c_max = c2
           endif
         enddo scale_loop
          
 C **** Prepare and plot the same on .PS, look for existing output files in order not overwrite them				
 				if(j_ps==1) then
-
 					jfile = 1
 					do						!look for existing .ps files to continue numbering
             if(j_name==0.and.t_single)then
-              write(file_ps,1041) trim(file_master),trim(c_fil(j_acc)),jfile,trim(pg_out)
-1041   		format(a,'_rdf',a,'_',i2.2,'.',a)      
-              write(file_res,1042) trim(file_master),trim(c_fil(j_acc)),jfile
-1042   		format(a,'_rdf',a,'_',i2.2,'.txt')      
+              write(file_ps,1041) trim(file_master),jfile,trim(pg_out)
+1041   		format(a,'_rdf','_',i2.2,'.',a)      
+              write(file_res,1042) trim(file_master),jfile
+1042   		format(a,'_rdf','_',i2.2,'.txt')      
             else
               write(c_jfile,'("_",i2.2)') jfile
-              if(nfile_min<=9999) then
-                write(c_nfile_min,'(i4.4)') nfile_min
-              elseif(nfile_min>=10000) then
-                write(c_nfile_min,'(i8)') nfile_min
+              if(nfile>nfile_min) then
+                if(nfile_min<=9999) then
+                  write(c_nfile_min,'(i4.4)') nfile_min
+                elseif(nfile_min>=10000) then
+                  write(c_nfile_min,'(i8)') nfile_min
+                endif
+                c_nfile_min = '_'//adjustl(c_nfile_min)
+              else
+                c_nfile_min = ''
               endif
-              c_nfile_min = '_'//adjustl(c_nfile_min)
     
               if(nfile<=9999) then
                 write(c_nfile,'(i4.4)') nfile
@@ -1124,20 +1345,21 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
 					CALL PGSCRN(0, 'white', IER)	!plot on white background
 					CALL PGSCRN(1, 'black', IER)
 
-					plot_title = file_ps//'  '//trim(at_weight_scheme(j_weight))//' weights  '//trim(masks)	
+					plot_header = trim(subst_name)//'  '//file_ps//'  '//trim(at_weight_scheme(j_weight))//' weights  '//trim(masks)//'  '//trim(smooth)	
  
           CALL PGSCI (1)  !white
           CALL PGSCH(1.)
           CALL PGSLW(2)
           CALL PGSLS (1)  !full
-          CALL PGENV(r_start,r_end,c_min,c_max,0,j_grid+1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes w/o grid
-          CALL PGLAB('r(A)', 'g(r)',trim(plot_title))  !put the axis labels
+          CALL PGENV(x_start,x_end,c_min,c_max,0,j_grid+1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes w/o grid
+          CALL PGLAB(trim(x_label(j_pdf)), trim(y_label(j_pdf)),trim(plot_header))  !put the axis labels
           CALL PGSCI (1)  !white needs to be reset after PGLAB
           CALL PGSLW(5)			!operates in steps of 5
-				  CALL PGLINE(n_plot,r(i_start:i_end),rdf_tot_plot(i_start:i_end))  !plots the curve
+				  CALL PGLINE(n_plot,x(i_start:i_end),rdf_p2_plot(n_atom+1,n_atom+1,i_start:i_end))  !plots the curve
 					y_plot = .9*c_max
 					CALL PGSTBG(0)																				 !erase graphics under text
-					CALL PGTEXT (x_plot,y_plot,'PDF_tot '//trim(subst_name)) !the x_plot,y_plot are in world (axis units) coordinates
+C		  		CALL PGTEXT (x_plot,y_plot,trim(curve_label(j_pdf))//trim(subst_name)) !the x_plot,y_plot are in world (axis units) coordinates
+          CALL PGTEXT (x_plot,y_plot,'Total     x 1.0')
           CALL PGSLW(2)
 
           do j=1,n_part
@@ -1145,7 +1367,7 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
             write(plot_title,115) at_name_plot(ind_part(1,j)),at_name_plot(ind_part(2,j)),part_scale(j)
           	y_plot = (.9-.06*j)*c_max
             CALL PGSCI (j+1)  !red-green-blue
-            CALL PGLINE(n_plot,r(i_start:i_end),part_scale(j)*rdf_p2_plot(ind_part(1,j),ind_part(2,j),i_start:i_end))  !plots the curve
+            CALL PGLINE(n_plot,x(i_start:i_end),part_scale(j)*rdf_p2_plot(ind_part(1,j),ind_part(2,j),i_start:i_end))  !plots the curve
 						CALL PGSTBG(0)																				 !erase graphics under text
           	CALL PGSLW(5)			!operates in steps of 5
 						CALL PGTEXT (x_plot,y_plot,plot_title)				!the x_plot,y_plot are in world (axis units) coordinates
@@ -1154,7 +1376,7 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
 					CALL PGCLOS
 					write(*,*) ' Postscript output written to: ',file_ps	
 					write(9,*)
-					write(9,*) '  ',trim(int_mode),' integration',n_int*n_int2,' pairs'
+					write(9,*) '  ',trim(int_mode),' integration',n_int,' pairs'
 					write(9,*) '  ','Masks:',(at_mask(i),i=1,n_atom)				
 					if(n_smooth>1) write(9,*) '  ','Smoothing FWHM:',n_smooth_fwhm	
 					write(9,*) ' Postscript output written to: ',file_ps
@@ -1167,9 +1389,9 @@ C     look for existing output files in order not overwrite them
 C *** write PDF file header
             write(4,*) 'Substance:',trim(subst_name),'       ',time_stamp
             write(4,*) 'Input files: ',trim(file_dat_t0),' to ',trim(file_dat),' step',nfile_step									   
-            write(4,*) 'Supercell size:',nrow																				
+            write(4,*) 'Supercell size:',n_row																				
 				    write(4,*) 'OMP processes  = ', proc_num_in									
-            write(4,*) 'Integration ',trim(int_mode),'  ',n_int*n_int2,'cell pairs, j_rand',j_rand
+            write(4,*) 'Integration ',trim(int_mode),'  ',n_int,'cell pairs, j_rand',j_rand
             write(4,*) 'Unit cell parameter:',a_par																				
             write(4,*) 'Atoms/unit_cell:',n_atom
             write(4,*) 	 'Atoms  :',(('    '//at_name_plot(i)),i=1,n_atom)
@@ -1177,28 +1399,31 @@ C *** write PDF file header
             write(4,125) (at_occup_r(i),i=1,n_atom)
             write(4,126) (at_weight(i),i=1,n_atom)
             write(4,127) (at_mask(i),i=1,n_atom)
+            write(4,*)  'Smoothing FWHM [Å]',n_smooth_fwhm*pdf_step
 125     format(1x,"Occup's: ",50f8.4)								
 126     format(1x,'Weights: ',50f8.4)								
 127     format(1x,'Masks	: ',50i8)								
-            write(4,*)	
+            write(4,*)
+            write(4,*) 'Output: ',pdf_out(j_pdf)
 
 C *** write the PDFs
             if(j_out==1) then
-              write(4,107) ((ii,jj,ii=1,jj),jj=1,n_atom)
-              write(4,106) ((trim(at_name_plot(ii)),trim(at_name_plot(jj)),ii=1,jj),jj=1,n_atom)
+              write(4,107) ((ii,jj,ii=1,jj),jj=1,n_atom_tot)
+              write(4,106) trim(x_label(j_pdf)),((trim(at_name_plot(ii)),trim(at_name_plot(jj)),ii=1,jj),jj=1,n_atom_tot)
               do i=1,n_pdf
-                write(4,105) r(i),rdf_tot_plot(i),((rdf_p2_plot(ii,jj,i),ii=1,jj),jj=1,n_atom)
+                write(4,105) r(i),rdf_p2_plot(n_atom+1,n_atom+1,i),((rdf_p2_plot(ii,jj,i),ii=1,jj),jj=1,n_atom_tot)
               enddo
             else
               write(4,107) (ind_part(1,j),ind_part(2,j),j=1,n_part)
-              write(4,106) (trim(at_name_plot(ind_part(1,j))),trim(at_name_plot(ind_part(2,j))),j=1,n_part)
+              write(4,106) trim(x_label(j_pdf)),(trim(at_name_plot(ind_part(1,j))),trim(at_name_plot(ind_part(2,j))),j=1,n_part)
               do i=i_start,i_end
-                write(4,105) r(i),rdf_tot_plot(i),(rdf_p2_plot(ind_part(1,j),ind_part(2,j),i),j=1,n_part)
+                write(4,105) r(i),rdf_p2_plot(n_atom+1,n_atom+1,i),(rdf_p2_plot(ind_part(1,j),ind_part(2,j),i),j=1,n_part)
               enddo
             endif
 105   	format(1x,f7.3,1x,f8.3,32(2x,5f8.3))	
 107   	format(1x,"Partials index  ",32(2x,5(2x,2i3)))	
-106   	format('    r[Å]  PDF_tot   ',32(2x,5(a,'_',a,3x)))	
+C106   	format('    r[Å]  PDF_tot   ',32(2x,5(a,'_',a,3x)))	
+106   	format('   ',a,'   Total     ',32(2x,5(a,'_',a,3x)))	
             close(4)
             write(*,*) ' Text output written to: ',file_res	  
             write(9,*) ' Text output written to: ',file_res	  
@@ -1209,7 +1434,7 @@ C *** write the PDFs
 C ***   all done, now decide what comes next
 			
 			 way_point: do
-					write(*,*) 'Choose a PDF plot option (FILE output is ',trim(ps_out(j_ps+1)),' size ',trim(size_out(j_out+1)),'):'
+					write(*,*) 'Choose a PDF options (MODE is ',trim(pdf_out(j_pdf)),', FILE output is ',trim(ps_out(j_ps+1)),', SIZE is ',trim(size_out(j_out+1)),'):'
 	        write(*,*) '       1   REPLOT the PDFs '
 	        write(*,'("        2   select max ",i2," partial PDFs & replot")') n_part_max
 	        write(*,*) '       3   adjust partial PDF scales & replot '
@@ -1219,6 +1444,8 @@ C ***   all done, now decide what comes next
 					write(*,*) '       7   toggle FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
 					write(*,*) '       8   toggle .TXT output SIZE to ',trim(size_out(mod(j_out+1,2)+1))
           write(*,*) '       9   RESTART with updated weights, masks & pseudo_atoms '
+          write(*,*)        
+          write(*,*) '       10  select the PDF MODE, actual: ',trim(pdf_out(j_pdf))
           
           write(*,*) '       0   EXIT'  
 
@@ -1229,7 +1456,7 @@ C ***   all done, now decide what comes next
 							cycle plot_loop
 
 						case(2) 
-              write(*,*) '("Confirm/modify up to ", i2," pairs of partial/pseudo PDF indices (-1 -1 skip the rest):")',n_part_max
+              write(*,*) '("Confirm/modify up to ", i2," pairs of partial/pseudo PDF indices (0 0 erase, -1 -1 skip the rest):")',n_part_max
               do j=1,n_part_max
                 j1 = ind_part(1,j)
                 j2 = ind_part(2,j) 
@@ -1288,7 +1515,7 @@ C ***   all done, now decide what comes next
                 else
                   write(*,*) 'Actual pseudo_atoms:'
                   do i=1,n_pseudo
-                    write(*,*) trim(at_name_pseudo(i)),i,'  masks:',ind_pseudo(1:n_atom,i)
+                    write(*,*) trim(at_name_pseudo(i)),n_atom+i,'  masks:',ind_pseudo(:,n_atom+i)
                   enddo
                 endif
                 
@@ -1299,19 +1526,23 @@ C ***   all done, now decide what comes next
                   write(*,*) 'Maximum number of pseudo-atoms reached, consider modifying existing ones'
                   write(*,'("Modify (number): ")',advance = 'no')
                   read(*,*) j
+                  j = j-n_atom
                 endif
                   
                 if(j<=0) then
                   exit pseudo_loop
-                elseif(j<=n_pseudo) then
+                elseif(j==1) then
+                  write(*,*) 'The TOT pseudo cannot be modified'
+                  cycle pseudo_loop
+                elseif(j>1.and.j<=n_pseudo) then
                   write(*,'("New indices: ")',advance = 'no')
-                  read(*,*)ind_pseudo(1:n_atom,j)
+                  read(*,*)ind_pseudo(:,j)
                   cycle pseudo_loop
                 else
                   write(*,'("Type pseudo_atom name (<=4 char): ")',advance = 'no')
                   read(*,*) at_name_pseudo(n_pseudo+1)
                   write(*,'("Type pseudo_atom indices (n_atom): ")',advance = 'no')
-                  read(*,*)ind_pseudo(1:n_atom,n_pseudo+1)
+                  read(*,*)ind_pseudo(:,n_pseudo+1)
                   n_pseudo = n_pseudo+1
                   cycle pseudo_loop
                 endif 
@@ -1331,6 +1562,11 @@ C ***   all done, now decide what comes next
 						case(9) 
               exit plot_loop
 
+						case(10) 
+              write(*,*) 'Select the PDF MODE: ',(j,'  ',trim(pdf_out(j)),j=1,n_mode)
+              read(*,*) j_pdf
+              exit plot_loop
+
 						case(0) 
               exit at_weights_loop
 					end select
@@ -1339,7 +1575,7 @@ C ***   all done, now decide what comes next
 			
         enddo plot_loop
 
-        deallocate(rdf_p2_plot,rdf_tot_plot,at_name_plot)  			
+        deallocate(rdf_p2_plot,rdf_p2_ws,at_name_plot,rdf_fft)  			
       enddo at_weights_loop
 
 			flush(9)
@@ -1373,8 +1609,6 @@ C     write(*,*)
       return
       END      
       
-      
-  
 C **** string conversion to all upper case
 C     
  			subroutine up_case (string)
@@ -1390,79 +1624,5 @@ C
 			end do
 
 			end subroutine up_case	     
-
-
- 
-      SUBROUTINE PALETT(TYPE, CONTRA, BRIGHT)
-C-----------------------------------------------------------------------
-C Set the RAINBOW palette of colors to be used by PGIMAG.
-C-----------------------------------------------------------------------
-      INTEGER TYPE
-      REAL CONTRA, BRIGHT
-C
-      REAL GL(2), GR(2), GG(2), GB(2)
-      REAL RL(9), RR(9), RG(9), RB(9)
-      REAL JKL(9), JKR(9), JKG(9), JKB(9)
-      REAL HL(5), HR(5), HG(5), HB(5)
-      REAL WL(10), WR(10), WG(10), WB(10)
-      REAL AL(20), AR(20), AG(20), AB(20)
-C
-      DATA GL /0.0, 1.0/
-      DATA GR /0.0, 1.0/
-      DATA GG /0.0, 1.0/
-      DATA GB /0.0, 1.0/
-C
-      DATA RL /-0.5, 0.0, 0.17, 0.33, 0.50, 0.67, 0.83, 1.0, 1.7/
-      DATA RR / 0.0, 0.0,  0.0,  0.0,  0.6,  1.0,  1.0, 1.0, 1.0/
-      DATA RG / 0.0, 0.0,  0.0,  1.0,  1.0,  1.0,  0.6, 0.0, 1.0/
-      DATA RB / 0.0, 0.3,  0.8,  1.0,  0.3,  0.0,  0.0, 0.0, 1.0/
-C
-      DATA JKL / 0,   0.1,  0.2,  0.33, 0.50, 0.67, 0.83, 1.0, 1.7/
-      DATA JKR / 1.0, 0.5,  0.1,  0.1,  0.3,  1.0,  1.0, 1.0, 1.0/
-      DATA JKG / 1.0, 0.7,  0.4,   .8,  1.,   1.0,  0.6, 0.0, 1.0/
-      DATA JKB / 1.0, 1.0,  0.9,   .6,  0.3,  0.0,  0.0, 0.0, 1.0/
-C
-      DATA HL /0.0, 0.2, 0.4, 0.6, 1.0/
-      DATA HR /0.0, 0.5, 1.0, 1.0, 1.0/
-      DATA HG /0.0, 0.0, 0.5, 1.0, 1.0/
-      DATA HB /0.0, 0.0, 0.0, 0.3, 1.0/
-C
-      DATA WL /0.0, 0.5, 0.5, 0.7, 0.7, 0.85, 0.85, 0.95, 0.95, 1.0/
-      DATA WR /0.0, 1.0, 0.0, 0.0, 0.3,  0.8,  0.3,  1.0,  1.0, 1.0/
-      DATA WG /0.0, 0.5, 0.4, 1.0, 0.0,  0.0,  0.2,  0.7,  1.0, 1.0/
-      DATA WB /0.0, 0.0, 0.0, 0.0, 0.4,  1.0,  0.0,  0.0, 0.95, 1.0/
-C
-      DATA AL /0.0, 0.1, 0.1, 0.2, 0.2, 0.3, 0.3, 0.4, 0.4, 0.5,
-     :         0.5, 0.6, 0.6, 0.7, 0.7, 0.8, 0.8, 0.9, 0.9, 1.0/
-      DATA AR /0.0, 0.0, 0.3, 0.3, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0,
-     :         0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0/
-      DATA AG /0.0, 0.0, 0.3, 0.3, 0.0, 0.0, 0.0, 0.0, 0.8, 0.8,
-     :         0.6, 0.6, 1.0, 1.0, 1.0, 1.0, 0.8, 0.8, 0.0, 0.0/
-      DATA AB /0.0, 0.0, 0.3, 0.3, 0.7, 0.7, 0.7, 0.7, 0.9, 0.9,
-     :         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0/
-C
-      IF (TYPE.EQ.1) THEN
-C        -- gray scale
-         CALL PGCTAB(GL, GR, GG, GB, 2, CONTRA, BRIGHT)
-      ELSE IF (TYPE.EQ.2) THEN
-C        -- rainbow
-         CALL PGCTAB(RL, RR, RG, RB, 9, CONTRA, BRIGHT)
-      ELSE IF (TYPE.EQ.3) THEN
-C        -- heat
-         CALL PGCTAB(HL, HR, HG, HB, 5, CONTRA, BRIGHT)
-      ELSE IF (TYPE.EQ.4) THEN
-C        -- weird IRAF
-         CALL PGCTAB(WL, WR, WG, WB, 10, CONTRA, BRIGHT)
-      ELSE IF (TYPE.EQ.5) THEN
-C        -- AIPS
-         CALL PGCTAB(AL, AR, AG, AB, 20, CONTRA, BRIGHT)
-      ELSE IF (TYPE.EQ.6) THEN
-C        -- JK rainbow
-         CALL PGCTAB(JKL, JKR, JKG, JKB, 9, CONTRA, BRIGHT)
-      END IF
-      END
-      
-   
-  
-  
      
+  

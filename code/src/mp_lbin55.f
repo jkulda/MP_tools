@@ -83,7 +83,7 @@ C *****
       integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:)
       integer,allocatable,target :: i_series(:),at_ind_out(:)
       integer,pointer ::  jr(:)
-      real,allocatable ::  e_kin(:,:),e_kin_s(:,:),at_base(:,:),at_base_in(:,:),at_occup(:),at_mass_in_c(:),at_mass_in_s(:)
+      real,allocatable ::  e_kin(:,:),e_kin_s(:,:),at_base_in(:,:),at_base(:,:),at_occup(:),at_mass_in_c(:),at_mass_in_s(:)
 
 C **** the following variables MUST have the following 32bit sizes or multiples because of alignement in the binary output file
 C
@@ -151,13 +151,17 @@ C *** diverse initialisations
 			n_site = 0
 			n_eq = 1								!later introduce sites, basis etc.
 			i_dom = 0
-			n_cond = 0
+			n_cond = 2               !orthorhombic periodic bound_cond by default
 			n_tot_in = 0
 			at_list = .true.
       t_ms = .0
+      t_step = .0
+      t_dump = .0
       t_dump0 = .0
       temp_par = .0
       at_base_shift = .0
+      filter_name = ''
+      filter_fwhm = .0
      
 C *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
       write(*,*) 'Parameter file name (.par will be added)'
@@ -250,6 +254,10 @@ CC        write(*,*) '   >',string,'<   '
         i_site(j_label,ind_l(i)) = j
       enddo
 			close(4)		
+      
+      do j=1,n_atom
+        at_base(j,:) = at_base_in(j,:)+at_base_shift
+      enddo
 
       string = subst_name
       write(*,*) 'Substance name (confirm, &append or replace): ', string
@@ -666,7 +674,7 @@ CC			write(9,*) 'sim_type, sim_style = ',sim_type,sim_style
       if(input_method=='CELL'.and.j_basis==0) then               
         write(*,*) 'Atoms types not identified explicitly,'
         write(*,*) 'trying to identify them by fractional positions'
-        write(*,*) '      tolerance range:',eps_x
+        write(*,*) '      tolerance range:',eps_x,' check whether the whole box isn''t shifted!'
         write(9,*) 'Atoms types not identified explicitly,trying to identify them by fractional positions,'
         write(9,*) '      tolerance range:',eps_x
       endif
@@ -978,6 +986,8 @@ C *** treat BULK data
               enddo
               if(nsuper/=1) at_pos_in2 = at_pos_in2/a_par
             endif
+
+            jrec = inrec
  
 C *** treat CELL data 
 					elseif(input_method=='CELL') then
@@ -995,12 +1005,20 @@ C *** treat CELL data
 									jat = i_site(jl,ii)
 									if(maxval(abs(pos_inp-anint(pos_inp))).le.eps_x) exit !atom found
 								enddo
-								if(maxval(abs(pos_inp-anint(pos_inp))).gt.eps_x) then
-								  write(*,*) 'Identification by position not succeeded: atom, record ',at_label(jl),inrec
-								  write(*,*) 'Possible solutions (modify the .PAR file):'
-								  write(*,*) '  1/check the ATOMS basis, 2/ try to slightly increase EPS, 3/ use the BULK input method '
-								  stop
-								endif
+                  if(maxval(abs(pos_inp-anint(pos_inp))).gt.eps_x) then
+                    write(*,*) 'Identification by position not succeeded: frame, record, atom ',ifile,inrec,at_label(jl)
+                    write(*,*) 'Input position ',at_pos_in
+                    write(*,*) 'Candidates (JAT, ATOM, BASIS POSITION, MAX_DIFF,EPS_X): '
+                    do ii=1,ind_l(jl)
+                      pos_inp = at_pos_in-at_base_in(i_site(jl,ii),:)
+                      write(*,*) i_site(jl,ii),at_name_par(i_site(jl,ii)),at_base_in(i_site(jl,ii),:),maxval(abs(pos_inp-anint(pos_inp))),eps_x
+                    enddo
+                    write(*,*) 'Type JAT and confirm/modify AT_POS_IN:'
+                    read(*,*) jat,at_pos_in
+                    write(*,*) 'Other possible solutions:'
+                    write(*,*) '  1/check the ATOMS basis, 2/ try to slightly increase EPS_X, 3/ use the BULK input method, 4/edit the trajectory file '
+                    write(*,*) '      (working ...) '
+                  endif
 							endif						
 						endif
 						
@@ -1080,7 +1098,7 @@ C *** accumulate the occupation number and the kinetic energy to refine the real
             enddo
           endif !input method
 				enddo read_loop
-						
+
 C *** indexing for the output
 				allocate(at_ind_out(n_tot),at_name_out(n_atom),ind_at(n_atom))
 				if(input_method=='BULK') then
@@ -1168,6 +1186,7 @@ CC        if(i_traj==nt_min.and.ifile==nfile_min) then
       endif 		!i_traj==nt_min.and.ifile==nfile_min
 
 			t_dump = i_save*t_step
+
 
 C *** define the record structure
       n_rec = (n_tot/l_rec4)														!for each position there are 4 components
@@ -1303,7 +1322,7 @@ CC  				write(*,*)'at_shells,i_rec',i_rec
 			deallocate(at_name,at_ind,e_kin,at_occup_r,nsuper_r,i_series)
 			if(j_shell.eq.1) deallocate(e_kin_s)
 
-			deallocate(at_name_par,at_label,at_base,ind_l,i_site,at_occup,at_mass_in_c,at_mass_in_s)
+			deallocate(at_name_par,at_label,at_base_in,at_base,ind_l,i_site,at_occup,at_mass_in_c,at_mass_in_s)
 
 			CALL SYSTEM_CLOCK (COUNT = sc_c2)
       write(*,*) 'Trajectory finished: ',ifile-nfile_min,' .dat files written in SYS time',(sc_c2-sc_c1)/sc_r,' sec'

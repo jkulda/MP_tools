@@ -94,10 +94,10 @@ CC      use mp_nopgplot          ! uncomment when not able to use PGPLOT, compil
       real,allocatable :: at_base(:,:),at_charge(:),at_charge1(:),displ_plot(:,:,:),displ_vect(:,:,:)
     
       real     ::  c_min,c_max,filter_fwhm,p_size,res(3),pol(3),res2,charge_mom_c(3),charge_mom_s(3),charge_mom_cell(3)
-      real     ::  e1_norm(3),e2_norm(3),ev_norm(3),x1,y1,x2,y2
+      real     ::  e1_norm(3),e2_norm(3),ev_norm(3),ed_norm(3),x1,y1,x2,y2
       
       character(4)   :: c_int(2),c_fil(2),version,head,atom
-      character(10)  :: pg_out,string,section,c_date,c_time,c_zone,c_jt,c_slice,c_mode,c_jfile,at_name
+      character(10)  :: pg_out,string,section,c_date,c_time,c_zone,c_jt,c_slice,c_mode,c_jfile,at_name,dom_name
       character(16)  :: sim_type_par,data_type,string16,wedge_label,filter_name,c_e1(3),c_e2(3),c_x,c_y
       character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name
       character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,line
@@ -124,7 +124,7 @@ C **** the following variables MUST have the following type(4) or multiples beca
       real,pointer        :: at_pos_file(:,:,:,:,:),at_pos1_file(:,:,:,:,:),at_vel_file(:,:,:,:,:),at_vel1_file(:,:,:,:,:)
       
       character(16)  :: sim_type,dat_type,input_method,file_par,dat_source
-      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum
+      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_out,j_pgc
       real(4)        :: rec_zero(l_rec),t_ms,t0,t_dump,t_step,a_par(3),angle(3),temp
 
       namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
@@ -132,10 +132,10 @@ C **** the following variables MUST have the following type(4) or multiples beca
       namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
-      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out       
-                          !general rule: namelists of tools should only contain their local parameters
+      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out,j_ps,j_out,j_pgc        
+  										!general rule: namelists of tools should only contain their local parameters
                           !what is of global interest they should pass into data_header
-      
+			
 C *** PGPLOT variables 
       INTEGER   PGBEG,PGOPEN
       INTEGER   MXI, MXJ
@@ -306,7 +306,10 @@ C     allocate (at_ind_file(4,n_row(1),n_row(2),n_row(3),jat),at_ind_in(4*n_tot)
  			write(*,*) 'Displacement domain type (0 = NONE, 1=[100], 2=[110], 3= 111])?'
  			read(*,*) n_dom		!displacement domain type (1=[100], 2=[110], 3= 111])
  			if(n_dom==0) i_dom = 1
- 			    
+ 			
+ 			write(*,*) '          (reading input files ...)'
+ 			write(*,*) 
+ 			
 CCC *** calculate the domain segment number - new convention different from MD_TOOLS
 C
 C			i_dom = 0																		!if n_dom = 0 nothing happens
@@ -390,16 +393,16 @@ C       write(*,*)'input: ',file_dat
           enddo  
           i_rec = i_rec+1
           read(1,rec=i_rec) at_pos1_in((n_rec-1)*l_rec+1:4*n_tot)  
-        endif        
-
-        if(n_traj==1) then
-          do j=1,n_rec-1                    ! read CORE data
+    
+          if(n_traj==1) then
+            do j=1,n_rec-1                    ! read CORE data
+              i_rec = i_rec+1
+              read(1,rec=i_rec) at_vel1_in((j-1)*l_rec+1:j*l_rec)      
+            enddo  
             i_rec = i_rec+1
-            read(1,rec=i_rec) at_vel1_in((j-1)*l_rec+1:j*l_rec)      
-          enddo  
-          i_rec = i_rec+1
-          read(1,rec=i_rec) at_vel1_in((n_rec-1)*l_rec+1:4*n_tot) 
-        endif 
+            read(1,rec=i_rec) at_vel1_in((n_rec-1)*l_rec+1:4*n_tot) 
+          endif 
+        endif        
         
         close(1)
 
@@ -414,7 +417,7 @@ C       write(*,*)'input: ',file_dat
         endif
 
 C       write(*,*) 'n_atom,n_row',n_atom,n_row
-
+C
 C       do
 C         write(*,*) 'jat,i,j,k?'
 C         read(*,*) jat,i,j,k
@@ -433,31 +436,58 @@ C       enddo
                 displ_field(:,i,j,k,jat,jt) = res
                 res2 = dot_product(res,res)
 C                 jj = jj+2**(3-ii)*(sign(1.0,res)+1.)/2.
+C
+C               if(n_dom==1) then
+C                 jj = maxloc((abs(res)),dim=1)
+CC					write(*,*) 'maxloc',i_dom
+C                 if(res(jj).gt.0.) jj = jj+3
+C               else if (n_dom==2) then
+C                 ii = minloc((abs(res)),dim=1)
+CC					write(*,*) 'minloc',ii
+C                 i2 = ii+1
+C                 if(i2.gt.3) i2 = i2-3
+C                 i3 = ii+2
+C                 if(i3.gt.3) i3= i3-3
+C                 jj = mod(ii,3)*4+(sign(1.,res(i2))+1)+(sign(1.,res(i3))+1)/2 +1
+C               else if (n_dom==3) then
+C                 jj = 1
+C                 do ii=1,3
+C                   jj = jj+2**(ii-1)*(sign(1.0,res(ii))+1.)/2.
+C                 enddo 
+C               endif
+C
+
 
                 if(n_dom==1) then
                   jj = maxloc((abs(res)),dim=1)
-C					write(*,*) 'maxloc',i_dom
-                  if(res(jj).gt.0.) jj = jj+3
                 else if (n_dom==2) then
                   ii = minloc((abs(res)),dim=1)
-C					write(*,*) 'minloc',ii
                   i2 = ii+1
                   if(i2.gt.3) i2 = i2-3
                   i3 = ii+2
                   if(i3.gt.3) i3= i3-3
-                  jj = mod(ii,3)*4+(sign(1.,res(i2))+1)+(sign(1.,res(i3))+1)/2 +1
+                  jj = mod(ii,3)*2+abs(sign(1.,res(i2))+sign(1.,res(i3)))*.5+1
                 else if (n_dom==3) then
-                  jj = 1
+                  jj = 0
                   do ii=1,3
-                    jj = jj+2**(ii-1)*(sign(1.0,res(ii))+1.)/2.
+                    jj = jj+(2**(ii-1))*(sign(1.0,res(ii))+1.)*.5
                   enddo 
+                  if(jj>=0.and.jj<=3) then
+                    jj = 4-jj
+                  else
+                    jj = jj-3
+                  endif
                 endif
+                
+C               write(*,*) 'n_dom,res,jj,ii,i2,i3',n_dom,res,jj,ii,i2,i3
+C               read(*,*)
 
                 if(j_shell_out==1) then
                   res = at_pos1_file(1:3,i,j,k,jat)-at_base(jat,:)
                   res = res-nint(res)
                   displ_field1(:,i,j,k,jat,jt) = res
-                endif        
+                endif 
+                       
                 i_dom(i,j,k,jat,jt) = jj
                 displ_norm(i,j,k,jat,jt) = sqrt(res2)   !displacement magnitude is calculated for CORES only
               enddo
@@ -469,6 +499,20 @@ C					write(*,*) 'minloc',ii
           displ_norm_tot(jat,jt) = sum(displ_norm(:,:,:,jat,jt))/nsuper
         enddo
 C       if(j_verb==1) write(*,*) 'jt,displ_norm_tot(:,jt)',jt,displ_norm_tot(:,jt)
+
+C         write(*,*) 'n_dom',n_dom
+C       do
+C         write(*,*) 'jat,i,j,k?'
+C         read(*,*) jat,i,j,k
+C         write(*,*) 'Core:', at_pos_file(:,i,j,k,jat)
+C         write(*,*) 'Core:', displ_field(:,i,j,k,jat,jt),i_dom(i,j,k,jat,jt)
+C         write(*,*) 'Shell:', at_pos1_file(:,i,j,k,jat)
+C         write(*,*) 'Shell:', displ_field1(:,i,j,k,jat,jt)
+C         if(jat==0) exit
+C       enddo
+C
+
+
         
 C ***  calculate nominal unit cell electric polarisation for regularly occupied lattice
         if(ifile==nfile_min.and.sum(at_occup_r)/n_atom==1.) then
@@ -525,7 +569,7 @@ C *** calculate the domain (quadrant) number for polar(ization)
               if(n_dom==1) then
                 jj = maxloc((abs(pol)),dim=1)
 C					write(*,*) 'maxloc',i_dom
-                if(pol(jj).gt.0.) jj = jj+3
+C               if(pol(jj).gt.0.) jj = jj+3
               else if (n_dom==2) then
                 ii = minloc((abs(pol)),dim=1)
 C					write(*,*) 'minloc',ii
@@ -533,11 +577,14 @@ C					write(*,*) 'minloc',ii
                 if(i2.gt.3) i2 = i2-3
                 i3 = ii+2
                 if(i3.gt.3) i3= i3-3
-                jj = mod(ii,3)*4+(sign(1.,pol(i2))+1)+(sign(1.,pol(i3))+1)/2 +1
+C               jj = mod(ii,3)*4+(sign(1.,pol(i2))+1)+(sign(1.,pol(i3))+1)/2 +1
+                jj = mod(ii,3)*2+(sign(1.,pol(i3))+1)/2
               else if (n_dom==3) then
                 jj = 1
                 do ii=1,3
-                  jj = jj+2**(ii-1)*(sign(1.0,pol(ii))+1.)/2.
+C                 jj = jj+2**(ii-1)*(sign(1.0,pol(ii))+1.)/2.
+                  jj = jj+2**(ii-1)*(sign(1.0,pol(ii))+1.)/2.-4
+                  if(jj<1) jj = 1-jj
                 enddo 
               endif
 
@@ -574,15 +621,39 @@ CC
 CC         type {1 1 1}: 1 = [-1 -1 -1], 2 = [1 -1 -1], 3 = [-1 1 -1], 4 = [1 1 -1],        !binary code from left: take the -1 for 0 & add +1
 CC                       5 = [-1 -1  1], 6 = [1 -1  1], 7 = [-1 1  1], 8 = [1 1  1]
 
+C     select case(n_dom)      !n_dom becomes the number of possible domains
+C       case(0)
+C         n_dom = 1
+C       case(1)
+C         n_dom = 6
+C       case(2)
+C         n_dom = 12
+C       case(3)
+C         n_dom = 8
+C     end select
+C
+C     allocate(dom_ind(n_dom),mask(n_dom))
+C
+C     select case(n_dom)      !n_dom becomes the number of possible domains
+C       case(1)
+C         dom_ind = ''
+C       case(6)
+C         dom_ind = (/'[-1 0 0]','[ 0-1 0]','[ 0 0-1]','[ 1 0 0]','[ 0 1 0]','[ 0 0 1]'/)
+C       case(12)
+C         dom_ind = (/'[-1-1 0]','[-1 1 0]','[ 1-1 0]','[ 1 1 0]','[ 0-1-1]','[ 0-1 1]','[ 0 1-1]','[ 0 1 1]','[-1 0-1]','[ 1 0-1]','[-1 0 1]','[ 1 0 1]'/)
+C       case(8)
+C         dom_ind = (/'[-1-1-1]','[ 1-1-1]','[-1 1-1]','[ 1 1-1]','[-1-1 1]','[ 1-1 1]','[-1 1 1]','[ 1 1 1]'/)
+C     end select
+C 
       select case(n_dom)      !n_dom becomes the number of possible domains
         case(0)
           n_dom = 1
         case(1)
-          n_dom = 6
+          n_dom = 3
         case(2)
-          n_dom = 12
+          n_dom = 6
         case(3)
-          n_dom = 8
+          n_dom = 4
       end select
 
       allocate(dom_ind(n_dom),mask(n_dom))
@@ -590,14 +661,16 @@ CC                       5 = [-1 -1  1], 6 = [1 -1  1], 7 = [-1 1  1], 8 = [1 1 
       select case(n_dom)      !n_dom becomes the number of possible domains
         case(1)
           dom_ind = ''
+        case(3)
+          dom_ind = (/'[ 1 0 0]','[ 0 1 0]','[ 0 0 1]'/)
         case(6)
-          dom_ind = (/'[-1 0 0]','[ 0-1 0]','[ 0 0-1]','[ 1 0 0]','[ 0 1 0]','[ 0 0 1]'/)
-        case(12)
-          dom_ind = (/'[-1-1 0]','[-1 1 0]','[ 1-1 0]','[ 1 1 0]','[ 0-1-1]','[ 0-1 1]','[ 0 1-1]','[ 0 1 1]','[-1 0-1]','[ 1 0-1]','[-1 0 1]','[ 1 0 1]'/)
-        case(8)
-          dom_ind = (/'[-1-1-1]','[ 1-1-1]','[-1 1-1]','[ 1 1-1]','[-1-1 1]','[ 1-1 1]','[-1 1 1]','[ 1 1 1]'/)
+          dom_ind = (/'[ 1-1 0]','[ 1 1 0]','[ 0 1-1]','[ 0 1 1]','[-1 0 1]','[ 1 0 1]'/)
+        case(4)
+          dom_ind = (/'[-1-1 1]','[ 1-1 1]','[-1 1 1]','[ 1 1 1]'/)
       end select
       
+
+    
 C **** choose displayed variable and range
       plot_loop: do      
         scale = 1
@@ -613,11 +686,11 @@ C         write(*,*) '         8 in-plane polarisation vectors, scale (~50)'
 C         write(*,*) '         0 exit (0 0)'
 
         write(*,*) 'Display: 1 displacement in-plane (vector), scale (~20) '
-        write(*,*) '         2 displacement out-of-plane (value), scale (~5) '
+        write(*,*) '         2 displacement in direction (value), scale (~5) '
         write(*,*) '         3 velocity in-plane (vector), scale (~1) '
-        write(*,*) '         4 velocity out-of-plane (value), scale (~1)'
+        write(*,*) '         4 velocity in direction (value), scale (~1)'
         write(*,*) '         5 polarisation in-plane (vector), scale (~5)  '
-        write(*,*) '         6 polarisation out-of-plane (value), scale (~1) '
+        write(*,*) '         6 polarisation in direction (value), scale (~1) '
         write(*,*) '         0 exit (0 0)'
         
         if(j_verb==1) then
@@ -632,10 +705,16 @@ C         write(*,*) '         0 exit (0 0)'
           write(*,*) '         17 polarisation magnitude, scale(~5)  '
           write(*,*) '         18 polarisation component, scale (~5) '
           write(*,*) '         19 polarisation domains, 1 '          
+          write(*,*) '         20 bond length, (~5) '          
         endif
 
         fmin = 0.
-        read(*,*) mode,scale                              
+        read(*,*) mode,scale
+        if(mode==2.or.mode==4.or.mode==6) then
+          write(*,*) 'Direction vector components:'
+          read(*,*) ed_norm
+          ed_norm = ed_norm/norm2(ed_norm)
+        endif                             
         if(mode==0) exit plot_loop
 
         j_cycle = 1
@@ -698,15 +777,19 @@ C     define n_x,n_y according to geometry
         jj = maxloc(e2,1)
         n_y = n_row(jj)
           
-C         write(*,*) 'n_x,n_y',n_x,n_y
-C         write(*,*) 'e1,e2,ev',e1,e2,ev
-C         write(*,*) 'e_slice',e_slice
+          write(*,*) 'n_x,n_y',n_x,n_y
+          write(*,*) 'e1,e2,ev',e1,e2,ev
+          write(*,*) 'e_slice',e_slice
         
         allocate(displ_plot(2,n_x,n_y),displ_vect(2,n_x,n_y),i_dom_out(n_x,n_y),ind(3,n_x,n_y))
         
 
         atom_loop: do
-          if(mode<=4.or.(mode>=10.and.mode<17)) then
+          if(mode==20) then
+            write(*,*) 'Atom pair numbers: (0 0 =END)'
+            read(*,*) jat,j_atom
+            if(jat==0.or.j_atom==0) exit atom_loop          
+          elseif(mode<=4.or.(mode>=10.and.mode<17)) then
             if(n_dom/=1) then
               write(*,*) 'Atom numbers: display & domain reference (0 = NONE, -1 = POLARISATION, 99=END)'
               read(*,*) jat,j_atom
@@ -730,8 +813,18 @@ C         write(*,*) 'e_slice',e_slice
               cycle atom_loop
             endif
             at_name = 'polar'
-            jat = 1
           endif
+          
+          if(mode/=20) then
+            if(j_atom==-1) then
+              dom_name = 'polar'
+            elseif(j_atom==0) then
+              dom_name = ''
+            else
+              dom_name = at_name_par(j_atom)
+            endif
+          endif
+
 
 C **** collect map data, start from the beginning
           j_frame = 0
@@ -778,7 +871,7 @@ C ***         define displ_plot(1,n_x,n_y) according to mode
               case(2)         
                 do i=1,n_x         
                   do j=1,n_y
-                    displ_plot(1,i,j) = dot_product(displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt),ev_norm)
+                    displ_plot(1,i,j) = dot_product(displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt),ed_norm)
                   enddo
                 enddo
               case(3)
@@ -791,7 +884,7 @@ C ***         define displ_plot(1,n_x,n_y) according to mode
               case(4)         
                 do i=1,n_x         
                   do j=1,n_y
-                    displ_plot(1,i,j) = dot_product(vel_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt),ev_norm)
+                    displ_plot(1,i,j) = dot_product(vel_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt),ed_norm)
                   enddo
                 enddo
               case(5)         
@@ -804,7 +897,7 @@ C ***         define displ_plot(1,n_x,n_y) according to mode
               case(6)         
                 do i=1,n_x         
                   do j=1,n_y
-                    displ_plot(1,i,j) = dot_product(polar(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jt),ev_norm)
+                    displ_plot(1,i,j) = dot_product(polar(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jt),ed_norm)
                   enddo
                 enddo
               case(10)         
@@ -867,9 +960,30 @@ C ***         define displ_plot(1,n_x,n_y) according to mode
                     displ_plot(1,i,j) = i_dom_p(ind(1,i,j),ind(2,i,j),ind(3,i,j),jt)
                   enddo
                 enddo
+              case(20)         
+                do i=1,n_x         
+                  do j=1,n_y
+                    displ_plot(1,i,j) = norm2(displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt)-
+     1                    displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),j_atom,jt))
+                  enddo
+                enddo
             end select
 
-
+          if(j_verb==1) then
+            write(*,*) 'Test output vs. input (last frame): atom, slice',jat,k
+            do
+              write(*,*) 'Position: i,j? (0 0 exit)'
+              read(*,*) i,j
+              if(i==0.or.j==0) exit
+              write(*,*) 'Core:  at_pos_file ', at_pos_file(:,i,j,k,jat)
+              write(*,*) 'Core:  displ_field ', displ_field(:,i,j,k,jat,jt),i_dom(i,j,k,jat,jt)
+              if(j_shell_out==1) then
+                write(*,*) 'Shell: at_pos1_file', at_pos1_file(:,i,j,k,jat)
+                write(*,*) 'Shell: displ_field1', displ_field1(:,i,j,k,jat,jt)
+              endif
+              write(*,*) 'Plot:  displ_plot  ', displ_plot(1,i,j)
+            enddo
+          endif
 
 C **** open the PGPLOT window
           IF (PGBEG(0,'/xserv',1,1) .LE. 0) STOP
@@ -896,10 +1010,16 @@ C ***  initialize PGPLOT map
             file_dat = trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
           endif
 
-          write(plot_title,104) trim(file_dat),trim(at_name),jt,j_slice,mode
-104       format(a,'  ',a,'  frame = ',i6,'  layer = ',i2,'  mode = ',i2)      
+          if(jt<=9999) then
+            write(line,104) jt,j_slice,mode
+104         format('  frame = ',i4.4,'  layer = ',i2,'  mode = ',i2) 
+          else
+            write(line,1041) mod(jt,10000),j_slice,mode
+1041         format('  frame = *',i4.4,'  layer = ',i2,'  mode = ',i2) 
+          endif     
+          plot_title = trim(file_dat)//'  '//trim(at_name)//'/'//trim(dom_name)//line
           CALL PGSCH(.7)
-          CALL PGENV(x1-.5,x2-.5,y1+.5,y2+.5,0,1) !draw the axes
+          CALL PGENV(x1-.5,x2+.5,y1-.5,y2+.5,0,1) !draw the axes
           CALL PGSTBG (0)     !puts opaque bgr to text (erase previous one)
           CALL PGLAB(c_x, c_y,plot_title)  !put the axis labels
           
@@ -907,7 +1027,6 @@ C         BRIGHT = 0.5
 C         CONTRA  = 1.0
 C         CALL PALETT(2, CONTRA, BRIGHT)
 
-          CALL PGSHLS (20,.0,.3,.0)     !dark grey  !set my colors
           CALL PGSHLS (21,.0,.4,.7)     !my blue
           CALL PGSHLS (22,120.,.5,1.)   !my red
           CALL PGSHLS (23,240.,.35,.8)  !my green
@@ -919,13 +1038,14 @@ C         CALL PALETT(2, CONTRA, BRIGHT)
           CALL PGSHLS (29,150.,.5,1.)   !my other
           CALL PGSHLS (30,270.,.5,1.)   !my other
           CALL PGSHLS (31,300.,.5,1.0)  !my other
+          CALL PGSHLS (32,.0,.3,.0)     !dark grey  !set my colors
 
 C *** write the domain legend
             CALL PGSLW (5)
             CALL PGSCH(.4)
             do k=1,n_dom
               if(mask(k)==0) cycle
-              CALL PGSCI(19+k)
+              CALL PGSCI(20+k)
               CALL PGMTXT ( 'RV',.5,1.-.02*k, .0,trim(dom_ind(k)))
 C                  PGMTXT (SIDE, DISP, COORD, FJUST, TEXT)
             enddo
@@ -937,7 +1057,10 @@ C *** plot the scalar fields
             do i=1,n_x         
               do j=1,n_y
                 if(mask(i_dom_out(i,j))==0) cycle
-                CALL PGSCI(19+i_dom_out(i,j))
+C               write(*,*)i,j,displ_plot(1,i,j),sqrt(abs(displ_plot(1,i,j)))
+C               read(*,*)
+                CALL PGSCI(20+i_dom_out(i,j))
+C               CALL PGSCI(ci)
                 if(displ_plot(1,i,j)>=.0)then
                   CALL PGSFS (1)            !full circles
                 else
@@ -960,7 +1083,7 @@ C *** plot the vector fields
                 displ_vect(1,:,:) = displ_plot(1,:,:)
                 displ_vect(2,:,:) = displ_plot(2,:,:)
               end where
-              CALL PGSCI(19+j)
+              CALL PGSCI(20+j)
               CALL PGVECT(displ_vect(1,:,:),displ_vect(2,:,:),n_x,n_y,1,n_x,1,n_y,scale,nc,TR,blank)              
             enddo
           endif

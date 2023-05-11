@@ -106,7 +106,7 @@ C **** the following variables MUST have the following type(4) or multiples beca
       real(4),pointer :: at_vel_file(:,:,:)
       
       character(16)  :: sim_type,dat_type,input_method,file_par
-      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,idum
+      integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,idum,j_pgc
       real(4)        :: rec_zero(l_rec),t_ms,t0,t1,a_par(3),angle(3),temp,p_size
 
       namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,
@@ -114,7 +114,7 @@ C **** the following variables MUST have the following type(4) or multiples beca
       namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
      
       namelist /mp_gen/ j_verb,j_proc       
-      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out       
+      namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out,j_pgc       
       										!general rule: namelists of tools should only contain their local parameters
                           !what is of global interest they should pass into data_header
 
