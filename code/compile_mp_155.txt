@@ -1,0 +1,57 @@
+echo "Compiling MP_TOOLS v. 1.55"
+alias ff='gfortran -ffixed-form -ffixed-line-length-none -fimplicit-none -O2 -march=native -ffpe-summary=none'
+#
+echo "mp_dbin5    DL_POLY input file conversion"
+ff src/mp_dbin55.f -o /usr/local/bin/mp_dbin5
+#
+echo "mp_lbin5    LAMMPS & GENERAL input file conversion"
+ff src/mp_lbin55.f -o /usr/local/bin/mp_lbin5
+#
+echo "mp_pdf5     PDF calculation and plotting"
+ff src/singleton.f src/mp_pdf55.f -o /usr/local/bin/mp_pdf5 -L/usr/local/lib -lm -fopenmp  -L/usr/local/pgplot -lpgplot -lX11 -lpng
+#
+echo "mp_dos5     DOS calculation and plotting"
+ff src/singleton.f src/mp_dos55.f -o /usr/local/bin/mp_dos5 -L/usr/local/lib -lm -fopenmp  -L/usr/local/pgplot -lpgplot -lX11 -lpng
+#
+echo "mp_sqom5    S(Q,w) calculation and plotting"
+ff src/singleton.f src/mp_sqom55.f -o /usr/local/bin/mp_sqom5 -L/usr/local/lib -lfinufft  -lstdc++ -lfftw3 -lfftw3_omp -lm -fopenmp -L/usr/local/pgplot -lpgplot -lX11 -lpng
+#
+echo "mp_dplot5   DOMAIN maps in real space"
+ff src/mp_dplot55.f -fbounds-check -o /usr/local/bin/mp_dplot5 -L/usr/local/lib -lm  -L/usr/local/pgplot -lpgplot -lX11 -lpng
+#
+echo "mp_insp5    BINARY data file inspection"
+ff src/mp_insp55.f -o /usr/local/bin/mp_insp5
+#
+echo "mp_tfilter5 TIME filter for MD trajectories"
+ff src/mp_tfilter55.f -o /usr/local/bin/mp_tfilter5
+#
+echo "mp_latt5     Undistorted crystal lattice"
+ff src/mp_ref55.f -fbounds-check -o /usr/local/bin/mp_latt5
+#
+echo "mp_lc5      LINEAR COMBINATION of snapshots"
+ff src/mp_lc55.f -fbounds-check -o /usr/local/bin/mp_lc5
+#
+if ! [ -e /usr/local/mp_tools ]; then sudo mkdir /usr/local/mp_tools;
+echo "Need sudo password to create /usr/local/mp_tools"
+sudo cp -R * /usr/local/mp_tools;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref ]; then sudo mkdir /usr/local/mp_tools/ref;
+echo "Need sudo password to create /usr/local/mp_tools/ref"
+sudo cp ./ref/* /usr/local/mp_tools/ref;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref/neutron_xs.txt ]; 
+then sudo cp ./ref/neutron_xs.txt /usr/local/mp_tools/ref;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref/xray_ff.txt ]; 
+then sudo cp ./ref/xray_ff.txt /usr/local/mp_tools/ref;
+fi
+#
+
+
+#in case of need use: 
+#   -fbounds-check to localize SEGMENTATION ERRORS (slows down the execution by 10-20%) 
+#   -L/usr/X11R6/lib insert in lines containing -lX11 (alternative localisation of X11)
+#   -O or -Ofast instead of -march=native if transportability is the goal
