@@ -358,7 +358,6 @@ C **** Read the auxiliary file <file_title.par> with structure parameters, atom 
       read(4,nml=mp_gen)
       rewind(4)
       read(4,nml=mp_out)
-C     if(j_sq==0) j_logsc=0  !linear scale for I(Q,t)
       
       call down_case(pg_out) 
       if(index(pg_out,'png')/=0) then
@@ -371,6 +370,8 @@ CC      pg_ext = '.png'     !use PNG for intensity maps, the .PS stays emergency
 
       rewind(4)
       read(4,nml=mp_sqom) 
+C     if(j_sq==0) j_logsc=0  !linear scale for I(Q,t)
+
 CC      read(4,nml=mp_bin) 
 CC			write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
 CC			write(*,*) 'namelist input: j_verb,j_proc,j_shrec,j_grid,sim_type,dat_type',j_verb,j_proc,j_shrec,j_grid,sim_type,dat_type
@@ -1541,7 +1542,7 @@ CC				scale_loop: do
         endif
         
 				scale_loop: do
-          if(j_plot==0.or.j_plot>1.and.j_sq==1.and.j_logsc==1) then
+          if((j_plot<=1.or.j_plot>1.and.j_sq==1).and.j_logsc==1) then
             cs_out = log10(cs_plot)
 			      wedge_label = 'Log_scale'
           else
