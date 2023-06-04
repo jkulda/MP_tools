@@ -112,7 +112,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       real 		:: 			 arg,c_min,c_max,c_max2,c1,c2,x_start,x_end,pdf_step,q_step,ro_0,c_smooth,rnd(5)
       
       character(4)   :: version,head,atom,ps_out(2),size_out(2)
-      character(10)  :: at_weight_scheme(3),pg_out,string,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
+      character(10)  :: at_weight_scheme(3),pg_out,pg_ext,string,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
       character(16)  :: sim_type_par,data_type,string16,filter_name
       character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name
       character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,line,masks,smooth
@@ -363,6 +363,13 @@ C **** Read the auxiliary file <file_par.par> with structure parameters, atom na
       p_size = 7.
       rewind(4)
       read(4,nml=mp_out)
+      
+      call down_case(pg_out) 
+      if(index(pg_out,'png')/=0) then
+        pg_ext = '.png'
+      else
+        pg_ext = '.ps'
+      endif
       
       if(j_weight==3) then
         write(*,*) 'Xray weights not yet implemented, setting to Uniform'
@@ -1298,8 +1305,8 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
 					jfile = 1
 					do						!look for existing .ps files to continue numbering
             if(j_name==0.and.t_single)then
-              write(file_ps,1041) trim(file_master),jfile,trim(pg_out)
-1041   		format(a,'_rdf','_',i2.2,'.',a)      
+              write(file_ps,1041) trim(file_master),jfile,trim(pg_ext)
+1041   		format(a,'_rdf','_',i2.2,a)      
               write(file_res,1042) trim(file_master),jfile
 1042   		format(a,'_rdf','_',i2.2,'.txt')      
             else
@@ -1323,7 +1330,7 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
               c_nfile = '_'//adjustl(c_nfile)
     
               file_res = trim(file_master)//'_pdf'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//'.txt'							
-              file_ps  = trim(file_master)//'_pdf'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//'.'//trim(pg_out)
+              file_ps  = trim(file_master)//'_pdf'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//trim(pg_ext)
             endif
 
 						inquire(file=file_ps,exist=found_ps)
@@ -1337,10 +1344,10 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
 						endif	
 					enddo						
 							
-					ier = PGOPEN(file_ps//'/CPS')
+					ier = PGOPEN(file_ps//"/"//trim(pg_out))
 					IF (ier.LE.0) STOP
 					CALL PGASK(.FALSE.)     ! would not ask for <RET>
-					CALL PGPAP(11.0,.7)     ! define the plot area as landscape
+ 			  	CALL PGPAP(11.0,.6)     ! define the plot area as landscape
 					CALL PGSUBP(1,1)				! PGPLOT window of 1x1 no of panes
 					CALL PGSCRN(0, 'white', IER)	!plot on white background
 					CALL PGSCRN(1, 'black', IER)
@@ -1389,9 +1396,9 @@ C     look for existing output files in order not overwrite them
 C *** write PDF file header
             write(4,*) 'Substance:',trim(subst_name),'       ',time_stamp
             write(4,*) 'Input files: ',trim(file_dat_t0),' to ',trim(file_dat),' step',nfile_step									   
-            write(4,*) 'Supercell size:',n_row																				
 				    write(4,*) 'OMP processes  = ', proc_num_in									
             write(4,*) 'Integration ',trim(int_mode),'  ',n_int,'cell pairs, j_rand',j_rand
+            write(4,*) 'Supercell size:',n_row																				
             write(4,*) 'Unit cell parameter:',a_par																				
             write(4,*) 'Atoms/unit_cell:',n_atom
             write(4,*) 	 'Atoms  :',(('    '//at_name_plot(i)),i=1,n_atom)
@@ -1609,6 +1616,7 @@ C     write(*,*)
       return
       END      
       
+C **********************************************************************************************************
 C **** string conversion to all upper case
 C     
  			subroutine up_case (string)
@@ -1624,5 +1632,20 @@ C
 			end do
 
 			end subroutine up_case	     
+
+C **** string conversion to all lower case
+C          
+ 			subroutine down_case (string)
+
+			character(*), intent(inout)	:: string
+			integer											:: j, nc
+			character(len=26), parameter	:: lower = 'abcdefghijklmnopqrstuvwxyz'
+			character(len=26), parameter	:: upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+			do j = 1, len(string)
+				nc = index(upper, string(j:j))
+				if (nc > 0) string(j:j) = lower(nc:nc)
+			end do
+
+			end subroutine down_case	     
      
-  
