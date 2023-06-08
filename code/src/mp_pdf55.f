@@ -107,7 +107,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       real,allocatable,target ::  r(:),q(:)
       real,pointer ::      x(:)
 	  
-			integer ::       i_rdf,n_pdf,j_acc,n_int,n_pseudo,i_ref,j_pdf,j_rand,n_ind(3),n_skip1,n_skip2
+			integer ::       i_rdf,n_pdf,n_pdf_min,j_acc,n_int,n_pseudo,i_ref,j_pdf,j_rand,n_ind(3),n_skip0,n_skip1,n_skip2,n_skip2_tot
       real    ::       rdf_dist,pdf_range,rdf_sum,rdf_tot_sum,rdf_norm,at_weight_av,at_pos(3),at_pos2(3)
       real 		:: 			 arg,c_min,c_max,c_max2,c1,c2,x_start,x_end,pdf_step,q_step,ro_0,c_smooth,rnd(5)
       
@@ -132,7 +132,7 @@ CC  		use mp_nopgplot					! uncomment when not able to use PGPLOT, compile and l
       real :: t_dump,filter_fwhm,tt0,tt,b_sum,at_sum,rand1,rand2,sc_r,at_displ,p_size,rdf_tot_err,pdf_pix,pdf_pix_shift(3),a_par_grid(3)
       integer :: rand1_seed(8),rand2_seed(8),seed_size
 
-      real :: pdf_grid_min(3),pdf_grid_max(3),diff_pos(3),diff_pos_norm,x_plot,y_plot,part_scale(4),d_pos(3)
+      real :: pdf_grid_min(3),pdf_grid_max(3),diff_pos(3),diff_pos_norm,x_plot,y_plot,tot_scale,part_scale(4),d_pos(3)
 
 C **** the following variables MUST have the following type(4) or multiples because of alignement in the binary output file
       character(4),allocatable :: at_name_out(:)
@@ -587,7 +587,7 @@ C **** check the PDF range
         endif      
       endif
       
-      n_pdf = anint(pdf_range/pdf_step)
+      n_pdf = anint(pdf_range/pdf_step)+1
       if(n_cond==0) then
         n_mc_max =  real(n_tot)**2/(500.*n_mc)       !more exactly: (.008*n_tot)*n_atom*(4./3.)*pi*product(.4*n_row)=.00215*n_tot**2
       else
@@ -597,15 +597,16 @@ C **** check the PDF range
  
 C **** establish the overlay PDF_GRID 
       n_pdf_grid = anint(n_row/pdf_pix)     
-C     d_pos = pdf_pix/a_par               !d_pos is indexing mesh cell size in lattice units (default corresponding to 1Å)
-      d_pos = pdf_pix                     !d_pos is indexing mesh cell size in lattice units, has to be commensurate with the box size, should be commensurate with the cell size
+C     d_pos = pdf_pix/a_par               !d_pos is overlay grid cell size in lattice units (default corresponding to 1Å)
+      d_pos = pdf_pix                     !d_pos is overlay grid cell size in lattice units, has to be commensurate with the box size, should be commensurate with the cell size
       a_par_grid = a_par*pdf_pix           !a_par_grid is its lattice parameter in Å
-!      pdf_pix_shift                      !pdf_pix_shift specified in .PAR is offset of pdf_grid to lattice to get most atoms in centres of its cells
+!      pdf_pix_shift                      !pdf_pix_shift specified in .PAR is offset of PDF overlay grid to lattice to get most atoms in centres of its cells
 
-      if(j_verb==1) write(*,*) 'Fine grid size, step and offset:',n_pdf_grid,d_pos,pdf_pix_shift
+      if(j_verb==1) write(*,*) 'Overlay grid size, step and offset:',n_pdf_grid,d_pos,pdf_pix_shift
       if(j_verb==1) write(*,*) 
 
-      n_pix_step = anint(sqrt(3.)*pdf_pix/pdf_step)       !we shall avoid correlations within the 1st pixel range
+      n_pix_step = anint(norm2(a_par_grid)/pdf_step)       !we shall avoid correlations within the 1st pixel range
+      if(j_verb==1) write(*,*) 'n_pix_step',n_pix_step
      
       
 C *********************  OpenMP initialization start  *******************************      
@@ -706,9 +707,11 @@ C *************  the file loop: cycle over the tt files to augment statistics
       CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
       
       nfile = 0
+      n_skip2_tot = 0
  
       file_loop: do ifile=nfile_min,nfile_max,nfile_step									
 
+        n_skip0 = 0
         n_skip1 = 0
 
 C ***  open the t0 file (binary MD snapshot file)
@@ -774,15 +777,11 @@ C **** searching for atom_1 candidates in a non-periodic box
           endif
         endif
 
-C *** reindexing atoms on a finer atomary grid	
+C *** reindexing atoms on a finer PDF overlay grid	
         ii =1		
         do i=1,n_tot
           if(maxval(abs(at_pos_in(4*(i-1)+1:4*(i-1)+3)))>.0) then
             d_ind = 1+anint((at_pos_in(4*(i-1)+1:4*(i-1)+3)-pdf_pix_shift+n_row/2)/d_pos)   !+d_ind_shift
-C           if(j_verb==1.and.i==ii)then
-C             write(*,*)'i,at_pos_in',i,at_ind_in(4*(i-1)+1:4*(i-1)+3),at_pos_in(4*(i-1)+1:4*(i-1)+3)
-C             write(*,*)'d_ind convert',d_ind
-C           endif
 
             do j=1,3                                                  !handle basis atoms displaced out of the nominal box
               if(d_ind(j)<=0) then
@@ -794,38 +793,34 @@ C           endif
                 at_pos_in(4*(i-1)+j) = at_pos_in(4*(i-1)+j)-n_row(j)
               endif
             enddo
-C           if(j_verb==1.and.i==ii)then
-C             write(*,*)'d_ind shift',d_ind,'next ii?'
-C             read(*,*)ii
-C           endif
-           
+
            if(ind_pdf(d_ind(1),d_ind(2),d_ind(3))/= 0) then
-              write(*,*) 'Fine grid cell already taken (you can accept a few by RETURN, else modify pdf_pix in .PAR):'
-              write(*,*) 'at_ind_in,at_pos_in',at_ind_in(4*(i-1)+1:4*(i-1)+4),'  ',at_pos_in(4*(i-1)+1:4*(i-1)+3)
-C             write(*,*) 'i,d_ind,ind_pdf(d_ind(1),d_ind(2),d_ind(3))',i,d_ind,ind_pdf(d_ind(1),d_ind(2),d_ind(3))
-C             write(*,*) 'OLD: at_ind_in,at_pos_in',at_ind_in(4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+1:4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+4),
-C    1              '  ',at_pos_in(4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+1:4*(ind_pdf(d_ind(1),d_ind(2),d_ind(3))-1)+3)
-             read(*,*)
-             n_skip1 = n_skip1+1
+C             write(*,*) 'Overlay grid cell already taken (you can accept a few by RETURN, else modify pdf_pix in .PAR):'
+C             write(*,*) 'at_ind_in,at_pos_in',at_ind_in(4*(i-1)+1:4*(i-1)+4),'  ',at_pos_in(4*(i-1)+1:4*(i-1)+3)
+C            read(*,*)
+             n_skip0 = n_skip0+1
             endif
             ind_pdf(d_ind(1),d_ind(2),d_ind(3)) = i
             at_ind_in(4*(i-1)+1:4*(i-1)+3) = d_ind            !re-use at_ind_in(:,1:3) to store the new indices		
           endif	
         enddo
-
+        
         CALL SYSTEM_CLOCK (COUNT = sc_c2)
         write(*,*) 
-        if(j_verb==1) write(*,*) 'Input finished         ',(sc_c2-sc_c1)/sc_r,' sec'
+C       if(j_verb==1) write(*,*) 'Input finished         ',(sc_c2-sc_c1)/sc_r,' sec'
         
-        if(n_skip1>10) then
-          write(*,*) 'Number of atoms skipped due to fine grid double occupancy:', n_skip1
-          write(*,*) 'Modify .PAR pdf_pix (0), continue (1)?'
-          read(*,*) jj
-          if(jj==0) stop
+        if(n_skip0>0) then
+          write(*,*) 'Number of atoms skipped due to overlay grid cell double occupancy:', n_skip0
+          if(n_skip0>10)then
+            write(*,*) 'Modify .PAR pdf_pix (0), continue (1)?'
+            read(*,*) jj
+            if(jj==0) stop
+          endif
         endif
  			
 C *************  the integration loop: cycle over the site pairs to accumulate the PDFs ******************
 
+        write(*,*)    
         write(*,*) 'Accumulating the PDFs ...'     
         n_skip1 = 0
         n_skip2 = 0
@@ -862,7 +857,7 @@ CCCCCCC OMP continuation line must have a valid character in column 6  CCCCCCC
               i_r1 = n_tot*rand1+1	!i_r1 may become 1 to n_tot
               at_pos(:) = at_pos_in(4*(i_r1-1)+1:4*(i_r1-1)+3)       !randomly select first atom
               if(sum(abs(at_pos(:)))==.0) cycle
-              at_ind = at_ind_in(4*(i_r1-1)+1:4*(i_r1-1)+3)   !at_ind_in(:,1:3) has been re-used to store the fine-grid indices
+              at_ind = at_ind_in(4*(i_r1-1)+1:4*(i_r1-1)+3)   !at_ind_in(:,1:3) has been re-used to store the overlay grid indices
               ii = at_ind_in(4*(i_r1-1)+4)
             else
               i_r1 = i_at1*rand1+1	!i_r1 may become 1 to i_at1
@@ -870,7 +865,7 @@ CCCCCCC OMP continuation line must have a valid character in column 6  CCCCCCC
               if(ind_at1(i_r1)<=0) read(*,*)
               at_pos(:) = at_pos_in(4*(ind_at1(i_r1)-1)+1:4*(ind_at1(i_r1)-1)+3)       !randomly select first atom among their shortlist
               if(sum(abs(at_pos(:)))==.0) cycle
-              at_ind = at_ind_in(4*(ind_at1(i_r1)-1)+1:4*(ind_at1(i_r1)-1)+3)   !at_ind_in(:,1:3) has been re-used to store the fine-grid indices
+              at_ind = at_ind_in(4*(ind_at1(i_r1)-1)+1:4*(ind_at1(i_r1)-1)+3)   !at_ind_in(:,1:3) has been re-used to store the overlay grid indices
               ii = at_ind_in(4*(ind_at1(i_r1)-1)+4)
             endif 
           
@@ -887,17 +882,16 @@ C           write(*,*) 'jint,at_ind,at_pos',jint,at_ind,at_pos
                 if(diff_pos_norm>.0.and.diff_pos_norm<=1.) exit     !only diff_pos within unit sphere is kept !throwing away also the unlikely event of diff_pos=.0, not d_ind=0!
               enddo
 
-              diff_pos = diff_pos/diff_pos_norm             !now we project random points onto spherical surface by d_ind/norm2(d_ind) ....
+              diff_pos = diff_pos/diff_pos_norm        !now we project random points onto spherical surface by d_ind/norm2(d_ind) ....
               call random_number(rand2)
-              diff_pos = pdf_range*rand2*diff_pos     ! .... and select a random point on their radius (rand2) to emulate scaling 1/i**2, diff_pos is in Å now
+              diff_pos = pdf_range*rand2*diff_pos      ! .... and select a random point on their radius (rand2), diff_pos is in Å now
 
-              d_ind = anint(diff_pos/a_par_grid)       ! .... and select a random point on their radius (rand2) to emulate scaling 1/i**2   (we needn't switch to l.u. and back)
-
-              at_ind2 = at_ind+d_ind          !all of them are on the fine grid
+              d_ind = anint(diff_pos/a_par_grid)       ! .... convert the distance to overlay grid units  
+              at_ind2 = at_ind+d_ind          
 
 C *** treat atoms out of the supercell by applying cyclic boundary conditions
               j_base = 0
-              do j =1,3                                !n_pdf_grid is the supercell size on the fine grid
+              do j =1,3                                !n_pdf_grid is the supercell size on the overlay grid
                 if(at_ind2(j).lt.1) then
                   at_ind2(j) = at_ind2(j)+n_pdf_grid(j)
                   j_base(j) = -n_row(j)
@@ -913,8 +907,7 @@ C *** retrieve the 2nd atom positions
               i = ind_pdf(at_ind2(1),at_ind2(2),at_ind2(3))
               if(i==0) then
                 n_skip1 = n_skip1+1             
-C               if(n_skip1 == 100*(n_skip1/100)) write(*,*) 'n_skip1=',n_skip1,at_ind2
-                cycle                                !cycle over void indexing mesh cells
+                cycle m_cycle                              !cycle over void indexing overlay grid
               endif
               at_pos2 = at_pos_in(4*(i-1)+1:4*(i-1)+3)             
               
@@ -924,35 +917,29 @@ C               if(n_skip1 == 100*(n_skip1/100)) write(*,*) 'n_skip1=',n_skip1,a
               at_pos2 = at_pos2-at_pos
 
 C *** accumulate all the PDF at once
-              i_rdf = anint(norm2(at_pos2*a_par)/pdf_step)+1     !we need 0 in the 1st channel for FT
+              i_rdf = anint(norm2(at_pos2*a_par)/pdf_step)+1     
               
-C             write(*,*)'d_at_pos2,i_rdf',at_pos2,i_rdf
-
-              if(i_rdf>n_pix_step.and.i_rdf<=n_pdf) then         !we are avoiding the low-R range of self-correlations
-                rdf_p2_n(ii,jj,i_rdf,k) = rdf_p2_n(ii,jj,i_rdf,k)+1.      
-                m = m+1
-                if(m<=0.or.m>1000) then 
-                  write(*,*) 'Trouble: m=',m
-                  read(*,*)
-                endif
+              if(i_rdf<=n_pdf) then         
+C               if(i_rdf>1) then
+                  rdf_p2_n(ii,jj,i_rdf,k) = rdf_p2_n(ii,jj,i_rdf,k)+1.       
+                  m = m+1
               else
-                n_skip2 = n_skip2+1             
-C               write(*,*) 'skip2',jint,m,d_ind,at_pos,at_pos2,i_rdf,n_skip2
-C               read(*,*)
-                cycle
+                    n_skip2 = n_skip2+1             
+                    cycle m_cycle
               endif
-                if(m==1000) exit
+              if(m==1000) exit
             enddo m_cycle   !m
             jint = jint+1
-C           if(jint == 100*(jint/100)) write(*,*) 'jint=',jint
             if(jint==n_mc/1000) exit integration_loop_2
 					enddo integration_loop_2
 				enddo		!k=1,n_h
 !$omp end do
 !$omp end parallel
 
-        write(*,*)'MC hits to empty fine grid cells [%]:',(100.*n_skip1)/(real(n_h*n_mc)+real(n_skip1))
+        write(*,*)'MC hits to empty overlay grid cells [%]:',(100.*n_skip1)/(real(n_h*n_mc)+real(n_skip1))
         write(*,*)'MC hits out of PDF range [%]:',(100.*n_skip2)/(real(n_h*n_mc))
+        n_skip2_tot = n_skip2_tot+n_skip2
+C       write(*,*) 'n_skip2_tot',n_skip2_tot
 
 C *** sum up contributions from individual cycles and estimate statistical error at the a_par(1) position
         do k=1,n_h                     
@@ -971,20 +958,30 @@ C       if(j_verb==1) write(*,*) 'n_pdf,n_int,sum(rdf_p2)',n_pdf,n_int,sum(rdf_p
 C       if(j_verb==1) write(*,*) 'n_skip2',n_skip2
  			write(*,*) 
 
+      n_pdf_min = 1
+      do i=2,n_pdf
+        if(sum(rdf_p2(:,:,i))/=.0) exit
+      enddo
+      n_pdf_min = i
+      write(*,*) 'n_pdf_min',n_pdf_min
+      
+      
 C *** normalise the accumulated PDF
-      rdf_norm = nfile*n_int/real(n_pdf-n_pix_step)          !PDF_STEP completes the 4*pi*r**2*dr volume element, PDF_RANGE goes with the MC scaling
+      rdf_norm = (nfile*n_int-sum(rdf_p2(:,:,1)))/real(n_pdf-n_pdf_min+n_pix_step*.3)          
       rdf_p2 = rdf_p2/rdf_norm
+      
+      rdf_p2(:,:,1) = rdf_p2(:,:,1)*(real(n_pdf/4-1)-sum(rdf_p2(:,:,2:n_pdf/4)))/sum(rdf_p2(:,:,1))
+      
 
       if(j_verb==1) then    
         write(*,*) 'PDF_norm',rdf_norm
-C       write(*,*) 'rdf_tot mean',sum(rdf_p2(:,:,:)/real(n_pdf-n_pix_step))
-CC       write(*,*) 'rdf_tot mean1',sum(rdf_p2(:,:,n_pix_step/2+1:n_pdf/4)/real(n_pdf/4-n_pix_step))
-C       write(*,*) 'rdf_tot mean1',sum(rdf_p2(:,:,n_pix_step+1:n_pdf/4)/real(n_pdf/4-n_pix_step))
-C       write(*,*) 'rdf_tot mean2',sum(rdf_p2(:,:,n_pdf/4+1:n_pdf/2)/real(n_pdf/4))
-C       write(*,*) 'rdf_tot mean3',sum(rdf_p2(:,:,n_pdf/2+1:3*n_pdf/4)/real(n_pdf/4))
-C       write(*,*) 'rdf_tot mean4',sum(rdf_p2(:,:,3*n_pdf/4+1:n_pdf)/real(n_pdf/4))
+        write(*,*) 'rdf_tot mean',sum(rdf_p2(:,:,1:n_pdf)/real(n_pdf))
+        write(*,*) 'rdf_tot mean1',sum(rdf_p2(:,:,1:n_pdf/4)/real(n_pdf/4))
+        write(*,*) 'rdf_tot mean2',sum(rdf_p2(:,:,n_pdf/4+1:n_pdf/2)/real(n_pdf/2-n_pdf/4))
+        write(*,*) 'rdf_tot mean3',sum(rdf_p2(:,:,n_pdf/2+1:(3*n_pdf)/4)/real((3*n_pdf)/4-n_pdf/2))
+        write(*,*) 'rdf_tot mean4',sum(rdf_p2(:,:,(3*n_pdf)/4+1:n_pdf)/real(n_pdf-(3*n_pdf)/4))
 C       do i=1,n_atom
-C         write(*,*) 'rdf_tot mean4_diag i =',i,sum(rdf_p2(i,i,3*n_pdf/4+1:n_pdf)/real(n_pdf/4))
+C         write(*,*) 'rdf_tot mean4_diag i =',i,sum(rdf_p2(i,i,(3*n_pdf)/4+1:n_pdf)/real(n_pdf-(3*n_pdf)/4))
 C       enddo
         write(*,*) 
       endif
@@ -992,12 +989,11 @@ C       enddo
 C *** suppress termination effects in last pixels
       do i=1,n_atom
         do j=1,n_atom
-          rdf_p2(i,j,n_pdf-n_pix_step:n_pdf) = at_occup_r(i)*at_occup_r(j)/sum(at_occup_r)**2        !the asymptote is 1 for rdf_tot: we are generating directly g(r) with unit weights
+          rdf_p2(i,j,n_pdf-n_pix_step/2:n_pdf) = at_occup_r(i)*at_occup_r(j)/sum(at_occup_r)**2        !the asymptote is 1 for rdf_tot: we are generating directly g(r) with unit weights
         enddo
       enddo
 
 C *** estimate statistical error (Poisson statistics, sqrt(n)^-1) at the a_par(1) position
-C     i_ref = nint(a_par(1)/pdf_step)
       rdf_tot_err = 1./sqrt(rdf_norm)                      !rdf_norm is the average count rate in the flat part of g(r)
       rdf_err = rdf_tot_err*n_atom/at_occup_r              ! each single-atom partial error is n_atom-times larger
      
@@ -1008,15 +1004,10 @@ C *** Accumulated! set initial weights, plot range and partial PDFs
 
       do i=1,n_pdf
         w(i) = .5*(1.+cos(pi*i/real(n_pdf)))       ! FT window == Hann profile
-CC					t_wind(i) = 0.355768-0.487396*cos(twopi*(i)/real(n_int+1))							!max is at n_int/2+1		Nuttall window
-CC					t_wind(i) = t_wind(i)+0.144232*cos(2.*twopi*(i)/real(n_int+1))						
-CC					t_wind(i) = t_wind(i)-0.012604*cos(3.*twopi*(i)/real(n_int+1))							
 C				w(i) = 0.355768+0.487396*cos(pi*(i)/real(n_pdf))							!max is at i=0		Nuttall window
 C				w(i) = w(i)+0.144232*cos(2.*pi*(i)/real(n_pdf))						
 C				w(i) = w(i)+0.012604*cos(3.*pi*(i)/real(n_pdf))							
       enddo
-C     w = 1.
-C     write(*,*) 'w',w(1),w(n_pdf/2),w(n_pdf)
       
       q_step = 2.*pi/(n_pdf*pdf_step)
       do i=1,n_pdf
@@ -1053,6 +1044,7 @@ C *** set atom weights
 
       if(n_part==0) ind_part = 0
       part_scale = 1.
+      tot_scale = 1.
       
  			at_weights_loop: do		
 			
@@ -1122,17 +1114,16 @@ C *** extend the RDF matrix by pseudo_atom rows&columns
 					f_smooth(j) = 2.**(-((j-n_smooth/2-1)/(.5*n_smooth_fwhm))**2) 
 				enddo
 				f_smooth = f_smooth/sum(f_smooth(1:n_smooth))				!profile normalized to unit integral
-C			  write(*,*) 'f_smooth', (f_smooth(j),j=1,n_smooth)		
 
 				if(n_smooth>1) write(*,*) 'Applying Gaussian smoothing with FWHM=',n_smooth_fwhm,' steps of',pdf_step,'[A^]'
         write(smooth,'("Smooth FWHM",f5.2," [A]")') pdf_step*n_smooth_fwhm
 
         if(n_smooth==1) then
-          do i = n_pix_step,n_pdf
+          do i = 1,n_pdf
             rdf_p2_ws(:,:,i) = rdf_p2(:,:,i)*at_weight_matrix         
           enddo               
         else
-          do i = n_pix_step,n_pdf
+          do i = 1,n_pdf
             do j = 1,n_smooth
               if (i-n_smooth/2+j-1.le.0) cycle  !zeros out of range
               if (i-n_smooth/2+j-1.gt.n_pdf) then
@@ -1172,8 +1163,7 @@ C *** calculate S(Q) components & total
           enddo
         endif
 
-C *** produce rdf_p2_plot and sum up symmetric off-diagonal elements         
-
+C *** generate rdf_p2_plot and sum up symmetric off-diagonal elements         
         do i=1,n_pdf
           rdf_p2_plot(:,:,i) = matmul(matmul(transpose(ind_pseudo(:,1:n_atom_tot)),rdf_p2_ws(:,:,i)),ind_pseudo(:,1:n_atom_tot))
         enddo
@@ -1186,11 +1176,11 @@ C *** produce rdf_p2_plot and sum up symmetric off-diagonal elements
            enddo
         enddo
 
-C       if(j_verb==1) then
-C         do j=1,4
-C           write(*,*) 'rdf_tot_plot mean',j,sum(rdf_p2_plot(n_atom+1,n_atom+1,1+(j-1)*n_pdf/4:j*n_pdf/4)/real(n_pdf/4))
-C         enddo
-C       endif
+        if(j_verb==1) then
+          do j=1,4
+            write(*,*) 'rdf_tot_plot mean',j,sum(rdf_p2_plot(n_atom+1,n_atom+1,1+(j-1)*(n_pdf/4):j*(n_pdf/4))/real(n_pdf/4))
+          enddo
+        endif
         
         if(j_pdf<=2) then
           x => r
@@ -1260,11 +1250,13 @@ C *** Set JK colors for line plots
           CALL PGSLW(5)			!operates in steps of 5
           x_plot = x_start+.75*(x_end-x_start)
           y_plot = .9*c_max
-          CALL PGLINE(n_plot,x(i_start:i_end),rdf_p2_plot(n_atom+1,n_atom+1,i_start:i_end))  !plots the curve
+          CALL PGLINE(n_plot,x(i_start:i_end),tot_scale*rdf_p2_plot(n_atom+1,n_atom+1,i_start:i_end))  !plots the curve
          
           CALL PGSTBG(0)																				 !erase graphics under text
 C         CALL PGTEXT (x_plot,y_plot,trim(curve_label(j_pdf))//'    x 1.0')
-          CALL PGTEXT (x_plot,y_plot,'Total     x 1.0')
+          write(plot_title,115) 'Total','    ',tot_scale
+C         CALL PGTEXT (x_plot,y_plot,'Total     x 1.0')
+          CALL PGTEXT (x_plot,y_plot,plot_title)
           CALL PGSLW(2)
 
           do j=1,n_part
@@ -1362,11 +1354,13 @@ C **** Prepare and plot the same on .PS, look for existing output files in order
           CALL PGLAB(trim(x_label(j_pdf)), trim(y_label(j_pdf)),trim(plot_header))  !put the axis labels
           CALL PGSCI (1)  !white needs to be reset after PGLAB
           CALL PGSLW(5)			!operates in steps of 5
-				  CALL PGLINE(n_plot,x(i_start:i_end),rdf_p2_plot(n_atom+1,n_atom+1,i_start:i_end))  !plots the curve
+				  CALL PGLINE(n_plot,x(i_start:i_end),tot_scale*rdf_p2_plot(n_atom+1,n_atom+1,i_start:i_end))  !plots the curve
 					y_plot = .9*c_max
 					CALL PGSTBG(0)																				 !erase graphics under text
 C		  		CALL PGTEXT (x_plot,y_plot,trim(curve_label(j_pdf))//trim(subst_name)) !the x_plot,y_plot are in world (axis units) coordinates
-          CALL PGTEXT (x_plot,y_plot,'Total     x 1.0')
+          write(plot_title,115) 'Total','    ',tot_scale
+C         CALL PGTEXT (x_plot,y_plot,'Total     x 1.0')
+          CALL PGTEXT (x_plot,y_plot,plot_title)
           CALL PGSLW(2)
 
           do j=1,n_part
@@ -1429,7 +1423,6 @@ C *** write the PDFs
             endif
 105   	format(1x,f7.3,1x,f8.3,32(2x,5f8.3))	
 107   	format(1x,"Partials index  ",32(2x,5(2x,2i3)))	
-C106   	format('    r[Å]  PDF_tot   ',32(2x,5(a,'_',a,3x)))	
 106   	format('   ',a,'   Total     ',32(2x,5(a,'_',a,3x)))	
             close(4)
             write(*,*) ' Text output written to: ',file_res	  
@@ -1487,6 +1480,8 @@ C ***   all done, now decide what comes next
               cycle plot_loop
 
 						case(3) 
+              write(*,"('Confirm/modify total scale factor ',4f4.1)") tot_scale
+              read(*,*) tot_scale
               write(*,"('Confirm/modify partial scale factors ',4f4.1)") part_scale(1:n_part)
               read(*,*) part_scale(1:n_part)
               cycle plot_loop
