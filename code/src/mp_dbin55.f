@@ -599,6 +599,8 @@ C *** take fresh lattice parameters for each snapshot - they may evolve
 					  write(*,*) 'Simulation box size =',a_par
 					endif			
 				endif
+				
+C			write(*,*) 'n_tot,n_tot_in',n_tot,n_tot_in
 
 C *** get the actual time step of the sequence
 				if(ifile==nfile_min) then
@@ -636,7 +638,7 @@ C ***  read-in the text of a snapshot in one go
 C *** first read the CORE data  
 
           read(1,*,iostat=ios_t) at_name_in,at_no,at_mass_in,at_charge_in,at_displ_in
-CC						if(ios/=0) write(*,*) 'Error on ASCII input IOS: ',ios
+						if(ios_t/=0) write(*,*) 'Error on ASCII input IOS: ',ios_t
 CC						if(ios>0) cycle frame_loop     !corrupt input data, jump out to new snapshot
 
           if(ios_t<0.or.at_name_in.eq.head) then
@@ -715,6 +717,8 @@ C *** treat BULK data
               if(nsuper/=1) at_pos_in2 = at_pos_in2/a_par
             endif
 		
+            jrec = inrec
+ 
 C *** treat CELL data 
           elseif(input_method=='CELL'.or.input_method=='FAST')then		
             at_pos_in = at_pos_in/a_par
@@ -828,6 +832,8 @@ C *** accumulate the occupation number and the kinetic energy to refine the real
             enddo
           endif
 				enddo read_loop
+				
+				write(*,*) 'read finished'
 				
 C *** indexing for the output
 				allocate(at_ind_out(n_tot),at_name_out(n_atom),ind_at(n_atom))
