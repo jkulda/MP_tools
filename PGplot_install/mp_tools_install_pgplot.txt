@@ -1,3 +1,14 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+The corrected PNG driver in most PGPLOT distributions resolves the original pointer bug, but keeps the obsolete image width (850), height (680) and - most importantly - the crude pitch of 85 ppi. The CPNDRIV_CORRECTED_HIRES.C version included here, in addition to the habitual pointer correction, passes those values to 2048, 2048 and 300 ppi, respectively. These permit to save bitmap output in adequate quality.
+
+This is another reason to perform local compilation of the PGPLOT package, after the original PNG driver has been overwritten by its present version by   
+
+      cp pndriv_corrected_hires.c ./drivers/pndriv.c  
+      
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 A/ Linux UBUNTU/DEBIAN
 
 Use APT to install the PGPLOT5 libraries
@@ -9,8 +20,11 @@ Alternatively you may download the package from UBUNTU MULTIVERSE
 You may still wish to get the original PGPLOT distribution package (cf. below) to get the demo sourcefiles 
 and to compile (cf. the MPtools compile script) at least PGDEMO1.F for testing purposes.
 
-
 B/ Mac OS X
+
+B.1. Intel Mac
+
+(may use the script under B.2 with adequate modifications)
 
 Download both the pgplot tarfile and the specific configuration files for MacOSX created by Benjamin Weiner and copy/move them into
 cd /usr/local/src/:
@@ -45,14 +59,20 @@ comment out the line
 i.e.
   #pndriv.o : ./png.h ./pngconf.h ./zlib.h ./zconf.h 
 
+**** the corrections of MAKEMAKE can be carried out by the patch under B.2 ***
+
 Run MAKEMAKE 
 cd /usr/local/pgplot/ 
 /usr/local/src/pgplot/makemake /usr/local/pgplot macosx gfortran_gcc_64
 
-Copy the corrected PNG driver into the drivers list (overwrite the original one)
-  cp pndriv_corrected.c ./drivers/pndriv.c  
+Copy the corrected PNG driver into the drivers directory (overwrite the original one)
+  cp pndriv_corrected_hires.c ./drivers/pndriv.c  
+
 alternatively, to do the correction, edit the driver source pndriv.c to fix the pointer problem: 
 setjmp(png_ptr->jmpbuf)   should be   setjmp(png_jmpbuf(png_ptr)) (line ≈255)
+
+and change the image size (lines ≈60) and pitch (lines ≈600)  
+
 
 and then do the MAKE 
   make 
@@ -69,3 +89,33 @@ Linking a fortran code against pgplot needs to include the X11 and the PNG libra
 on systems, where the X11 libraries are not part of standard configuration, you may need 
 to add their path as well (-L/usr/X11/lib)  
 
+
+
+B.2. Apple Silicon Mac under Monterrey
+
+- do the following (after https://www.mail-archive.com/pdl-general@lists.sourceforge.net/msg00895.html):
+		- be sure to have the 
+				gfortran_cc_Monterrey.conf 
+		  or
+		        gfortran_cc_BigSur.conf
+		  files in the appropriate sys subdirectory (here sys_darwin)
+		  
+		- execute the following commands (cf. below)
+		- in case of fatal errors in the course of MAKE check the locations of libraries
+		  between the *.conf file and reality
+
+curl --remote-name https://astronomy.swin.edu.au/~karl/pgplot/pgplot531.tar.gz
+curl --remote-name https://astronomy.swin.edu.au/~karl/pgplot/pgplotpatch.diff
+tar xvf pgplot531.tar.gz
+cd pgplotsrc
+patch  -p 1 -i ../pgplotpatch.diff					#applies the famous PNG patch
+SRC=$PWD
+sudo mkdir /usr/local/pgplot
+cd  /usr/local/pgplot
+sudo cp $SRC/drivers.list .
+sudo $SRC/makemake $SRC/ darwin gfortran_cc_Monterrey
+sudo make
+sudo make clean
+export DISPLAY=:0
+/opt/X11/bin/xhost +
+./pgdemo1 # Works

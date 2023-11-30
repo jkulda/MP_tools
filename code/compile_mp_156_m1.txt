@@ -1,0 +1,60 @@
+echo "Compiling MP_TOOLS v. 1.56"
+alias f9='gfortran -ffree-form -ffree-line-length-none -fimplicit-none -O2 -march=native -ffpe-summary=none'
+#
+echo "mp_dbin6    DL_POLY input file conversion"
+f9 src/mp_dbin56.f90 -o /usr/local/bin/mp_dbin6
+#
+echo "mp_lbin6    LAMMPS & GENERAL input file conversion"
+f9 src/mp_lbin56.f90 -o /usr/local/bin/mp_lbin6
+#
+echo "mp_dos6     DOS calculation and plotting"
+f9 src/singleton.f90 src/mp_dos56.f90 -o /usr/local/bin/mp_dos6 -L/usr/local/pgplot -lpgplot -L/opt/homebrew/lib -lm -fopenmp  -lX11 -lpng
+#
+echo "mp_sqom6    S(Q,w) single crystal calculation and plotting"
+f9 src/singleton.f90 src/mp_sqom56.f90 -o /usr/local/bin/mp_sqom6 -L/usr/local/pgplot -lpgplot -L/opt/usr/lib -lfinufft -L/opt/homebrew/lib -lstdc++ -lfftw3 -lfftw3_omp -lm -fopenmp -lX11 -lpng
+#
+echo "mp_sql6     S(Q) disorder/liquids calculation and plotting"
+f9 src/mp_sql56.f90 -o /usr/local/bin/mp_sql6  -L/usr/local/pgplot -lpgplot -L/opt/usr/lib -lfinufft -L/opt/homebrew/lib -lstdc++ -lfftw3 -lfftw3_omp -lm -fopenmp -lX11 -lpng
+#
+echo "mp_pdf6     PDF & S(Q) disorder/liquids calculation and plotting"
+f9 src/singleton.f90 src/mp_pdf56.f90 -o /usr/local/bin/mp_pdf6 -L/usr/local/pgplot -lpgplot -L/opt/homebrew/lib -lm -fopenmp -lX11 -lpng
+#
+echo "mp_dplot6   Domain maps in real space"
+f9 src/mp_dplot56.f90 -fbounds-check -o /usr/local/bin/mp_dplot6 -L/usr/local/pgplot -lpgplot  -L/opt/homebrew/lib -lm -lz -lX11 -lpng
+#
+echo "mp_insp6    Binary data file inspection"
+f9 src/mp_insp56.f90 -o /usr/local/bin/mp_insp6
+#
+echo "mp_tfilter6 Time filter for MD trajectories"
+f9 src/mp_tfilter56.f90 -o /usr/local/bin/mp_tfilter6
+#
+echo "mp_latt6    Undistorted crystal lattice creation"
+f9 src/mp_latt56.f90 -fbounds-check -o /usr/local/bin/mp_latt6
+#
+echo "mp_lc6      Linear combination of snapshots"
+f9 src/mp_lc56.f90 -fbounds-check -o /usr/local/bin/mp_lc6
+#
+if ! [ -e /usr/local/mp_tools ]; then sudo mkdir /usr/local/mp_tools;
+echo "Need sudo password to create /usr/local/mp_tools"
+sudo cp -R * /usr/local/mp_tools;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref ]; then sudo mkdir /usr/local/mp_tools/ref;
+echo "Need sudo password to create /usr/local/mp_tools/ref"
+sudo cp ./ref/* /usr/local/mp_tools/ref;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref/neutron_xs.txt ]; 
+then sudo cp ./ref/neutron_xs.txt /usr/local/mp_tools/ref;
+fi
+#
+if ! [ -e /usr/local/mp_tools/ref/xray_ff.txt ]; 
+then sudo cp ./ref/xray_ff.txt /usr/local/mp_tools/ref;
+fi
+#
+
+echo 
+echo "In case of need you may edit this script with:" 
+echo "   -fbounds-check     to localize SEGMENTATION ERRORS (slows down the execution by 10-20%)" 
+echo "   -L/usr/X11R6/lib   insert in lines containing -lX11 (alternative localisation of X11)"
+echo "   -O, -Ofast         replacing -march=native if transportability is the goal"

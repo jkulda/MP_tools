@@ -55,8 +55,12 @@
 #define TRANS_ON  2
 
 /* miscellaneous constants */
+/* original values
 #define DEFAULT_WIDTH 850
 #define DEFAULT_HEIGHT 680
+*/
+#define DEFAULT_WIDTH 2048        /* modified by JK 2023 */
+#define DEFAULT_HEIGHT 2048
 #define NCOLORS 256
 #define DEVICE_CAPABILITIES "HNNNNRPNYN"
 #define DEFAULT_FILENAME "pgplot.png"
@@ -581,9 +585,12 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	break;
 
 	/* return device scale */
-  case 3:
-	rbuf[0] = 85.0; /* same as used in GIF drivers */
-	rbuf[1] = 85.0;
+  case 3: 
+	/* same as used in GIF drivers        
+		rbuf[0] = 85.0; 
+	  rbuf[1] = 85.0; */
+	rbuf[0] = 300.0;        /* modified by JK 2023 */
+	rbuf[1] = 300.0;
 	rbuf[2] = 1.0;
 	*nbuf = 3;
 	break;
