@@ -1,0 +1,45 @@
+2023-12-04 10:44:35 RMC_Al-U_JK_work> mp_lbin6
+ *** Program MP_LBIN 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_LBIN>  Parameter file name (.par will be added)
+Al_U_large
+           Position units:BOX
+ MP_LBIN>  Substance name (confirm, &append or replace): Al_U
+,
+
+           Substance name: Al_U
+           Sim_type, dat_type, input method: STATIC          GENERAL         BULK
+ Atom labels (chemical species)            2
+                      1 Al             1
+                      1 U              2
+           Atom types:
+                      1 Al
+                      2 U
+ MP_LBIN>  Read snapshots number: min, max
+1 1
+ MP_LBIN>  Saved snapshot numbers start:
+1
+ MP_LBIN>  Master for MD input filename:
+Al_U_large
+ MP_LBIN>  Read input files number (0 0 0 no numbers): min,step,max
+0 0 0
+           1st input file to read:./data/Al_U_large.txt
+           angle_rad   1.57079637       1.57079637       1.57079637
+           angle_deg   90.0000763       90.0000763       90.0000763
+           Simulation type = STATIC
+           Trajectory recording mode =           0
+           Simulation box:           1           1           1
+           Lattice parameter:   79.8159637       79.8159637       79.8159637
+           Angles:              1.57079637       1.57079637       1.57079637
+           Atom species not identified explicitly, using their order in the list
+ MP_LBIN>  go ahead? (1/0)
+1
+           Reading trajectory file(s):  ./data/Al_U_large.txt
+           1st snapshot: total of       30000  atoms read in  0.136168003      sec
+           Bulk concentrations:
+                Al    0.920000017
+                U      7.99999982E-02
+           ./data/Al_U_large_n0001.dat
+           n_head           4
+           Trajectory finished:            1  .dat files written in SYS time  0.134000003      sec
+2023-12-04 10:45:54 RMC_Al-U_JK_work>

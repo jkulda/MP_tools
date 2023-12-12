@@ -1,0 +1,53 @@
+2023-12-12 09:54:19 RMC_Al-U_JK_work> mp_insp6
+ *** Program MP_INSP 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_INSP>  Data file_master:
+Al_U_large
+ MP_INSP>  snapshot file number (0 for no number):
+1
+           Reading ./data/Al_U_large_n0001.dat
+
+           Code & version, no. of header lines:   MP_TOOLS        1.56           4
+           Substance name:                        Al_U
+           Data & simulation type, input method:GENERAL         STATIC          BULK
+           Time structure t_ms,t_step,t_dump:     0.00000000       0.00000000       0.00000000
+           Shells, trajectory type, boundary cnd:  -1367965695              0              2
+           Supercell & temperature:                       1           1           1   300.000000
+           Unit cell parameter(3), angle(3):      79.8159637       79.8159637       79.8159637            1.57079637       1.57079637       1.57079637
+
+             a_cell                                                  a_cell_inv
+              1.00000000       0.00000000       0.00000000            1.00000000       0.00000000       0.00000000
+              0.00000000       1.00000000       0.00000000            0.00000000       1.00000000       0.00000000
+              0.00000000       0.00000000       1.00000000            0.00000000       0.00000000       1.00000000
+
+           Atom numbers:                                  2       27600        2400       30000
+           Atoms & occupancies:
+                              Al     0.00000000       0.00000000       0.00000000      0.920000017
+                              U      0.00000000       0.00000000       0.00000000       7.99999982E-02
+
+ MP_INSP>  jat, relative record_index (0 0 = new file number, -1 -1 = END):
+1 1
+           Atom, type, mass, charge    Al             1   0.00000000       0.00000000
+           Atom index                       1
+           Atom position              -25.3963871      -19.8629589      -38.6950645
+
+ MP_INSP>  jat, relative record_index (0 0 = new file number, -1 -1 = END):
+1 1000
+           Atom, type, mass, charge    Al             1   0.00000000       0.00000000
+           Atom index                    1000
+           Atom position              -18.5888100       36.1096497      -38.8077927
+
+ MP_INSP>  jat, relative record_index (0 0 = new file number, -1 -1 = END):
+2 1
+           Atom, type, mass, charge    U              2   0.00000000       0.00000000
+           Atom index                   27601
+           Atom position              -14.1297760       35.0735474      -6.00403166
+
+ MP_INSP>  jat, relative record_index (0 0 = new file number, -1 -1 = END):
+2 1000
+           Atom, type, mass, charge    U              2   0.00000000       0.00000000
+           Atom index                   28600
+           Atom position              -10.5045185      -8.02664280      -20.8438568
+
+ MP_INSP>  jat, relative record_index (0 0 = new file number, -1 -1 = END):
+-1 -1

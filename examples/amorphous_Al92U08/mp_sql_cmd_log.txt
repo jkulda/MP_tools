@@ -1,0 +1,216 @@
+2023-12-12 10:09:02 RMC_Al-U_JK_work> mp_sql6
+ *** Program MP_SQL 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_SQL>   Data file_master & file numbers (min, max; 0 0 single file):
+Al_U_large
+1 1
+           Input data:  MP_TOOLS        1.56           4
+ MP_SQL>   Parameter file name (.par to be added) (confirm or type other name): Al_U_large
+           Modes J_MODE=1..2 not available with MP_SQL, setting J_MODE=6 for I(Q)
+
+ MP_SQL>   Substance name (confirm, &append or replace): Al_U
+,
+
+           Substance name: Al_U
+           Sim_type, dat_type, input method: STATIC          GENERAL         BULK
+
+           Atoms from Al_U_large.par (name, occupancy,neutron b_coh, Xray formfactor parameters)
+                Al      0.9200    0.3449    6.4202  3.0387  1.9002  0.7426  1.5936 31.5472  1.9646 85.0886  1.1151
+                U       0.0800    0.8417   36.0228  0.5293 23.4128  3.3253 14.9491 16.0927  4.1880100.6130 13.3966
+ n_head,n_row,product(n_row)           4           1           1           1           1
+           Input files:
+           ./data/Al_U_large_n0001.dat
+                      1  files read in    4.00000019E-03  sec SYS time
+ MP_SQL>   Q-range [Å-1] (0=END)
+20
+
+           NOTE: NUFFT_3D requires about   8 Gb memory, in case of problems quit other applications or reduce Q-range!
+
+           Preparing FT ...
+           Doing FT ...
+
+           FINUFFT on           1 snapshot CPU_TIME   72.2989044       SYS_TIME   62.8020020
+
+           Doing Gauss integration ...
+
+           Gaussian smooth FWHM in Q_steps of 0.010[Å-1] (1 no smoothing = default)
+19
+           Atoms:              Al       U
+           Atoms no.:          1        2
+           Occupancy:          0.9200   0.0800
+           Amplitudes:        19.3117  25.1244
+           Scale factors:      1.0000   1.0000
+
+           Actual masks:
+             1  1
+
+           Vertical scale c_min,c_max -0.400000006       2.20000005
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+
+ MP_SQL>   Choose output options (MODE is I(Q), FILE output is OFF
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Xray weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000
+                  7   toggle FILE output ON (mind the J_TXT switch in .PAR)
+                  8   import external I(Q) curve
+                  9   RESTART with updated weights & masks
+                 10   select the OUTPUT MODE, actual: I(Q)
+
+                  0   EXIT
+7
+
+ MP_SQL>   Choose output options (MODE is Z(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Xray weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external Z(Q) curve
+                  9   RESTART with updated weights & masks
+                 10   select the OUTPUT MODE, actual: Z(Q)
+
+                  0   EXIT
+9
+           Gaussian smooth FWHM in Q_steps of 0.010[Å-1] (1 no smoothing = default)
+5
+           Atoms:              Al       U
+           Atoms no.:          1        2
+           Occupancy:          0.9200   0.0800
+           Amplitudes:        19.3117  25.1244
+           Scale factors:      1.0000   1.0000
+
+           Actual masks:
+             1  1
+
+           Vertical scale c_min,c_max  -8.10000038       6.20000029
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+-5 7
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+            Postscript output written to: Al_U_large_sql_0001_40.ps
+            Text output written to: Al_U_large_sql_0001_40.txt
+
+ MP_SQL>   Choose output options (MODE is Z(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Xray weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external Z(Q) curve
+                  9   RESTART with updated weights & masks
+                 10   select the OUTPUT MODE, actual: Z(Q)
+
+                  0   EXIT
+10
+ MP_SQL>   Select the output MODE:            3   F(Q)           4   S(Q)           5   Z(Q)           6   I(Q)           7   I(Q)_unscaled
+6
+           Gaussian smooth FWHM in Q_steps of 0.010[Å-1] (1 no smoothing = default)
+5
+           Atoms:              Al       U
+           Atoms no.:          1        2
+           Occupancy:          0.9200   0.0800
+           Amplitudes:        19.3117  25.1244
+           Scale factors:      1.0000   1.0000
+
+           Actual masks:
+             1  1
+
+           Vertical scale c_min,c_max -0.400000006       2.50000000
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+            Postscript output written to: Al_U_large_sql_0001_41.ps
+            Text output written to: Al_U_large_sql_0001_41.txt
+
+ MP_SQL>   Choose output options (MODE is I(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Xray weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external I(Q) curve
+                  9   RESTART with updated weights & masks
+                 10   select the OUTPUT MODE, actual: I(Q)
+
+                  0   EXIT
+10
+ MP_SQL>   Select the output MODE:            3   F(Q)           4   S(Q)           5   Z(Q)           6   I(Q)           7   I(Q)_unscaled
+4
+           Gaussian smooth FWHM in Q_steps of 0.010[Å-1] (1 no smoothing = default)
+5
+           Atoms:              Al       U
+           Atoms no.:          1        2
+           Occupancy:          0.9200   0.0800
+           Amplitudes:        19.3117  25.1244
+           Scale factors:      1.0000   1.0000
+
+           Actual masks:
+             1  1
+
+           Vertical scale c_min,c_max  -1.10000002       4.70000029
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+-1 5
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+            Postscript output written to: Al_U_large_sql_0001_42.ps
+            Text output written to: Al_U_large_sql_0001_42.txt
+
+ MP_SQL>   Choose output options (MODE is S(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Xray weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external S(Q) curve
+                  9   RESTART with updated weights & masks
+                 10   select the OUTPUT MODE, actual: S(Q)
+
+                  0   EXIT
+10
+ MP_SQL>   Select the output MODE:            3   F(Q)           4   S(Q)           5   Z(Q)           6   I(Q)           7   I(Q)_unscaled
+7
+           Gaussian smooth FWHM in Q_steps of 0.010[Å-1] (1 no smoothing = default)
+5
+           Atoms:              Al       U
+           Atoms no.:          1        2
+           Occupancy:          0.9200   0.0800
+           Amplitudes:        19.3117  25.1244
+           Scale factors:      1.0000   1.0000
+
+           Actual masks:
+             1  1
+
+           Vertical scale c_min,c_max  -252.199997       1298.09998
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+-300 1500
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+            Postscript output written to: Al_U_large_sql_0001_43.ps
+            Text output written to: Al_U_large_sql_0001_43.txt
+
+ MP_SQL>   Choose output options (MODE is I(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Xray weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external I(Q) curve
+                  9   RESTART with updated weights & masks
+                 10   select the OUTPUT MODE, actual: I(Q)
+
+                  0   EXIT
+0
+2023-12-12 10:48:55 RMC_Al-U_JK_work>
