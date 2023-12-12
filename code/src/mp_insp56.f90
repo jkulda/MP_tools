@@ -58,10 +58,12 @@ program mp_insp55
 ! *****
 ! ***** atom positions are converted to and recorded in reduced lattice coordinates (x) 
 ! ***** 
+! ***** 
     integer,parameter :: l_rec  =  1024		    !record length in real(4)
     
     character(4),allocatable      :: at_name_out(:)
     character(4)			:: version
+    character(10)			:: prompt,space = '          '
     character(16)     :: sim_type,file_par,dat_type,dat_source,input_method,string,filter_name
     character(40)     :: subst_name,file_master,string_in,mp_tool
     character(60) 		:: file_dat,file_out
@@ -86,10 +88,11 @@ program mp_insp55
    
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_INSP>  '
   mp_tool = 'MP_INSP '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *
 ! *******************************************************************      
 
     n_traj = 0
@@ -104,8 +107,8 @@ program mp_insp55
     filter_name = 'nn'
     filter_fwhm = .0
     
-    write(*,*) 'Master filename: '
-    read(*,*) file_master 
+  print *,prompt, 'Data file_master: '
+  read(*,*) file_master
 
 ! **** open a t-snapshot file and read its header 
 
@@ -113,7 +116,7 @@ program mp_insp55
 
       jrec_save = 0
 
-      write(*,*) 'snapshot file number (0 for no number):'
+      print *,prompt, 'snapshot file number (0 for no number):'
       read(*,*) jt
 
       if(jt==0)then
@@ -127,8 +130,8 @@ program mp_insp55
         endif
       endif 			
 
-      write(*,*)'Reading ',file_dat
-      write(*,*) 
+      print *,space,'Reading ',file_dat
+      print *,space
       open (1,file=file_dat,action='read',status ='old',access='direct',form='unformatted',recl=4*l_rec)
 
       i_rec = 1   			
@@ -164,33 +167,33 @@ program mp_insp55
       endif
 
       if(nml_in) then
-      write(*,*) 'Code & version, no. of header lines:   ',dat_source,version,n_head	
+      print *,space, 'Code & version, no. of header lines:   ',dat_source,version,n_head	
       else
-        write(*,*) 'Data source, version & number of header lines:  ','old header format'	
+        print *,space, 'Data source, version & number of header lines:  ','old header format'	
       endif
                     
-      write(*,*) 'Substance name:                        ',subst_name
-      write(*,*) 'Data & simulation type, input method:',dat_type,sim_type,input_method
-      write(*,*) 'Time structure t_ms,t_step,t_dump:  ',t_ms,t_step,t_dump
-      write(*,*) 'Shells, trajectory type, boundary cnd: ',j_shell_out,'  ',n_traj,'  ',n_cond
-      if(filter_fwhm/=0.) write(*,*) 'Time filter name, fwhm:                ',trim(filter_name),filter_fwhm
-      write(*,*) 'Supercell & temperature:            ',n_row,temp
-      write(*,*) 'Unit cell parameter(3), angle(3):   ',a_par,'    ',angle
+      print *,space, 'Substance name:                        ',subst_name
+      print *,space, 'Data & simulation type, input method:',dat_type,sim_type,input_method
+      print *,space, 'Time structure t_ms,t_step,t_dump:  ',t_ms,t_step,t_dump
+      print *,space, 'Shells, trajectory type, boundary cnd: ',j_shell_out,'  ',n_traj,'  ',n_cond
+      if(filter_fwhm/=0.) print *,space, 'Time filter name, fwhm:                ',trim(filter_name),filter_fwhm
+      print *,space, 'Supercell & temperature:            ',n_row,temp
+      print *,space, 'Unit cell parameter(3), angle(3):   ',a_par,'    ',angle
       if(n_head==4) then
-      write(*,*) 
-        write(*,*) '  a_cell                                                  a_cell_inv'
+        print *,space 
+        print *,space, '  a_cell                                                  a_cell_inv'
         do k=1,3
-          write(*,*) a_cell(k,:),'    ',a_cell_inv(k,:)
+          print *,space, a_cell(k,:),'    ',a_cell_inv(k,:)
         enddo
       endif
 
-      write(*,*) 
-      write(*,*) 'Atom numbers:                       ',n_atom,nsuper_r,n_tot
-      write(*,*) 'Atoms & occupancies: '
+      print *,space 
+      print *,space, 'Atom numbers:                       ',n_atom,nsuper_r,n_tot
+      print *,space, 'Atoms & occupancies: '
       do j=1,n_atom
-        write(*,*) '                   ',at_name_out(j),at_base(j,:),at_occup_r(j)
+        print *,space, '                   ',at_name_out(j),at_base(j,:),at_occup_r(j)
       enddo
-      write(*,*) 
+      print *,space 
       
       nrow = n_row(1)
       nlayer = n_row(1)*n_row(2)						!only to be used for record number calculation
@@ -209,7 +212,7 @@ program mp_insp55
 
       master_loop: do 	
         if(input_method=='CELL'.or.input_method=='FAST')	then
-          write(*,*) 'jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END): '
+          print *,prompt, 'jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END): '
           read(*,*) jat,i,j,k
           if (jat==0) exit master_loop
           if (jat==9.and.i==9.and.j==9.and.k==9) exit file_loop
@@ -217,13 +220,13 @@ program mp_insp55
 
           ind = nsuper*(jat-1)+nlayer*(k-1)+n_row(1)*(j-1)+i
         else !input_method == 'BULK'
-          write(*,*) 'jat, relative record_index (0 = new file number, -1 = END): '
+          print *,prompt, 'jat, relative record_index (0 0 = new file number, -1 -1 = END): '
           read(*,*) jat,ind
           if (jat==0) exit master_loop
           if (jat==-1) exit file_loop	
           if(jat>n_atom) cycle
           if(ind>nsuper_r(jat))	then
-            write(*,*) 'IND out of range!'
+            print *,space, 'IND out of range!'
             cycle master_loop
           endif			
           ind = ind+ind_at(jat)
@@ -243,7 +246,7 @@ program mp_insp55
         
           i_rec = jrec_in+n_rec+n_head
           read(1,rec=i_rec,iostat=ios) at_pos_c
-          if(ios/=0) write(*,*)'at_pos_c: ios,i_rec',ios,i_rec
+          if(ios/=0) print *,space,'at_pos_c: ios,i_rec',ios,i_rec
         
           if(index(sim_type,'static')==0.and.index(sim_type,'Static')==0.and.index(sim_type,'STATIC')==0) then
             i_rec = jrec_in+2*n_rec+n_head
@@ -261,26 +264,26 @@ program mp_insp55
         endif
 
         jj = 4*(jpos_in-1)
-        write(*,*) 'Atom, type, mass, charge    ',at_name_out(jat),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)   !at_ind(jj+4)=0 for unoccupied
+        print *,space, 'Atom, type, mass, charge    ',at_name_out(jat),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)   !at_ind(jj+4)=0 for unoccupied
         if(input_method=='CELL'.or.input_method=='FAST')	then
-          write(*,*) 'Cell index            ',at_ind(jj+1:jj+3)
+          print *,space, 'Cell index            ',at_ind(jj+1:jj+3)
         else
-          write(*,*) 'Atom index            ',at_ind(jj+1)					
+          print *,space, 'Atom index            ',at_ind(jj+1)					
         endif
         
-        write(*,*) 'Atom position            ',at_pos_c(jj+1:jj+3)
+        print *,space, 'Atom position            ',at_pos_c(jj+1:jj+3)
         if(index(sim_type,'static')==0.and.index(sim_type,'Static')==0.and.index(sim_type,'STATIC')==0) then
-          if(n_traj>=1) write(*,*) 'Atom velocity             ',at_veloc_c(jj+1:jj+3)
-          if(n_traj==2) write(*,*) 'Atom force                ',at_force_c(jj+1:jj+3)
-          write(*,*)
+          if(n_traj>=1) print *,space, 'Atom velocity             ',at_veloc_c(jj+1:jj+3)
+          if(n_traj==2) print *,space, 'Atom force                ',at_force_c(jj+1:jj+3)
+          print *,space
           if(j_shell_out==1) then
-            write(*,*) trim(at_name_out(jat))//'_s',at_veloc_s(jj+4),at_pos_s(jj+4)
-            write(*,*) 'Shell position                ',at_pos_s(jj+1:jj+3)
-            if(n_traj>=1) write(*,*) 'Shell velocity                ',at_veloc_s(jj+1:jj+3)
-            if(n_traj==2) write(*,*) 'Shell force               ',at_force_s(jj+1:jj+3)
+            print *,space, trim(at_name_out(jat))//'_s',at_veloc_s(jj+4),at_pos_s(jj+4)
+            print *,space, 'Shell position                ',at_pos_s(jj+1:jj+3)
+            if(n_traj>=1) print *,space, 'Shell velocity                ',at_veloc_s(jj+1:jj+3)
+            if(n_traj==2) print *,space, 'Shell force               ',at_force_s(jj+1:jj+3)
           endif
         endif				
-        write(*,*)         
+        print *,space         
       enddo master_loop
       close(1)
 

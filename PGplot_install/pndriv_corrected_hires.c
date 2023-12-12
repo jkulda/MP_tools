@@ -29,6 +29,19 @@
 
 */
 
+// This is a version reviewed by J. Kulda (ILL Grenoble) and P. Marton (FZU Prague) in December 2023
+// The driver functionality hasn't changed but in addition to the "canonic" bug
+// setjmp(png_ptr->jmpbuf)  that should be   setjmp(png_jmpbuf(png_ptr)) (line ≈250)
+// we have revisited the obsolete low resolution of the bitmap output, in fact:
+// - the DEFAULT_WIDTH and DEFAULT_HEIGHT does not seem relevant,  apparently internally 
+//   PGPLOT works with a maximum image size of 8"x8" and maximum 1280x1280 pixels
+// - thus the default resolution, originally at 85 ppi, has been increased to 160 ppi  
+// - the resolution can be further modified by setting a new environment variable PGPLOT_PNG_PPI,
+//   but above the value of 160 ppi it will result in only partial fills of the image field
+// - a new message on STDOUT warns when the PNG was not saved
+// - use STDERR redirection to STDOUT for more diagnostics: $> my_prog 2>&1
+// - error messages on STDERR are numbered for easier localisation in the code
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -59,8 +72,8 @@
 #define DEFAULT_WIDTH 850
 #define DEFAULT_HEIGHT 680
 */
-#define DEFAULT_WIDTH 2048        /* modified by JK 2023 */
-#define DEFAULT_HEIGHT 2048
+#define DEFAULT_WIDTH 1280        /* modified by JK 2023 but in fact: it doesn't matter */
+#define DEFAULT_HEIGHT 1280
 #define NCOLORS 256
 #define DEVICE_CAPABILITIES "HNNNNRPNYN"
 #define DEFAULT_FILENAME "pgplot.png"
@@ -166,9 +179,10 @@ static void write_image_file(DeviceData *dev) {
   png_color      colors[NCOLORS];
   ColorComponent r, g, b;
 
-  if (dev->error == true)
+  if (dev->error == true){
+	  fprintf(stderr,"%s: ERR PNG 0\n",png_ident,filename);
 	return;
-
+}
   /* fill the color table for libpng */
   for (i=0; i<NCOLORS; i++) {
 	get_color_rep(dev, i, &r, &g, &b);
@@ -186,7 +200,7 @@ static void write_image_file(DeviceData *dev) {
 
   filename = malloc(strlen(dev->filename)+EXTRA_CHARS);
   if (!filename) {
-	fprintf(stderr,"%s: out of memory, plotting disabled\n", png_ident);
+  	fprintf(stderr,"%s: out of memory, plotting disabled 1\n", png_ident);
 	dev->error = true;
 	return;
   }
@@ -199,7 +213,7 @@ static void write_image_file(DeviceData *dev) {
   /* open the file */
   if (strcmp("-",filename) != 0) {
 	if (! (fp = fopen(filename,"wb"))) {
-	  fprintf(stderr,"%s: could not open file %s for writing, plotting disabled\n",png_ident,filename);
+	  fprintf(stderr,"%s: could not open file %s for writing, plotting disabled 2\n",png_ident,filename);
 	  dev->error = true;
 	  free(filename);
 	  return;
@@ -217,7 +231,7 @@ static void write_image_file(DeviceData *dev) {
 
   info_ptr = png_create_info_struct(png_ptr);
   if (!info_ptr) {
-	fprintf(stderr,"%s: error in libpng while writing file %s, plotting disabled\n", png_ident, filename);
+  	fprintf(stderr,"%s: error in libpng while writing file %s, plotting disabled 3\n", png_ident, filename);
 	png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
 	dev->error = true;
 	if (fp != stdout)
@@ -227,7 +241,7 @@ static void write_image_file(DeviceData *dev) {
   }
 
   if (setjmp(png_jmpbuf(png_ptr))) { /* corrected by JK 2022 */
-	fprintf(stderr,"%s: error in libpng while writing file %s, plotting disabled\n", png_ident, filename);
+  	fprintf(stderr,"%s: error in libpng while writing file %s, plotting disabled 4\n", png_ident, filename);
 	png_destroy_write_struct(&png_ptr,&info_ptr);
 	dev->error = true;
 	if (fp != stdout)
@@ -304,9 +318,10 @@ static void fill_rectangle( DeviceData *dev, int x1, int y1, int x2, int y2, Col
   int y;
   int npix = (x2 - x1 + 1); /* number of pixels to fill on a single line */
 
-  if (dev->error == true)
+  if (dev->error == true){
+  	fprintf(stderr,"%s: ERR: fill_rectangle disabled 5\n",png_ident);
 	return;
-
+}
   /* ensure coords are lower left and upper right */
   if (x2<x1 && y2<y1)
 	swap_coords(&x1, &y1, &x2, &y2);
@@ -337,7 +352,7 @@ static void start_plot(DeviceData *dev, int w, int h) {
   dev->npix = dev->w * dev->h;
   dev->pixmap = malloc( dev->npix * sizeof(ColorIndex) );
   if (!dev->pixmap) {
-	fprintf(stderr,"%s: out of memory, plotting disabled\n",png_ident);
+  	fprintf(stderr,"%s: out of memory, plotting disabled 6\n",png_ident);
 	dev->error = true;
   }
   dev->npages++;
@@ -350,8 +365,11 @@ static void start_plot(DeviceData *dev, int w, int h) {
   memory allocated in start_plot() for pixmap.
 */
 static void end_plot(DeviceData *dev) {
-  if (dev->error == true)
+  if (dev->error == true){
+     fprintf(stderr,"%s", "ERR: PNG not saved, try once again ... 7\n\n");
+     printf("%s", "ERR: PNG not saved, try once again ...\n\n");
 	return;
+}	
   write_image_file(dev);
   free(dev->pixmap);
 }
@@ -359,7 +377,7 @@ static void end_plot(DeviceData *dev) {
 static void make_device_active(float devnum) {
   all_devices.active = devnum;
   if (ACTIVE_DEVICE == NULL)
-	fprintf(stderr,"%s: one SIGSEGV coming right up! ACTIVE_DEVICE == NULL\n",png_ident);
+	fprintf(stderr,"%s: one SIGSEGV coming right up! ACTIVE_DEVICE == NULL 8\n",png_ident);
 }
 
 /*
@@ -376,25 +394,60 @@ static void initialize_default_colortable(void) {
 }
 
 static void get_default_dimensions( int *width, int *height) {
+// troubleshooting PM
 
-  char *width_string = NULL;
-  char *height_string = NULL;
+  char width_string[100];
+  char height_string[100];
+  char *aux_width=NULL;
+  char *aux_height=NULL;
+  
+  if (! (aux_width = getenv("PGPLOT_PNG_WIDTH")))
+  {
+	sprintf(width_string,"%d",(int)(DEFAULT_WIDTH));
+  }
+  else
+  {
+	strcpy(width_string,aux_width);
+  }
 
-  if (! (width_string = getenv("PGPLOT_PNG_WIDTH")))
-	width_string = "DEFAULT_WIDTH";
-  if (! (height_string = getenv("PGPLOT_PNG_HEIGHT")))
-	height_string = "DEFAULT_HEIGHT";
+  if (! (aux_height = getenv("PGPLOT_PNG_HEIGHT")))
+  {
+	sprintf(height_string,"%d",(int)(DEFAULT_HEIGHT));
+  }
+  else
+  {
+	strcpy(height_string,aux_height);
+  }
 
   *width = atoi(width_string);
   *height = atoi(height_string);
 
   if (!(*width > 0) || !(*height>0)) {
-	*width = DEFAULT_WIDTH;
-	*height = DEFAULT_HEIGHT;
+	*width = (int)DEFAULT_WIDTH;
+	*height = (int)DEFAULT_HEIGHT;
   }
-
   return;
 }
+//static void get_default_dimensions( int *width, int *height) {
+//
+//  char *width_string = NULL;
+//  char *height_string = NULL;
+//
+//  if (! (width_string = getenv("PGPLOT_PNG_WIDTH")))
+//	width_string = "DEFAULT_WIDTH";
+//  if (! (height_string = getenv("PGPLOT_PNG_HEIGHT")))
+//	height_string = "DEFAULT_HEIGHT";
+//
+//  *width = atoi(width_string);
+//  *height = atoi(height_string);
+//
+//  if (!(*width > 0) || !(*height>0)) {
+//	*width = DEFAULT_WIDTH;
+//	*height = DEFAULT_HEIGHT;
+//  }
+//
+//  return;
+//}
 
 static void draw_line(DeviceData *dev, int x1, int y1, int x2, int y2, ColorIndex index) {
 
@@ -477,7 +530,7 @@ static void open_new_device(char *file, int length, float *id, float *err, int m
 
 	/* didn't get the memory needed */
 	if (!tmp) {
-	  fprintf(stderr,"%s: out of memory\n", png_ident);
+	  fprintf(stderr,"%s: out of memory 9\n", png_ident);
 	  return;
 	}
 	else {
@@ -489,13 +542,13 @@ static void open_new_device(char *file, int length, float *id, float *err, int m
   }
 
   if (!(all_devices.devices[devnum] = malloc(sizeof(DeviceData)))) {
-	fprintf(stderr,"%s: out of memory\n", png_ident);
+	fprintf(stderr,"%s: out of memory 10\n", png_ident);
 	return;
   }
 
   all_devices.devices[devnum]->filename = malloc(length+1);
   if (! all_devices.devices[devnum]->filename) {
-	fprintf(stderr,"%s: out of memory\n",png_ident);
+	fprintf(stderr,"%s: out of memory 11\n",png_ident);
 	free(all_devices.devices[devnum]);
 	all_devices.devices[devnum] = NULL;
 	return;
@@ -589,11 +642,31 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	/* same as used in GIF drivers        
 		rbuf[0] = 85.0; 
 	  rbuf[1] = 85.0; */
-	rbuf[0] = 300.0;        /* modified by JK 2023 */
-	rbuf[1] = 300.0;
+	//troubleshooting PM
+        char *aux_ppi=NULL;
+  
+        if (! (aux_ppi = getenv("PGPLOT_PNG_PPI")))
+	{
+	     rbuf[0] = 160.0;        /* modified by JK 2023: this matters! */
+	     rbuf[1] = 160.0;
+	}
+	else
+	{
+	     rbuf[0]=(float)atof(aux_ppi);
+	     rbuf[1]=(float)atof(aux_ppi);
+	}
 	rbuf[2] = 1.0;
 	*nbuf = 3;
 	break;
+//  case 3: 
+//	/* same as used in GIF drivers        
+//		rbuf[0] = 85.0; 
+//	  rbuf[1] = 85.0; */
+//	rbuf[0] = 300.0;        /* modified by JK 2023 */
+//	rbuf[1] = 300.0;
+//	rbuf[2] = 1.0;
+//	*nbuf = 3;
+//	break;
 
 	/* return device capabilities */
   case 4:
@@ -608,6 +681,8 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	break;
 
 	/* default edge coordinates of view surface */
+// JK_2023: apparently PGPLOT doesn't use this information when writing PNG
+// JK_2023: there seems to be an intrinsic WIDTH=HEIGHT=1280 to be matched by PPI=160
   case 6:
 	{
 	  int width, height;
@@ -619,7 +694,7 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	  rbuf[2] = 0.0;
 	  rbuf[3] = height - 1.0;
 	  *nbuf = 4;
-	};
+};
 	break;
 
 	/* scale factor of obsolete character set */
@@ -716,7 +791,6 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	  int y = rbuf[1];
 	  int base = ACTIVE_DEVICE->w * y + x;
 	  int i;
-
 	  for (i = 0; i<(int)*nbuf-2; i++)
 		ACTIVE_DEVICE->pixmap[base+i] = (ColorIndex)rbuf[i+2];
 	}
@@ -736,7 +810,7 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	break;
 
   default:
-	fprintf(stderr,"%s: unhandled opcode = %d (please notify Pete Ratzlaff: pratzlaff@cfa.harvard.edu)\n",png_ident, *opcode);
+	fprintf(stderr,"%s: unhandled opcode = %d (please notify Pete Ratzlaff: pratzlaff@cfa.harvard.edu) 12\n",png_ident, *opcode);
 
   }
 }

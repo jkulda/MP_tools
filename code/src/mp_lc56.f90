@@ -55,10 +55,10 @@ program mp_lc55
 ! *****
 ! ***** atom positions are converted from reduced lattice coordinates (x) to real space distances
 ! ***** 
-
   integer,parameter :: l_rec  =  1024		    !record length in real(4)
 
   character(4)   :: c_int(2),c_fil(2),version,head,atom
+  character(10)	 :: prompt,space = '          '
   character(10)  :: pg_out,section,c_date,c_time,c_zone
   character(16)  :: sim_type_par,data_type,string16,f_name,filter_name
   character(40)  :: subst_name,file_master_a,file_master_b,file_master_out,time_stamp,int_mode,string,mp_tool
@@ -95,11 +95,12 @@ program mp_lc55
 
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_LC>    '
   mp_tool = 'MP_LC '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*) '***           linear combination of snapshots             ***'			
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *,'***           linear combination of snapshots             ***'			
+  print *
 			
 ! ********************* Get a time stamp and open a .LOG file *******************************
   call getcwd(cwd_path)
@@ -119,29 +120,29 @@ program mp_lc55
   write(9,*) 
   
 ! *** Generate data file access
-  write(*,*) 'Data sequence A - file_master, file number min, step, max:  '
+  print *,prompt, 'Data sequence A - file_master, file number min, step, max:  '
   read(*,*) file_master_a,nfile_min_a,nfile_step_a,nfile_max_a
         
-!     write(*,*) 'Sequence A: data files number min, step, max: '
+!     print *,'Sequence A: data files number min, step, max: '
 !     read(*,*)   nfile_min_a,nfile_step_a,nfile_max_a
   
   nfile_a = ((nfile_max_a-nfile_min_a)/nfile_step_a)+1
   
-!		write(*,*) 'Sequence B: input data file_master: '
+!		print *,'Sequence B: input data file_master: '
 !		read(*,*) file_master_b 
 !					
-!     write(*,*) 'Sequence B: data files number min, step, max: '
+!     print *,'Sequence B: data files number min, step, max: '
 !     read(*,*)   nfile_min_b,nfile_step_b,nfile_max_b
   
-  write(*,*) 'Data sequence B - file_master, file number min, step, max:  '
+  print *,prompt, 'Data sequence B - file_master, file number min, step, max:  '
   read(*,*) file_master_b,nfile_min_b,nfile_step_b,nfile_max_b
   nfile_b = ((nfile_max_b-nfile_min_b)/nfile_step_b)+1
 
-!      write(*,*) 'nfile_a,nfile_b',nfile_a,nfile_b
+!      print *,'nfile_a,nfile_b',nfile_a,nfile_b
         
   if(nfile_a>1.and.nfile_b>1) then
     if(nfile_a/=nfile_b) then
-      write(*,*) 'Unequal length of file sequences: use the shorter one (1) or stop(0)? '
+      print *,space, 'Unequal length of file sequences: use the shorter one (1) or stop(0)? '
       read(*,*) jj      
       if(jj==1) then
         nfile = min(nfile_a,nfile_b)
@@ -154,11 +155,11 @@ program mp_lc55
   else
     nfile = max(nfile_a,nfile_b)      
   endif
-!        write(*,*) 'nfile',nfile
+!        print *,'nfile',nfile
       
 ! ***  Edit output file name
   do 
-    write(*,*) 'Output data file_master, file number min: '
+    print *,prompt, 'Output data file_master, file number min: '
     read(*,*) string,nfile_min_out
     file_master_out = trim(adjustl(string))
      
@@ -167,12 +168,12 @@ program mp_lc55
     inquire(file=file_dat_out,exist=found)
     
     if(.not.found) exit
-    write(*,*) 'File ',trim(file_dat_out),' already exists, overwrite(1/0)?'
+    print *,space, 'File ',trim(file_dat_out),' already exists, overwrite(1/0)?'
     read(*,*) j_over
     if(j_over==1) exit
   enddo 
      
-  write(*,*) 'Linear combination coeffs for sequences A & B:'
+  print *,prompt, 'Linear combination coeffs for sequences A & B:'
   read(*,*) coeff_a,coeff_b
   
         call cpu_time(t0)
@@ -191,11 +192,11 @@ program mp_lc55
 
       open(1,file=file_dat_a,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
       if(ios.ne.0) then
-        write(*,*) 'File A ',trim(file_dat_a),' not opened! IOS =',ios
-        write(*,*) 'Stop!'
+        print *,space, 'File A ',trim(file_dat_a),' not opened! IOS =',ios
+        print *,space, 'Stop!'
         stop
       else
-        if(ifile==1) write(*,*) 'File A ',trim(file_dat_a)
+        if(ifile==1) print *,space, 'File A ',trim(file_dat_a)
       endif
     endif
 
@@ -210,11 +211,11 @@ program mp_lc55
 
       open(2,file=file_dat_b,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
       if(ios.ne.0) then
-        write(*,*) 'File B ',trim(file_dat_b),' not opened! IOS =',ios
-        write(*,*) 'Stop!'
+        print *,space, 'File B ',trim(file_dat_b),' not opened! IOS =',ios
+        print *,space, 'Stop!'
         stop
       else
-        if(ifile==1) write(*,*) 'File B ',trim(file_dat_b)
+        if(ifile==1) print *,space, 'File B ',trim(file_dat_b)
       endif
     endif
 
@@ -228,7 +229,7 @@ program mp_lc55
         nml_in = .true.
         read(1,rec=i_rec) dat_source,version,string16
         read(string16,*) n_head
-!           write(*,*)		'Input data:  ',dat_source,version,n_head
+!           print *,		'Input data:  ',dat_source,version,n_head
     
         allocate(header(n_head))
         header(i_rec) = header_record
@@ -237,19 +238,19 @@ program mp_lc55
         read(1,rec=i_rec) header_record
         read(header_record,nml=data_header_1)	
       else
-        write(*,*) 'header record old, wrong or missing'
-        write(*,*) trim(header_record)
+        print *,space, 'header record old, wrong or missing'
+        print *,space, trim(header_record)
         stop
       endif 
 
       if(trim(input_method)/='CELL') then
-        write(*,*) 'WARNING: the input data were not produced by the CELL input method,'
-        write(*,*) 'the algorithm as such may work, BUT as there is no guaranteed relationship'
-        write(*,*) 'between the data position in the .BIN file and the position of the related ,'
-        write(*,*) 'atom in the simulation box, the results when combining several snapshots'
-        write(*,*) 'may become COMPLETELY IMPREVISIBLE!'
-        write(*,*) 
-        write(*,*) 'Do you wish to continue anyways, at YOUR risks & perils? (1/0)'
+        print *,space, 'WARNING: the input data were not produced by the CELL input method,'
+        print *,space, 'the algorithm as such may work, BUT as there is no guaranteed relationship'
+        print *,space, 'between the data position in the .BIN file and the position of the related ,'
+        print *,space, 'atom in the simulation box, the results when combining several snapshots'
+        print *,space, 'may become COMPLETELY IMPREVISIBLE!'
+        print *
+        print *,prompt, 'Do you wish to continue anyways, at YOUR risks & perils? (1/0)'
         read(*,*) jj
         if(jj/=1) stop
       endif
@@ -268,8 +269,8 @@ program mp_lc55
       do i=n_head+1,n_rec_tot
         read(2,rec=i,iostat=ios) 
         if(ios/=0) then
-          write(*,*) 'File B: end of file at i_rec=',i
-          write(*,*) 'Continue with this record number (1) or stop(0)?'
+          print *,space, 'File B: end of file at i_rec=',i
+          print *,prompt, 'Continue with this record number (1) or stop(0)?'
           read(*,*) jj
           if(jj==0) then
             stop
@@ -280,7 +281,7 @@ program mp_lc55
          endif   			 
       enddo	
 
-!         write(*,*) 'n_rec_0,n_rec_tot',n_rec_0,n_rec_tot
+!         print *,'n_rec_0,n_rec_tot',n_rec_0,n_rec_tot
 
       allocate(dat_char(n_rec_0),dat_file_a(n_rec_tot-n_rec_0,l_rec),dat_file_b(n_rec_tot-n_rec_0,l_rec))
     endif
@@ -290,8 +291,8 @@ program mp_lc55
       do i=1,n_rec_0
         read(1,rec=i,iostat=ios) dat_char(i)
         if(ios/=0) then
-          write(*,*) 'File A: end of file',ifile,'at i_rec=',i
-          write(*,*) 'Stop!'
+          print *,space, 'File A: end of file',ifile,'at i_rec=',i
+          print *,space, 'Stop!'
           stop
         endif   			 
       enddo
@@ -300,8 +301,8 @@ program mp_lc55
     do i=1,n_rec_tot-n_rec_0
       read(1,rec=n_rec_0+i,iostat=ios) dat_file_a(i,:)
       if(ios/=0) then
-        write(*,*) 'File A: end of file',ifile,'at i_rec=',n_rec_0+i
-        write(*,*) 'Stop!'
+        print *,space, 'File A: end of file',ifile,'at i_rec=',n_rec_0+i
+        print *,space, 'Stop!'
         stop
       endif   			 
     enddo	
@@ -310,8 +311,8 @@ program mp_lc55
       do i=1,n_rec_tot-n_rec_0
         read(2,rec=n_rec_0+i,iostat=ios) dat_file_b(i,:)
         if(ios/=0) then
-          write(*,*) 'File B: end of file',ifile,'at i_rec=',n_rec_0+i
-          write(*,*) 'Stop!'
+          print *,space, 'File B: end of file',ifile,'at i_rec=',n_rec_0+i
+          print *,space, 'Stop!'
           stop
         endif   			 
       enddo	
@@ -328,7 +329,7 @@ program mp_lc55
 !       inquire(file=file_dat_out,exist=found)
 !       
 !       if(found.and.j_over/=1) then
-!         write(*,*) 'File ',trim(file_dat_out),' already exists, overwrite(1/0)?'
+!         print *,'File ',trim(file_dat_out),' already exists, overwrite(1/0)?'
 !         read(*,*) j_over
 !         if(j_over==0) stop
 !       endif          
@@ -336,7 +337,7 @@ program mp_lc55
     open(3,file=file_dat_out,access='direct',form='unformatted',recl=4*l_rec)
 
     if(ifile==1) then 
-       write(*,*) '                 (working ... may take a short while)'
+       print *,'                 (working ... may take a short while)'
     endif
   
 
@@ -352,14 +353,14 @@ program mp_lc55
     enddo
     close(3)
 
-    if(ifile==1) write(*,*)'A: ',trim(file_dat_a),'   ','B: ',trim(file_dat_b),'   ','Out: ',trim(file_dat_out)
-    if(ifile<100.and.ifile==10*(ifile/10)) write(*,*) '   ',trim(file_dat_a),'   ','   ',trim(file_dat_b),'   ','     ',trim(file_dat_out)
-    if(ifile>=100.and.ifile==100*(ifile/100)) write(*,*) '   ',trim(file_dat_a),'   ','   ',trim(file_dat_b),'   ','     ',trim(file_dat_out)
+    if(ifile==1) print *,space,'A: ',trim(file_dat_a),'   ','B: ',trim(file_dat_b),'   ','Out: ',trim(file_dat_out)
+    if(ifile<100.and.ifile==10*(ifile/10)) print *,space, '   ',trim(file_dat_a),'   ','   ',trim(file_dat_b),'   ','     ',trim(file_dat_out)
+    if(ifile>=100.and.ifile==100*(ifile/100)) print *,space, '   ',trim(file_dat_a),'   ','   ',trim(file_dat_b),'   ','     ',trim(file_dat_out)
 
   enddo file_loop	
   
-  write(*,*) 'Finished: ',file_dat_out
-  write(*,*) 'Total of',nfile,' files written'  
+  print *,space, 'Finished: ',file_dat_out
+  print *,space, 'Total of',nfile,' files written'  
                     
 end program mp_lc55
    

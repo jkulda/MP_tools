@@ -44,12 +44,14 @@ program mp_latt55
 ! *****
 ! ***** atom positions are converted to and recorded in reduced lattice coordinates (x) 
 ! ***** 
+! ***** 
   real(4),parameter   :: pi=3.14159265359
   real,parameter   :: k_B = .831444 !DAPS/K Boltzmann's constant 0.08617333262145 meV/K   
   integer,parameter :: l_rec  =  1024		    !record length in real(4)
 
   logical :: found,found_txt,t_single
   character(4)   :: version,at_name_in,at_name_in2,at_name_in3,head,sim_type_lc,pos_units,pg_out
+  character(10)	 :: prompt,space = '          '
   character(10)  :: c_date,c_time,c_zone,ext,number
   character(16)  :: filter_name
   character(40)  :: subst_name,string,section,mp_tool
@@ -101,10 +103,11 @@ program mp_latt55
 !
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_LATT>  '
   mp_tool = 'MP_LATT '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *
 
 
 ! *** diverse initialisations
@@ -113,13 +116,13 @@ program mp_latt55
   call random_seed
   
 ! *** read auxiliary file <file_par.par> with structure parameters,atom names and further info
-  write(*,*) 'Parameter file name (.par will be added)'
+  print *,prompt, 'Parameter file name (.par will be added)'
   read(*,*) file_par
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_inp),' not found! Stop execution.'
+    print *,'          ', 'File ',trim(file_inp),' not found! Stop execution.'
     stop
   endif
 
@@ -130,7 +133,7 @@ program mp_latt55
   read(4,nml=mp_bin)
   
   string = subst_name
-  write(*,*) 'Substance name (confirm,&append or replace): ',string
+  print *,prompt, 'Substance name (confirm,&append or replace): ',string
   read(*,*) string
   string = trim(adjustl(string))
   if(string/=subst_name) then
@@ -141,17 +144,17 @@ program mp_latt55
     endif
   endif
 
-  write(*,*) 'Trajectory type? 0 = positions only,1 = +velocities,2 = +forces'
+  print *,prompt, 'Trajectory type? 0 = positions only,1 = +velocities,2 = +forces'
   read(*,*) n_traj
   
-  write(*,*) 'Shells? (1/0)'
+  print *,prompt, 'Shells? (1/0)'
   read(*,*) j_shell_out
   
-  write(*,*) 'Random displacement amplitude (0=none,<.1 useful)'
+  print *,prompt, 'Random displacement amplitude (0=none,<.1 useful)'
   read(*,*)  ampl
   
-  write(*,*) 
-  write(*,*) 'Substance name: ',subst_name
+  print *
+  print *,'          ', 'Substance name: ',subst_name
   
   allocate(at_name_par(n_atom),at_occup(n_atom),at_base_in(n_atom,3),at_base(n_atom,3))   !at_base would include at_base_shift & saved in data file header
 
@@ -165,7 +168,7 @@ program mp_latt55
   do
     read(4,'(a)',iostat=ios) string
     if(ios/=0) then
-      write(*,*) 'Section title:  ',trim(section),'  not found,check ',trim(file_inp)
+      print *,'          ', 'Section title:  ',trim(section),'  not found,check ',trim(file_inp)
       stop
     endif
     if(string(1:6).eq.section) exit	!find the mp_simple part of the .par file
@@ -180,9 +183,9 @@ program mp_latt55
     at_base(j,:) = at_base_in(j,:)+at_base_shift
   enddo
   
-  write(*,*) trim(subst_name),' structure info (atoms): '	  
+  print *,'          ', trim(subst_name),' structure info (atoms): '	  
   do j=1,n_atom
-       write(*,*) j,at_name_par(j),at_base_in(j,:)
+       print *,'          ', j,at_name_par(j),at_base_in(j,:)
   enddo
 			
 ! *** handle the cell matrices
@@ -206,26 +209,26 @@ program mp_latt55
   angle = acos(angle)
 
   if(j_verb==1) then
-    write(*,*) 'angle_rad',angle
-    write(*,*) 'angle_deg',angle*180./pi
+    print *,'          ', 'angle_rad',angle
+    print *,'          ', 'angle_deg',angle*180./pi
 
-    write(*,*) 'a_cell'
+    print *,'          ', 'a_cell'
     do k=1,3
-      write(*,*) a_cell(k,:)
+      print *,'          ', a_cell(k,:)
     enddo
   endif
 
   a_cell_1 = a_cell
   call gjinv(a_cell_1,3,3,a_cell_inv,3,ierr)
   if(ierr==1) then
-    write(*,*) 'Singular cell vector matrix,check your HISTORY file!'
+    print *,'          ', 'Singular cell vector matrix,check your HISTORY file!'
     stop
   endif
 
   if(j_verb==1) then
-    write(*,*) 'a_cell_inv'
+    print *,'          ', 'a_cell_inv'
     do k=1,3
-      write(*,*) a_cell_inv(k,:)
+      print *,'          ', a_cell_inv(k,:)
     enddo
   endif
 
@@ -330,7 +333,7 @@ program mp_latt55
   i_rec = i_rec+1
   write(2,rec=i_rec)rec_zero										!the last one has to be padded by 0
   write(2,rec=i_rec) (at_ind(:,ii),ii=(i-1)*l_rec4+1,n_tot)
-!!				write(*,*)'at_ind,i_rec',i_rec
+!!				print *,'at_ind,i_rec',i_rec
   
   do i=1,n_rec-1
     i_rec = i_rec+1
@@ -381,7 +384,7 @@ program mp_latt55
   endif
 
   close(2)
-  write(*,*) 'Done:  ',trim(file_dat)
+  print *,'          ', 'Done:  ',trim(file_dat)
 
   deallocate(at_name_out)
   deallocate(at_pos,at_ind)

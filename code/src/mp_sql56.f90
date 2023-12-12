@@ -53,6 +53,7 @@ program mp_sql55
   character(1)   :: xyz(3)=(/'X','Y','Z'/)
   character(4)   :: atom,ps_out(2),version_t,head
   character(5)   :: pg_ext,c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
+  character(10)	 :: prompt,space = '          '
   character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
   character(40)  :: subst_name,file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(4),int_mode,mp_tool
   character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in,smooth
@@ -136,10 +137,11 @@ program mp_sql55
 !
 ! ********************* Initialization *******************************      
   version_t = '1.56'
+  prompt = 'MP_SQL>   '
   mp_tool = 'MP_SQL '//version_t
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *
 
 ! ********************* Get a time stamp and open a .LOG file *******************************
 
@@ -197,18 +199,10 @@ program mp_sql55
 
   
 ! *** Generate data file access
-  write(*,*) 'Input data file_master: '
-  read(*,*) file_master 
-  
-			
-  if(j_verb==1)	then	
-    write(*,*) 'Read data files number min, step, max (0 0 no numbers, single file): '
-    read(*,*)   nfile_min,nfile_step,nfile_max
-  else
-    write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
-    read(*,*)   nfile_min,nfile_max
-    nfile_step = 1
-  endif
+  print *,prompt, 'Data file_master & file numbers (min, max; 0 0 single file): '
+  read(*,*) file_master,nfile_min,nfile_max
+  nfile_step = 1
+
   t_single = nfile_max==0.and.nfile_min==0
 
   if(t_single.and.nfile_min==0)then
@@ -232,7 +226,7 @@ program mp_sql55
 
   open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_dat_t0),' not found! Stop execution.'
     stop
   endif
   
@@ -244,14 +238,14 @@ program mp_sql55
       nml_in = .true.
       read(1,rec=i_rec) dat_source,version,string16
       read(string16,*) n_head
-    write(*,*)		'Input data:  ',dat_source,version,n_head
+    print *,space,		'Input data:  ',dat_source,version,n_head
     i_rec = i_rec+1   							
     read(1,rec=i_rec) header_record
     read(header_record,nml=data_header_1)	
     t0 = t_dump
     t_step_in = t_step
   elseif(head.eq.'TIME'.or.head.eq.'STAT') then                                  !old w/o structure
-    write(*,*)		'Input data:  ','old header format'
+    print *,space,		'Input data:  ','old header format'
     nml_in = .false.
     read(1,rec=1) sim_type,file_par,t_ms,t0,temp,a_par,angle,n_row,n_atom,n_eq,j_force,j_shell_out,n_cond,n_rec					
     n_head = 1
@@ -259,8 +253,8 @@ program mp_sql55
     input_method = 'CELL'
     if(index(sim_type,'BULK')/=0) input_method = 'BULK'
   else
-    write(*,*) 'header record wrong or missing'
-    write(*,*) trim(header_record)
+    print *,space, 'header record wrong or missing'
+    print *,space, trim(header_record)
     stop
   endif 
 
@@ -295,18 +289,18 @@ program mp_sql55
 
 
   if(n_cond==0) then
-    write(*,*) 'Non-periodic boundary conditions!'
-    write(*,*) 'FT will use Hann window profile - results in 2x lower resolution in Q!'
+    print *,space, 'Non-periodic boundary conditions!'
+    print *,space, 'FT will use Hann window profile - results in 2x lower resolution in Q!'
     j_wind = 1
   endif
  
 ! **** Read the auxiliary file <file_title.par> with structure parameters, atom names and further info
-  write(*,*) 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
+  print *,prompt, 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_inp),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_inp),' not found! Stop execution.'
     stop
   endif
 
@@ -314,14 +308,14 @@ program mp_sql55
 
   read(4,nml=mp_gen,iostat=ios)
     if(ios/=0) then
-      write(*,*) 'Error reading NML = mp_gen from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
+      print *,space, 'Error reading NML = mp_gen from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
       stop
     endif
   rewind(4)
 
   read(4,nml=mp_out,iostat=ios)
     if(ios/=0) then
-      write(*,*) 'Error reading NML = mp_out from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
+      print *,space, 'Error reading NML = mp_out from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
       stop
     endif
     if(j_weight<1.or.j_weight>3) j_weight = 1
@@ -338,12 +332,11 @@ program mp_sql55
 !   read(4,nml=mp_sql,iostat=ios)
   read(4,nml=mp_pdf,iostat=ios)
   if(ios/=0) then
-    write(*,*) 'Error',ios ,'reading NML = mp_pdf from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
-    write(*,*) 'j_acc,n_h,j_rand,q_step',j_acc,n_h,j_rand,q_step
+    print *,space, 'Error',ios ,'reading NML = mp_pdf from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
     stop
   endif
   if(j_mode<=2) then
-    write(*,*) 'Modes J_MODE=1..2 not available with MP_SQL, setting J_MODE=6 for I(Q)'
+    print *,space, 'Modes J_MODE=1..2 not available with MP_SQL, setting J_MODE=6 for I(Q)'
     j_mode = 6
   endif
   
@@ -367,7 +360,7 @@ program mp_sql55
   ext_dy = .0
   
   if(j_acc==0.or.j_acc==1) then
-    write(*,*) 'Setting J_ACC = 3 to the recommended Gauss integration algorithm (check for other J_ACC choices in .PAR)'
+    print *,space, 'Setting J_ACC = 3 to the recommended Gauss integration algorithm (check for other J_ACC choices in .PAR)'
   endif
 
 ! *** Read the atom positions       
@@ -376,7 +369,7 @@ program mp_sql55
   do
     read(4,'(a)',iostat=ios) string
     if(ios/=0) then
-      write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+      print *,space, 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
       stop
     endif
     if(string(1:5).eq.section) exit	!find the atoms part of the .par file
@@ -417,7 +410,7 @@ program mp_sql55
     endif   
   endif
 
-  if(j_verb==1) write(*,*) 'ind_mo',ind_mo
+  if(j_verb==1) print *,space, 'ind_mo',ind_mo
   
   at_av_matrix = .0
 !   if(sum(ind_mo)==0.or.product(ind_mo)==1) then
@@ -428,11 +421,11 @@ program mp_sql55
   enddo
 
       if(j_verb==1) then
-        write(*,*) 'at_av matrix'
+        print *,space, 'at_av matrix'
         do ii=1,n_atom
-            write(*,*) ii,at_av_matrix(ii,:) 
+            print *,space, ii,at_av_matrix(ii,:) 
         enddo      
-        write(*,*) 
+        print *
       endif
 
 
@@ -445,7 +438,7 @@ program mp_sql55
     do
       read(4,'(a)',iostat=ios) string
       if(ios/=0) then
-        write(*,*) 'Section title: PARTIAL_PDF  not found (can be added in dialogue)'    !n_part,n_pseudo
+        print *,space, 'Section title: PARTIAL_PDF  not found (can be added in dialogue)'    !n_part,n_pseudo
         n_part = 0
         found = .false.
         exit
@@ -477,7 +470,7 @@ program mp_sql55
 !!    do
 !!      read(4,'(a)',iostat=ios) string
 !!      if(ios/=0) then
-!!        write(*,*) 'Section title: PSEUDO_ATOMS not found (can be added in dialogue)'
+!!        print *,'Section title: PSEUDO_ATOMS not found (can be added in dialogue)'
 !!        n_pseudo = 1
 !!        found = .false.
 !!        exit
@@ -506,7 +499,7 @@ program mp_sql55
 !!        c_pseudo(ind_mo(j)) = c_pseudo(ind_mo(j))+at_occup_r(j)
 !!        m_pseudo(ind_mo(j)) = m_pseudo(ind_mo(j))+1
 !!        if(n_atom+n_pseudo+ind_mo(j)>n_atom+n_pseudo_max) then
-!!          write(*,*) 'Increase N_PSEUDO_MAX in .PAR to >',n_atom+n_pseudo+maxval(ind_mo)
+!!          print *,'Increase N_PSEUDO_MAX in .PAR to >',n_atom+n_pseudo+maxval(ind_mo)
 !!          stop
 !!        endif
 !!      endif
@@ -515,7 +508,7 @@ program mp_sql55
 !!  
 !!  c_pseudo_mean = c_pseudo(1:maxval(ind_mo))/real(m_pseudo(1:maxval(ind_mo)))
 !! 
-!! if(j_verb==1) write(*,*) 'c_pseudo_mean,c_pseudo(1:maxval(ind_mo))',c_pseudo_mean,c_pseudo(1:maxval(ind_mo))
+!! if(j_verb==1) print *,'c_pseudo_mean,c_pseudo(1:maxval(ind_mo))',c_pseudo_mean,c_pseudo(1:maxval(ind_mo))
 !! 
 !!  do j=1,maxval(ind_mo)
 !!    write(at_name_pseudo(n_pseudo+j),'("P",I1.1)')j   !put names P1,P2 to mixed atoms
@@ -523,9 +516,9 @@ program mp_sql55
 !!  n_pseudo = n_pseudo+maxval(ind_mo)
 !!
 !!  if(j_verb==1) then
-!!    write(*,*) 'n_pseudo',n_pseudo
+!!    print *,'n_pseudo',n_pseudo
 !!    do j=1,n_pseudo
-!!      write(*,*) 'j,at_name_pseudo(j),ind_pseudo(:,j)',j,at_name_pseudo(j),ind_pseudo(:,n_atom+j)
+!!      print *,'j,at_name_pseudo(j),ind_pseudo(:,j)',j,at_name_pseudo(j),ind_pseudo(:,n_atom+j)
 !!    enddo
 !!  endif
 !!  
@@ -533,8 +526,8 @@ program mp_sql55
 ! *** Check atom names against the .PAR input       
   do j=1,n_atom
     if(at_name_par(j)/=at_name_out(j)) then
-      write(*,*) 'Not-matching  atom names in .PAR and .DAT: ',j,at_name_par(j),at_name_out(j)
-      write(*,*) 'Prefer .DAT? (1/0)'
+      print *,space, 'Not-matching  atom names in .PAR and .DAT: ',j,at_name_par(j),at_name_out(j)
+      print *,prompt, 'Prefer .DAT? (1/0)'
       read(*,*) ii
       if(ii==1) at_name_par = at_name_out
       exit 
@@ -547,11 +540,11 @@ program mp_sql55
     open(4,file='/usr/local/mp_tools/ref/neutron_xs.txt',action='read',status ='old',iostat=ios)
     if(ios.ne.0) then
       do
-        write(*,*) 'File neutron_xs.txt not found, type in valid access path/filename'
+        print *,prompt, 'File neutron_xs.txt not found, type in valid access path/filename'
         read(*,'(a)') x_file_name
         open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
         if(ios==0) exit
-        write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+        print *,space, 'File',trim(x_file_name),' not found, try again ...'
       enddo
     endif
   endif
@@ -565,12 +558,12 @@ program mp_sql55
         cycle search_loop
       endif
     enddo
-    write(*,*) 'b_coh for ',trim(at_label(j)),' not found,'
-    write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+    print *,space, 'b_coh for ',trim(at_label(j)),' not found,'
+    print *,space, 'check your spelling and the neutron_xs.txt table; use unit weights'
   enddo search_loop
   
   b_coh = .1*b_coh  !convert b_coh from FM to 10^12 cm
-  write(*,*)
+  print *
 
 ! *** read Xray formfactor parameters 
   open(4,file='xray_ff.txt',action='read',status ='old',iostat=ios)
@@ -578,11 +571,11 @@ program mp_sql55
     open(4,file='/usr/local/mp_tools/ref/xray_ff.txt',action='read',status ='old',iostat=ios)
     if(ios.ne.0) then
       do
-        write(*,*) 'File xray_ff.txt not found, type valid access path/filename'
+        print *,prompt, 'File xray_ff.txt not found, type valid access path/filename'
         read(*,'(a)') x_file_name
         open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
         if(ios==0) exit
-        write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+        print *,space, 'File',trim(x_file_name),' not found, try again ...'
       enddo
     endif
   endif
@@ -596,13 +589,13 @@ program mp_sql55
         cycle atom_loop
       endif
     enddo
-    write(*,*) 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
-    write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+    print *,space, 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
+    print *,space, 'check your spelling and the neutron_xs.txt table; use unit weights'
   enddo atom_loop
   close(4)
   
   string_in = subst_name
-  write(*,*) 'Substance name (confirm, &append or replace): ', string_in
+  print *,prompt, 'Substance name (confirm, &append or replace): ', string_in
   read(*,*) string_in
   string = trim(adjustl(string_in))
   if(string_in/=subst_name) then
@@ -613,51 +606,58 @@ program mp_sql55
     endif
   endif
 
-  write(*,*) 
-  write(*,*) 'Substance name: ', subst_name
-  write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
+  print *
+  print *,space, 'Substance name: ', subst_name
+  print *,space, 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
 
 ! *** write overview of atom data
-  write(*,*)
-  write(*,*) 'Atoms from ',trim(file_inp), ' (name, occupancy,neutron b_coh, Xray formfactor parameters)'
+  print *
+  print *,space, 'Atoms from ',trim(file_inp), ' (name, occupancy,neutron b_coh, Xray formfactor parameters)'
   if(input_method== 'BULK') then
     do j=1,n_atom
-      write(*,'(5x,a4,2x,2(f8.4,2x),20f8.4)')	at_name_par(j),at_occup_r(j),b_coh(j),x_ffpar(j,:)
+      write(*,'(1x,a,5x,a4,2x,2(f8.4,2x),20f8.4)')	space,at_name_par(j),at_occup_r(j),b_coh(j),x_ffpar(j,:)
       write(9,'(5x,a4,2x,2(f8.4,2x),20f8.4)')	at_name_par(j),at_occup_r(j),b_coh(j),x_ffpar(j,:)
     enddo	
   else
     do j=1,n_atom
-      write(*,'(5x,a4,3f8.4,2x,2(f8.4,2x),20f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j),x_ffpar(j,:)
+      write(*,'(1x,a,5x,a4,3f8.4,2x,2(f8.4,2x),20f8.4)')	space,at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j),x_ffpar(j,:)
       write(9,'(5x,a4,3f8.4,2x,2(f8.4,2x),20f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j),x_ffpar(j,:)
     enddo	
   endif							
 
 ! *** Create the a_cell_inv matrix for older data (orthorhombic only)
+
+   print *,'n_head,n_row,product(n_row)',n_head,n_row,product(n_row)
   if(n_head<4) then                                 !generate a_cell_inv for orthogonal lattices (older data without a_cell)
     a_cell_inv = .0
-    do k=1,3
-      a_cell_inv(k,k) = 1./a_par(k)
-    enddo
+    
+    if(product(n_row)>1) then
+      do k=1,3
+        a_cell_inv(k,k) = 1./a_par(k)
+      enddo
+    else
+       do k=1,3
+        a_cell_inv(k,k) = 1.
+      enddo
+   endif
   endif
 
- 
- 
 !!!! *** generate triclinic a_cell for test purposes
 !!!      if(j_test==1) then
 !!!        n_head = 4
 !!! 
-!!! 				write(*,*) 
-!!! 				write(*,*) 'Test of geometric relations in real & reciprocal space'
-!!! 				write(*,*) 
+!!! 				print *,
+!!! 				print *,'Test of geometric relations in real & reciprocal space'
+!!! 				print *,
 !!!
 !!!        a_cell = transpose(reshape((/
 !!!     1   3.5,-1.,.5, 											!rows are elementary translations in real space
 !!!     2  -1.2,4.5,.5, 
 !!!     3   .5,.5,4.1/),(/3,3/)))
 !!!
-!!!				write(*,*) 'a_cell - rows are elementary translations in real space'
+!!!				print *,'a_cell - rows are elementary translations in real space'
 !!!				do i=1,3
-!!!					write(*,*) a_cell(i,:)
+!!!					print *,a_cell(i,:)
 !!!				enddo
 !!!        e1 = a_cell(1,:) 
 !!!        e2 = a_cell(2,:) 
@@ -669,46 +669,46 @@ program mp_sql55
 !!!        do j=1,3
 !!!          a_par(j) = norm2(a_cell(j,:))
 !!!        enddo 
-!!!			  write(*,*) 'Lattice parameters',a_par
+!!!			  print *,'Lattice parameters',a_par
 !!!
-!!!				write(*,*) 'Axis angles - real space:'
+!!!				print *,'Axis angles - real space:'
 !!!				angle(1) = dot_product(a_cell(2,:),a_cell(3,:))/(a_par(2)*a_par(3))
 !!!				angle(2) = dot_product(a_cell(1,:),a_cell(3,:))/(a_par(1)*a_par(3))
 !!!				angle(3) = dot_product(a_cell(1,:),a_cell(2,:))/(a_par(1)*a_par(2))
 !!!				angle = acos(angle)
 !!!
-!!!				write(*,*) 'angle_rad',angle
-!!!				write(*,*) 'angle_deg',angle*180./pi
+!!!				print *,'angle_rad',angle
+!!!				print *,'angle_deg',angle*180./pi
 !!!			
 !!!
-!!!				write(*,*) 'Reciprocal space basis - from A_CELL inversion:'
+!!!				print *,'Reciprocal space basis - from A_CELL inversion:'
 !!!				a_cell_1 = a_cell
 !!!				call gjinv(a_cell_1,3,3,a_cell_inv,3,ier)
 !!!				if(ier==1) then
-!!!					write(*,*) 'Singular cell vector matrix, check your HISTORY file!'
+!!!					print *,'Singular cell vector matrix, check your HISTORY file!'
 !!!					stop
 !!!				endif
-!!!				write(*,*) 'a_cell_inv  - columns are elementary translations in reciprocal space'
+!!!				print *,'a_cell_inv  - columns are elementary translations in reciprocal space'
 !!!				do i=1,3
-!!!					write(*,*) a_cell_inv(i,:)
+!!!					print *,a_cell_inv(i,:)
 !!!				enddo
 !!!        
 !!!
-!!!        write(*,*) 'Verify A_CELL inversion'
-!!!        write(*,*)'check by matmul(a_cell,a_cell_inv)',matmul(a_cell,a_cell_inv)
-!!!        write(*,*)'check by matmul(a_cell_inv,a_cell)',matmul(a_cell_inv,a_cell)
+!!!        print *,'Verify A_CELL inversion'
+!!!        print *,'check by matmul(a_cell,a_cell_inv)',matmul(a_cell,a_cell_inv)
+!!!        print *,'check by matmul(a_cell_inv,a_cell)',matmul(a_cell_inv,a_cell)
 !!!
 !!!
 !!!        cell_volume = dot_product(vector_product(e1,e2),e3)
-!!!        write(*,*) 'Real space cell_volume by mixed product',cell_volume
+!!!        print *,'Real space cell_volume by mixed product',cell_volume
 !!!
 !!!        cell_angle = sqrt(1.-cos(angle(1))**2-cos(angle(2))**2-cos(angle(3))**2+2.*cos(angle(1))*cos(angle(2))*cos(angle(3)))  !abc*sqrt(1−cos2α−cos2β−cos2γ+2cosαcosβcosγ) 
 !!!        cell_volume = e1_norm*e2_norm*e3_norm*cell_angle
 !!!       
-!!!        write(*,*) 'Real space cell_volume by ""SQRT(COS)"" formula',cell_volume
+!!!        print *,'Real space cell_volume by ""SQRT(COS)"" formula',cell_volume
 !!!      
-!!!				 write(*,*)
-!!!				 write(*,*) 'Reciprocal space basis - vector_product formulas'
+!!!				 print *
+!!!				 print *,'Reciprocal space basis - vector_product formulas'
 !!!				 e1_r = vector_product(e2,e3)/cell_volume
 !!!				 e2_r = vector_product(e3,e1)/cell_volume
 !!!				 e3_r = vector_product(e1,e2)/cell_volume
@@ -717,51 +717,51 @@ program mp_sql55
 !!!				 a_cell_inv(:,2) = e2_r
 !!!				 a_cell_inv(:,3) = e3_r
 !!!			 
-!!!				 write(*,*) 'e1_r',e1_r
-!!!				 write(*,*) 'e2_r',e2_r
-!!!				 write(*,*) 'e3_r',e3_r
-!!!				 write(*,*) 
+!!!				 print *,'e1_r',e1_r
+!!!				 print *,'e2_r',e2_r
+!!!				 print *,'e3_r',e3_r
+!!!				 print *,
 !!!			 
-!!!				 write(*,*)
-!!!				 write(*,*) 'Axis angles - reciprocal space - dot_product'
+!!!				 print *
+!!!				 print *,'Axis angles - reciprocal space - dot_product'
 !!!				 angle_r(1) = acos(dot_product(e2_r,e3_r)/(norm2(e2_r)*norm2(e3_r)))
 !!!				 angle_r(2) = acos(dot_product(e3_r,e1_r)/(norm2(e3_r)*norm2(e1_r)))
 !!!				 angle_r(3) = acos(dot_product(e1_r,e2_r)/(norm2(e1_r)*norm2(e2_r)))
-!!!				 write(*,*) 'angle_r',angle_r
+!!!				 print *,'angle_r',angle_r
 !!!       
-!!!				 write(*,*)
-!!!				 write(*,*) 'Angles - reciprocal space - COS formulas'
+!!!				 print *
+!!!				 print *,'Angles - reciprocal space - COS formulas'
 !!!				 angle_r(1) = acos((cos(angle(2))*cos(angle(3))-cos(angle(1)))/(sin(angle(2))*sin(angle(3))))
 !!!				 angle_r(2) = acos((cos(angle(3))*cos(angle(1))-cos(angle(2)))/(sin(angle(3))*sin(angle(1))))
 !!!				 angle_r(3) = acos((cos(angle(1))*cos(angle(2))-cos(angle(3)))/(sin(angle(1))*sin(angle(2))))
-!!!				 write(*,*) 'angle_r',angle_r
+!!!				 print *,'angle_r',angle_r
 !!!       
 !!!       
 !!!!      metrics matrices
 !!!       
-!!!					write(*,*)
-!!!				  write(*,*) 'Metrics matrices'
-!!!			    write(*,*) '1 G_matrix - via basis vectors - real space metrics'
+!!!					print *
+!!!				  print *,'Metrics matrices'
+!!!			    print *,'1 G_matrix - via basis vectors - real space metrics'
 !!!				  forall (i=1:3,j=1:3)
 !!!					  g_matrix(i,j) = dot_product(a_cell(i,:),a_cell(j,:))
 !!!				  end forall
 !!! 					do i=1,3
-!!!						write(*,*) g_matrix(i,:)
+!!!						print *,g_matrix(i,:)
 !!!					enddo
 !!!      
-!!!					write(*,*) 'G*_matrix via G^-1 - reciprocal space metrics'
+!!!					print *,'G*_matrix via G^-1 - reciprocal space metrics'
 !!!					a_cell_1 = g_matrix
 !!!					call gjinv(a_cell_1,3,3,g_r_matrix,3,ier)
 !!!					if(ier==1) then
-!!!						write(*,*) 'Singular g_matrix, check ...'
+!!!						print *,'Singular g_matrix, check ...'
 !!!						stop
 !!!					endif
 !!!					do i=1,3
-!!!						write(*,*) g_r_matrix(i,:)
+!!!						print *,g_r_matrix(i,:)
 !!!					enddo
 !!!        
-!!!				  write(*,*) 
-!!!				  write(*,*) 'G_matrix  - via angles - real space metrics'
+!!!				  print *,
+!!!				  print *,'G_matrix  - via angles - real space metrics'
 !!!					g_matrix(1,1) = e1_norm**2  
 !!!					g_matrix(2,2) = e2_norm**2  
 !!!					g_matrix(3,3) = e3_norm**2  
@@ -772,27 +772,27 @@ program mp_sql55
 !!!					g_matrix(1,3) = g_matrix(3,1)
 !!!					g_matrix(2,3) = g_matrix(3,2)
 !!!					do i=1,3
-!!!						write(*,*) g_matrix(i,:)
+!!!						print *,g_matrix(i,:)
 !!!					enddo
 !!!
-!!! 			    write(*,*) '2 G*_matrix  - via reciprocal basis vectors - reciprocal space metrics'
+!!! 			    print *,'2 G*_matrix  - via reciprocal basis vectors - reciprocal space metrics'
 !!!					forall (i=1:3,j=1:3)
 !!!						g_r_matrix(i,j) = dot_product(a_cell_inv(:,i),a_cell_inv(:,j))
 !!!					end forall
 !!!					do i=1,3
-!!!						write(*,*) g_r_matrix(i,:)
+!!!						print *,g_r_matrix(i,:)
 !!!					enddo
 !!!
 !!!! *** dot product
-!!!					 write(*,*) 
-!!!					 write(*,*) 'Dot product test'
-!!!					 write(*,*) 'real space: (3,2,1).(1,2,3) explicit', dot_product(3.*e1+2.*e2+e3,1.*e1+2.*e2+3.*e3)
-!!!					 write(*,*) 'real space: (3,2,1).(1,2,3) G-matrix', dot_product((/3.,2.,1./),matmul(g_matrix,(/1.,2.,3./)))
+!!!					 print *,
+!!!					 print *,'Dot product test'
+!!!					 print *,'real space: (3,2,1).(1,2,3) explicit', dot_product(3.*e1+2.*e2+e3,1.*e1+2.*e2+3.*e3)
+!!!					 print *,'real space: (3,2,1).(1,2,3) G-matrix', dot_product((/3.,2.,1./),matmul(g_matrix,(/1.,2.,3./)))
 !!!
-!!!					 write(*,*) 'reciprocal space: (3,2,1).(1,2,3) explicit', dot_product(3.*e1_r+2.*e2_r+e3_r,1.*e1_r+2.*e2_r+3.*e3_r)
-!!!					 write(*,*) 'reciprocal space: (3,2,1).(1,2,3) G*-matrix',dot_product((/3.,2.,1./),matmul(g_r_matrix,(/1.,2.,3./)))
-!!!					 write(*,*) 
-!!!					 write(*,*) 
+!!!					 print *,'reciprocal space: (3,2,1).(1,2,3) explicit', dot_product(3.*e1_r+2.*e2_r+e3_r,1.*e1_r+2.*e2_r+3.*e3_r)
+!!!					 print *,'reciprocal space: (3,2,1).(1,2,3) G*-matrix',dot_product((/3.,2.,1./),matmul(g_r_matrix,(/1.,2.,3./)))
+!!!					 print *,
+!!!					 print *,
 !!!
 !!!         endif !j_test
 !!!   
@@ -800,7 +800,7 @@ program mp_sql55
 ! *********************  OpenMP initialization start  *******************************      
 !
   proc_num_in = j_proc
-  if(j_verb.ge.1)write (*,*) 'PAR proc_num_in          = ',proc_num_in
+  if(j_verb.ge.1) print *,space, 'PAR proc_num_in          = ',proc_num_in
   thread_num_max = omp_get_max_threads( )								!this gives maximum number of threads available (limited by concurrent tasks??)
   proc_num = omp_get_num_procs( )							!this should give number of processors, but in reality gives threads (cf. other unix/linux process enquiries)
   if(proc_num_in==0) proc_num_in = proc_num/2 !ask just for one thread per core	
@@ -818,7 +818,7 @@ program mp_sql55
     write(9,*) 'OMP processes requested 	= ', proc_num_in
   else
     write(9,*) 'OpenMP not in use'
-    write(*,*) 'OpenMP not in use'
+    print *,space, 'OpenMP not in use'
   endif
   write(9,*) 
 !
@@ -833,17 +833,17 @@ program mp_sql55
     allocate(numbers(seed_size))
 
     if(j_rand==0) then                     
-      write(*,*) 'Random_number: j_rand =',j_rand,'  the system will supply unique, machine dependent seeds each time this code runs'
+      print *,space, 'Random_number: j_rand =',j_rand,'  the system will supply unique, machine dependent seeds each time this code runs'
       call random_seed(get=numbers)               !Gets actual seeds 
       if(j_verb==1) then
-        write(*,*) 'Random_number seed size:',seed_size
-        write(*,*) 'Random_seed:',numbers
-        write(*,*) 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
+        print *,space, 'Random_number seed size:',seed_size
+        print *,space, 'Random_seed:',numbers
+        print *,space, 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
       endif
     elseif(j_rand==1) then                     !if j_rand>1 generate a seed for later reference & numerical reproducibility checks
-      write(*,*) 'Random_number: j_rand =',j_rand,'  the system will supply k-dependent standard seeds for each of the OMP threads (use only for testing the consistence of OMP_on/OMP_off results)'
+      print *,space, 'Random_number: j_rand =',j_rand,'  the system will supply k-dependent standard seeds for each of the OMP threads (use only for testing the consistence of OMP_on/OMP_off results)'
     elseif(j_rand>1) then                     !if j_rand>1 generate a seed for later reference & numerical reproducibility checks
-      write(*,*) 'Random_number: j_rand =',j_rand,'  this seeding reference can be used to exactly reproduce this MC-run later on'
+      print *,space, 'Random_number: j_rand =',j_rand,'  this seeding reference can be used to exactly reproduce this MC-run later on'
      idum = j_rand
       numbers(1) = huge(1)*rand(idum)            !a dry call to initialise ran0
       do i=1,seed_size
@@ -854,17 +854,17 @@ program mp_sql55
         call random_number(rnd(i))
       enddo
       if(j_verb==1) then
-        write(*,*) 'Random_seed:',numbers
-        write(*,*) 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
+        print *,space, 'Random_seed:',numbers
+        print *,space, 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
       endif
     endif
-    write(*,*)
+    print *
   endif
 
 !
 ! **** cycle over snapshot files to accumulate input data
 !
-  write(*,*) 'Input files:'
+  print *,space, 'Input files:'
 
   CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
   sc_r = 1./sc_r
@@ -890,15 +890,15 @@ program mp_sql55
 
     open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
     if(ios.ne.0) then
-      write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
-    write(*,*) 'Skip this one (2), skip the rest (1), stop execution(0)?'
+      print *,space, 'File ',trim(file_dat),' not opened! IOS =',ios
+    print *,prompt, 'Skip this one (2), skip the rest (1), stop execution(0)?'
     read(*,*) jj
     if(jj==2) cycle file_loop
     if(jj==1) exit file_loop
     if(jj==0) stop
     endif
     ifile = ifile+1				
-    if(jfile==nfile_min.or.ifile==100*(ifile/100)) write(*,*) file_dat
+    if(jfile==nfile_min.or.ifile==100*(ifile/100)) print *,space, file_dat
 
     ind_at(1) = 0
     do j = 2,n_atom
@@ -927,7 +927,7 @@ program mp_sql55
   endif
 
   CALL SYSTEM_CLOCK (COUNT = sc_c2)
-  write(*,*) nfile,' files read in ',(sc_c2-sc_c1)*sc_r, ' sec SYS time'
+  print *,space, nfile,' files read in ',(sc_c2-sc_c1)*sc_r, ' sec SYS time'
  
   if(nsuper==1) then
     at_pos_min = -a_par/2.      !for n_row=1 BULK a_par represents the whole box
@@ -936,7 +936,7 @@ program mp_sql55
     at_pos_min = -n_row/2.
     at_pos_max = +n_row/2.         
   endif
-  if(j_verb==1) write(*,*) 'at_pos_min,at_pos_max',at_pos_min,at_pos_max
+  if(j_verb==1) print *,space, 'at_pos_min,at_pos_max',at_pos_min,at_pos_max
 
 
   jfile = 1				!now to be used as index for the successive output files			
@@ -951,7 +951,7 @@ program mp_sql55
   bz_loop: do
 
 ! *** define the momentum space range          
-    write(*,*) 'Q-range [Å-1] (0=END)'		
+    print *,prompt, 'Q-range [Å-1] (0=END)'		
     read(*,*) q_range
     if(q_range==0.) exit bz_loop	
 
@@ -968,9 +968,9 @@ program mp_sql55
     e3_r_norm = norm2(e3_r)
 
 !       if(j_verb==1) then
-!         write(*,*) 'e1_r,2Pi*e1_r_norm',e1_r,twopi*e1_r_norm			!twopi*e1_r_norm is the length of e1_r in A-1 on the usual scale containing the 2Pi factor
-!         write(*,*) 'e2_r,2Pi*e2_r_norm',e2_r,twopi*e2_r_norm
-!         write(*,*) 'e3_r,2Pi*e3_r_norm',e3_r,twopi*e3_r_norm
+!         print *,'e1_r,2Pi*e1_r_norm',e1_r,twopi*e1_r_norm			!twopi*e1_r_norm is the length of e1_r in A-1 on the usual scale containing the 2Pi factor
+!         print *,'e2_r,2Pi*e2_r_norm',e2_r,twopi*e2_r_norm
+!         print *,'e3_r,2Pi*e3_r_norm',e3_r,twopi*e3_r_norm
 !       endif
     
     e3v = vector_product(e1_r,e2_r)
@@ -981,23 +981,23 @@ program mp_sql55
     bz_nx = bz_n/(twopi*dot_product(e1_r,e1v)/norm2(e1v))+.5			!+.5 is a safety margin to avoid rounding effects
     bz_ny = bz_n/(twopi*dot_product(e2_r,e2v)/norm2(e2v))+.5
     bz_nz = bz_n/(twopi*dot_product(e3_r,e3v)/norm2(e3v))+.5
-    if(j_verb==1) write(*,*) 'bz_n,bz_nx,bz_ny,bz_nz',bz_n,bz_nx,bz_ny,bz_nz
+    if(j_verb==1) print *,space, 'bz_n,bz_nx,bz_ny,bz_nz',bz_n,bz_nx,bz_ny,bz_nz
 
     d_q = twopi/(at_pos_max-at_pos_min)				!pseudo-cubic phase steps for NUFFT defined by the box size
     
-    if(j_verb==1) write(*,*) 'd_q,q_step,q_range',d_q,'   ',q_step,q_range
+    if(j_verb==1) print *,space, 'd_q,q_step,q_range',d_q,'   ',q_step,q_range
 
     n_qq(1) = 2*anint((.5*twopi*bz_nx)/d_q(1))+1       
     n_qq(2) = 2*anint((.5*twopi*bz_ny)/d_q(2))+1       
     n_qq(3) = 2*anint((.5*twopi*bz_nz)/d_q(3))+1   
     i_centre = n_qq/2+1
-    if(j_verb==1) write(*,*) 'n_qq,i_centre',n_qq,'   ',i_centre
-      write(*,*) 	
+    if(j_verb==1) print *,space, 'n_qq,i_centre',n_qq,'   ',i_centre
+    print *	
   
     n_mem = 1+8.*(n_atom+4.)*(product(real(n_qq))/1.e9)					! 16*product(n_qq) is the size of NUFFT output (NUFFT needs 2x that), n_atom*8*product(n_qq) is needed for partial amplitudes; 1Gb is the rest (input etc.)
-    write(*,'("NOTE: NUFFT_3D requires about",i4," Gb memory, in case of problems quit other applications or reduce Q-range!")') n_mem
-    write(*,*) 	
-    write(*,*) 'Preparing FT ...'		
+    write(*,'(1x,a,"NOTE: NUFFT_3D requires about",i4," Gb memory, in case of problems quit other applications or reduce Q-range!")') space,n_mem
+    print *
+    print *,space, 'Preparing FT ...'		
 
 
 ! *** generate look-up table for Q(i,j,k) norms (non-identical on (i,j,k) permutations in non-orthogonal systems)
@@ -1031,17 +1031,17 @@ program mp_sql55
       n_h_max = int(.5*product(real(n_qq))/real(n_mc))   !(1+n_tot/n_mc)*n_atom*product(n_row)/2 product(n_row)/2 is roughly the volume of sphere with radius of pdf_range_max !n_mc=1e6
       write(string,'(i4)') n_h_max
       if(n_h==0) then
-        write(*,*) 'MC sampling pairs per frame ([x 10^6], ',trim(adjustl(string)),' max):'
+        print *,prompt, 'MC sampling pairs per frame ([x 10^6], ',trim(adjustl(string)),' max):'
         read(*,*)   n_h
       endif
       if(n_h.gt.n_h_max) then                   !n_h_max is in units of n_mc to avoid overflow for large boxes
-        write(*,*) 'WARNING: n_h exceeds max number of 10^6 atom pairs ',n_h_max
-        write(*,*) 'type in a reduced n_h (<',n_h_max,'):'
+        print *,space, 'WARNING: n_h exceeds max number of 10^6 atom pairs ',n_h_max
+        print *,prompt, 'type in a reduced n_h (<',n_h_max,'):'
         read(*,*)   n_h
       endif
       n_int = n_h*n_mc                           !number of MC cycles per snapshot
       int_mode = 'Monte Carlo'
-      write(*,*) trim(int_mode),' integration over',n_h,'*10^6 cell pairs'
+      print *,space, trim(int_mode),' integration over',n_h,'*10^6 cell pairs'
     endif
       
 
@@ -1054,7 +1054,7 @@ program mp_sql55
     sq_hist_tot = .0
     sq_hist = .0
   
-    write(*,*) 'Doing FT ...'		
+    print *,space, 'Doing FT ...'		
 
     call cpu_time(t1)				
     CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
@@ -1096,12 +1096,12 @@ program mp_sql55
 
       call cpu_time(t2)
       CALL SYSTEM_CLOCK (COUNT = sc_c2)
-      write(*,*) 	
-      write(*,*) 'FINUFFT on',ifile,'snapshot CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
-      write(*,*) 					
+      print *	
+      print *,space, 'FINUFFT on',ifile,'snapshot CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
+      print *					
    
       if(j_acc==2) then																	!do MC integration
-        write(*,*) 'Doing MC integration ...'
+        print *,space, 'Doing MC integration ...'
         allocate(sq_hist_k(n_atom,n_atom,n_hist,n_h))
         sq_hist_k = 0
         n_skip1 = 0
@@ -1125,9 +1125,9 @@ program mp_sql55
             call random_number(rand0(i))
           enddo
           if(j_verb==1) then
-            write(*,*) 'k =',k
-            write(*,*) 'Random_seed:',numbers
-            write(*,*) 'Reference 1st 5 random numbers:',(rand0(i),i=1,5)
+            print *,space, 'k =',k
+            print *,space, 'Random_seed:',numbers
+            print *,space, 'Reference 1st 5 random numbers:',(rand0(i),i=1,5)
           endif
         endif
           
@@ -1171,7 +1171,7 @@ program mp_sql55
 !$omp end do
 !$omp end parallel
               
-      if(j_verb==1) write(*,*) 'MC integration: n_skip1,n_skip2',n_skip1,n_skip2
+      if(j_verb==1) print *,space, 'MC integration: n_skip1,n_skip2',n_skip1,n_skip2
       
       do k=1,n_h
         sq_hist = sq_hist+sq_hist_k(:,:,:,k)
@@ -1179,7 +1179,7 @@ program mp_sql55
       deallocate(sq_hist_k)
      
     else                     !doing Gauss integration
-      write(*,*) 'Doing Gauss integration ...'
+      print *,space, 'Doing Gauss integration ...'
       allocate(sq_hist_k(n_atom,n_atom,n_hist,n_qq(1)))
       sq_hist_k = 0
 
@@ -1240,8 +1240,8 @@ program mp_sql55
   
     call cpu_time(t2)
     CALL SYSTEM_CLOCK (COUNT = sc_c2)
-    if(j_verb==1) write(*,*) 'S(Q) histogram normalisations CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
-    write(*,*) 					
+    if(j_verb==1) print *,space, 'S(Q) histogram normalisations CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
+    print *					
 
 
 ! **** start the weight loop to form the S(Q) output 
@@ -1255,7 +1255,7 @@ program mp_sql55
     tot_scale = 1.
     
     if(j_mode<=5.and.product(ind_mo)/=1) then
-      write(*,*) 'Modes J_MODE=3..5 only available for fully disordered systems, setting J_MODE=6 for I(Q)'
+      print *,space, 'Modes J_MODE=3..5 only available for fully disordered systems, setting J_MODE=6 for I(Q)'
       j_mode = 6
     endif
   
@@ -1293,13 +1293,13 @@ program mp_sql55
       endif
 
       if(j_verb==1) then
-        write(*,*) 'at_weight',at_weight
-        write(*,*) 'at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
-        write(*,*) 'at_weight matrix'
+        print *,space, 'at_weight',at_weight
+        print *,space, 'at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
+        print *,space, 'at_weight matrix'
         do ii=1,n_atom
-            write(*,*) ii,at_weight_matrix(ii,:) 
+            print *,space, ii,at_weight_matrix(ii,:) 
         enddo      
-        write(*,*) 
+        print *
       endif
 
 
@@ -1327,20 +1327,20 @@ program mp_sql55
 
 
       if(j_verb==1) then
-        write(*,*) '2at_weight',at_weight
-         write(*,*) '2at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
-       write(*,*) '2at_weight matrix'
+        print *,space, '2at_weight',at_weight
+         print *,space, '2at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
+       print *,space, '2at_weight matrix'
         do ii=1,n_atom
-            write(*,*) ii,at_weight_matrix(ii,:) 
+            print *,space, ii,at_weight_matrix(ii,:) 
         enddo      
-        write(*,*) 
+        print *
       endif
 
 
 ! *** generate the smoothing profile (Gauss) and ...
 !
       n_smooth_fwhm = 1
-      write(*,"('Gaussian smooth FWHM in Q_steps of',f6.3,'[Å-1] (1 no smoothing = default)')") q_step
+      write(*,"(1x,a,'Gaussian smooth FWHM in Q_steps of',f6.3,'[Å-1] (1 no smoothing = default)')") space,q_step
       read(*,*) n_smooth_fwhm
   
       if(n_smooth_fwhm==1) then
@@ -1357,7 +1357,7 @@ program mp_sql55
       f_smooth = f_smooth/sum(f_smooth(1:n_smooth))				!profile normalized to unit integral
 
 ! *** ... apply it
-!       if(n_smooth>1) write(*,*) 'Applying Gaussian smoothing with FWHM=',n_smooth_fwhm,' steps of',q_step,'[A-1]'
+!       if(n_smooth>1) print *,space, 'Applying Gaussian smoothing with FWHM=',n_smooth_fwhm,' steps of',q_step,'[A-1]'
       write(smooth,'("Smooth FWHM",f6.3," [A-1]")') q_step*n_smooth_fwhm
       
       if(n_smooth==1) then
@@ -1477,21 +1477,21 @@ program mp_sql55
       at_name_plot(1:n_atom) = at_name_par       
                     
       write(9,*)
-      write(*,'(1x,"Atoms:         ",51(1x,a8))')  (at_name_plot(i),i=1,n_atom)
+      write(*,'(1x,a,"Atoms:         ",51(1x,a8))')  space,(at_name_plot(i),i=1,n_atom)
       write(9,'(1x,"Atoms:         ",51(1x,a8))')  (at_name_plot(i),i=1,n_atom)
-      write(*,'(1x,"Atoms no.:  ",51(1x,i8))') (i,i=1,n_atom)
+      write(*,'(1x,a,"Atoms no.:  ",51(1x,i8))') space,(i,i=1,n_atom)
       write(9,'(1x,"Atoms no.:  ",51(1x,i8))') (i,i=1,n_atom)
-      write(*,'(1x,"Occupancy:       ",51(1x,f8.4))') (at_occup_r(i),i=1,n_atom)                    
+      write(*,'(1x,a,"Occupancy:       ",51(1x,f8.4))') space,(at_occup_r(i),i=1,n_atom)                    
       write(9,'(1x,"Occupancy:       ",51(1x,f8.4))') (at_occup_r(i),i=1,n_atom)
-      write(*,'(1x,"Amplitudes:      ",51(1x,f8.4))') (at_weight(i),i=1,n_atom)                    
+      write(*,'(1x,a,"Amplitudes:      ",51(1x,f8.4))') space,(at_weight(i),i=1,n_atom)                    
       write(9,'(1x,"Amplitudes:      ",51(1x,f8.4))') (at_weight(i),i=1,n_atom)
-      write(*,'(1x,"Scale factors:   ",51(1x,f8.4))') (at_scf(i),i=1,n_atom)                    
+      write(*,'(1x,a,"Scale factors:   ",51(1x,f8.4))') space,(at_scf(i),i=1,n_atom)                    
       write(9,'(1x,"Scale factors:   ",51(1x,f8.4))') (at_scf(i),i=1,n_atom)
 
-      write(*,*) 
-      write(*,*) 'Actual masks:'
-      write(*,'((50i3))') (at_mask(i),i=1,n_atom)        
-      write(*,*) 
+      print *
+      print *,space, 'Actual masks:'
+      write(*,'(11x,(50i3))') (at_mask(i),i=1,n_atom)        
+      print *
     
       if(minval(at_mask(1:n_atom))==1) then  !if all masks =1 don't put them into plot title
         masks = ''
@@ -1514,7 +1514,7 @@ program mp_sql55
       call PGSLCT(j_xserv)
     endif   
     if (j_xserv.LE.0) then    
-      write(*,*) 'Could not open PGPLOT /xserv'
+      print *,space, 'Could not open PGPLOT /xserv'
       STOP
     endif
   
@@ -1546,7 +1546,7 @@ program mp_sql55
       c_max = .1*(int(10*c_max)+1)
     endif
           
-    write(*,*) 'Vertical scale c_min,c_max',c_min,c_max
+    print *,space, 'Vertical scale c_min,c_max',c_min,c_max
     
     if (j_mode==5)then
       write(plot_header,'(a,"    ",a)') trim(file_dat_t0),trim(at_weight_scheme(1))         !implicit unit weights for Z(Q)
@@ -1623,14 +1623,14 @@ program mp_sql55
       CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp))
 
        
-      write(*,*) 'Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)'
+      print *,prompt, 'Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)'
       c1 = c_min
       c2 = c_max
       read(*,*) c1,c2
       if(c1==.0.and.c2==.0) then
         exit
       elseif(c1==-1.and.c2==-1) then              
-        write(*,*) 'Confirm/adjust plot range, max =',n_hist*(x(2)-x(1))
+        print *,prompt, 'Confirm/adjust plot range, max =',n_hist*(x(2)-x(1))
         write(*,'("x_start, x_end ",2f7.1,":  ")',advance='no') x_start,x_end 
         read(*,*) x_start,x_end 
         if(x_start.lt.q_step) x_start = x(1)
@@ -1679,7 +1679,7 @@ program mp_sql55
         if(.not.found_txt.and.(.not.found_ps)) exit				
         jfile = jfile+1
         if(jfile==100) then
-          write(*,*)'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
+          print *,prompt,'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
           read(*,*)
           jfile = 1
         endif	
@@ -1756,12 +1756,12 @@ program mp_sql55
       CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp))
 
       CALL PGCLOS
-      write(*,*) ' Postscript output written to: ',file_ps	
+      print *,space, ' Postscript output written to: ',file_ps	
       write(9,*)
       write(9,*) '  ',' S(Q) by a 3D_averaged NUFFT '
       write(9,*) '  ','Masks:',(at_mask(i),i=1,n_atom)				
       if(n_smooth>1) write(9,*) '  ','Smoothing FWHM:',n_smooth_fwhm	
-      write(9,*) ' Postscript output written to: ',file_ps
+      write(9,*) 'Postscript output written to: ',file_ps
 
 ! *** save the S(Q) results into an ASCII file (each line corresponds to a distance point)
 !     look for existing output files in order not overwrite them				
@@ -1800,7 +1800,7 @@ program mp_sql55
         endif
         
         close(4)
-        write(*,*) ' Text output written to: ',file_res	  
+        print *,space, ' Text output written to: ',file_res	  
         write(9,*) ' Text output written to: ',file_res	  
       endif 																							!j_txt
     endif 																							  !j_ps
@@ -1808,26 +1808,26 @@ program mp_sql55
 ! ***   all done, now decide what comes next
   
     way_point: do
-      write(*,*)                  
-      write(*,*) 'Choose output options (MODE is ',trim(pdf_out(j_mode)),', FILE output is ',trim(ps_out(j_ps+1))       !,', SIZE is ',trim(size_out(j_out+1)),'):'
-      write(*,*) '       1   REPLOT the last graph'
-      write(*,'("        2   select max ",i2," partial PDFs & replot")') n_part_max
-      write(*,*) '       3   adjust partials scales & replot '
-      write(*,*) '       4   modify atom WEIGHTS (',trim(at_weight_scheme(j_weight)) 
-      write(*,*) '       5   edit atom MASKS ',trim(masks(8:))
-      write(*,*) '       6   edit atom scale factors ',at_scf
-      write(*,*) '       7   toggle FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
+      print *                 
+      print *,prompt, 'Choose output options (MODE is ',trim(pdf_out(j_mode)),', FILE output is ',trim(ps_out(j_ps+1))       !,', SIZE is ',trim(size_out(j_out+1)),'):'
+      print *,space, '       1   REPLOT the last graph'
+      write(*,'(10x,"        2   select max ",i2," partial PDFs & replot")') n_part_max
+      print *,space, '       3   adjust partials scales & replot '
+      print *,space, '       4   modify atom WEIGHTS (',trim(at_weight_scheme(j_weight)) 
+      print *,space, '       5   edit atom MASKS ',trim(masks(8:))
+      print *,space, '       6   edit atom scale factors ',at_scf
+      print *,space, '       7   toggle FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
       if(j_ext==0)then
-        write(*,*) '       8   import external ',trim(pdf_out(j_mode)),' curve '
+        print *,space, '       8   import external ',trim(pdf_out(j_mode)),' curve '
       else
-        write(*,*) '       8   change/close external ',trim(pdf_out(j_mode)),' curve ',file_inp
+        print *,space, '       8   change/close external ',trim(pdf_out(j_mode)),' curve ',file_inp
       endif
      
-!!!					write(*,*) '       8   toggle .TXT output SIZE to ',trim(size_out(mod(j_out+1,2)+1))
-      write(*,*) '       9   RESTART with updated weights & masks'
-      if(product(ind_mo)==1) write(*,*) '      10   select the OUTPUT MODE, actual: ',trim(pdf_out(j_mode))
-      write(*,*)                  
-      write(*,*) '       0   EXIT'  
+!!!					print *,space, '       8   toggle .TXT output SIZE to ',trim(size_out(mod(j_out+1,2)+1))
+      print *,space, '       9   RESTART with updated weights & masks'
+      if(product(ind_mo)==1) print *,space, '      10   select the OUTPUT MODE, actual: ',trim(pdf_out(j_mode))
+      print *                 
+      print *,space, '       0   EXIT'  
 
       read(*,*) jj
   
@@ -1836,7 +1836,7 @@ program mp_sql55
           cycle plot_loop
 
         case(2) 
-          write(*,*) '("Confirm/modify up to ", i2," pairs of partial PDF indices (0 0 erase, -1 -1 skip the rest):")',n_part_max
+          print *,prompt, '("Confirm/modify up to ", i2," pairs of partial PDF indices (0 0 erase, -1 -1 skip the rest):")',n_part_max
           do j=1,n_part_max
             j1 = ind_part(1,j)
             j2 = ind_part(2,j) 
@@ -1874,7 +1874,7 @@ program mp_sql55
 
         case(4) 
           do
-            write(*,*) 'Atom weights ( 1= uniform, 2= neutron b_c^2, 3= Xray f(Q))'	
+            print *,prompt, 'Atom weights ( 1= uniform, 2= neutron b_c^2, 3= Xray f(Q))'	
             read(*,*) j_weight
             tot_scale = 1.
             if(j_weight>=1.and.j_weight<=3) exit
@@ -1883,17 +1883,17 @@ program mp_sql55
       
         case(5) 
           write(*,'(" Actual masks:",(50i3))') (at_mask(i),i=1,n_atom)
-          write(*,*)'Type in new ones (0/1):'
+          print *,prompt,'Type in new ones (0/1):'
           do
             read(*,*)(at_mask(i),i=1,n_atom)
             if(any(at_mask(1:n_atom).ge.0).and.any(at_mask(1:n_atom).le.1)) exit
-            write(*,*) 'Input out of range, repeat ...'
+            print *,space, 'Input out of range, repeat ...'
           enddo
           cycle way_point
           
         case(6) 
-          write(*,*) ' Actual values:',(at_scf(i),i=1,n_atom)
-          write(*,*) ' Confirm or type in new ones:'
+          print *,space, ' Actual values:',(at_scf(i),i=1,n_atom)
+          print *,prompt, ' Confirm or type in new ones:'
           read(*,*) at_scf
           exit plot_loop
 
@@ -1905,15 +1905,15 @@ program mp_sql55
         case(8)
           if(j_ext/=0) deallocate(x_ext,y_ext)
           ext_scale = 1.
-          write(*,*) 'Confirm or modify input file name ("=" close file):'
+          print *,prompt, 'Confirm or modify input file name ("=" close file):'
           read(*,*) file_inp
           if(index(file_inp,'=')/=0) then
             j_ext = 0
             cycle way_point
           else
             open(4,file=trim(file_inp),iostat=ios)
-            if(ios.ne.0) write(*,*) 'File ',trim(file_inp),' not opened! IOS =',ios
-            write(*,*) 'number of lines to skip, to read, column X, column Y(1)...Y(4) (0 if not used)?'
+            if(ios.ne.0) print *,space, 'File ',trim(file_inp),' not opened! IOS =',ios
+            print *,prompt, 'number of lines to skip, to read, column X, column Y(1)...Y(4) (0 if not used)?'
             read(*,*) n_ext_skip,n_x,j_x,ind_ext
 
             n_part_ext = 0
@@ -1921,7 +1921,7 @@ program mp_sql55
               if(ind_ext(j)>0) n_part_ext = n_part_ext+1
             enddo
             if(n_part_ext==0) then
-              write(*,*) 'Number of external data columns must be >0'
+              print *,space, 'Number of external data columns must be >0'
               cycle way_point
             endif
           
@@ -1952,7 +1952,7 @@ program mp_sql55
               enddo
             enddo
             close(4)
-            write(*,*) n_x,'data points read in'
+            print *,space, n_x,'data points read in'
             j_ext = 1
            endif 
          cycle way_point
@@ -1962,7 +1962,7 @@ program mp_sql55
 
         case(10) 
           do
-            write(*,*) 'Select the output MODE: ',(j,'  ',trim(pdf_out(j)),j=3,n_mode),'_unscaled'
+            print *,prompt, 'Select the output MODE: ',(j,'  ',trim(pdf_out(j)),j=3,n_mode),'_unscaled'
             read(*,*) j_mode         
             if(j_mode>=3.and.j_mode<=n_mode) exit plot_loop
           enddo

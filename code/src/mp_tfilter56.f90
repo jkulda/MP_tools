@@ -51,13 +51,13 @@ program mp_tfilter55
 ! *****
 ! ***** atom positions are converted from reduced lattice coordinates (x) to real space distances
 ! ***** 
-
   integer,parameter :: l_rec  =  1024		    !record length in real(4)
   real,parameter    :: pi = 3.14159
 
   real,allocatable ::  w(:)
   
   character(4)   :: c_int(2),c_fil(2),version,head,atom
+  character(10)	 :: prompt,space = '          '
   character(10)  :: pg_out,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
   character(16)  :: sim_type_par,data_type,string16,f_name,filter_name,f_short,f_short2
   character(40)  :: subst_name,file_master,file_master_out,time_stamp,int_mode,string,mp_tool
@@ -94,10 +94,11 @@ program mp_tfilter55
   
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = prompt
   mp_tool = 'MP_TFILTER '//version
 
   write(9,*) trim(time_stamp),'  ',mp_tool,'  ',trim(cwd_path) 
-  write(*,*)
+  print *
 
 ! ********************* Get a time stamp and open a .LOG file *******************************
   call getcwd(cwd_path)
@@ -117,11 +118,8 @@ program mp_tfilter55
   write(9,*) 
   
 ! *** Generate data file access
-  write(*,*) 'Input data file_master: '
-  read(*,*) file_master 
-        
-  write(*,*) 'Read data files number min, max: '
-  read(*,*)   nfile_min,nfile_max
+  print *,prompt, 'Data file_master & file numbers (min, max): '
+  read(*,*) file_master,nfile_min,nfile_max
   nfile_step = 1
   
   nfile = ((nfile_max-nfile_min)/nfile_step)+1
@@ -135,7 +133,7 @@ program mp_tfilter55
 
   open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
+    print *,'          ', 'File ',trim(file_dat_t0),' not found! Stop execution.'
     stop
   endif
   
@@ -148,7 +146,7 @@ program mp_tfilter55
     nml_in = .true.
     read(1,rec=i_rec) dat_source,version,string16
     read(string16,*) n_head
-    write(*,*)		'Input data:  ',dat_source,version,n_head
+    print *,'          ',		'Input data:  ',dat_source,version,n_head
     
     allocate(header(n_head))
     header(i_rec) = header_record
@@ -159,8 +157,8 @@ program mp_tfilter55
     write(header_record,nml=data_header_1)	      !update header record by parameters potentially absent in input data like filter_name,filter_fwhm
     header(i_rec) = header_record
   else
-    write(*,*) 'header record old, wrong or missing'
-    write(*,*) trim(header_record)
+    print *,'          ', 'header record old, wrong or missing'
+    print *,'          ', trim(header_record)
     stop
   endif 
   
@@ -171,13 +169,13 @@ program mp_tfilter55
   close(1)
   
   if(trim(input_method)/='CELL') then
-    write(*,*) 'WARNING: the input data were not produced by the CELL input method,'
-    write(*,*) 'the algorithm as such may work, BUT as there is no guaranteed relationship'
-    write(*,*) 'between the data position in the .BIN file and the position of the related ,'
-    write(*,*) 'atom in the simulation box, the results when adding several snapshots'
-    write(*,*) 'may become COMPLETELY IMPREVISIBLE!'
-    write(*,*) 
-    write(*,*) 'Do you wish to continue anyways, at YOUR risks & perils? (1/0)'
+    print *,'          ', 'WARNING: the input data were not produced by the CELL input method,'
+    print *,'          ', 'the algorithm as such may work, BUT as there is no guaranteed relationship'
+    print *,'          ', 'between the data position in the .BIN file and the position of the related ,'
+    print *,'          ', 'atom in the simulation box, the results when adding several snapshots'
+    print *,'          ', 'may become COMPLETELY IMPREVISIBLE!'
+    print *
+    print *,prompt, 'Do you wish to continue anyways, at YOUR risks & perils? (1/0)'
     read(*,*) jj
     if(jj/=1) stop
   endif
@@ -187,23 +185,23 @@ program mp_tfilter55
   n_sample2 = 2
   
   do
-    write(*,*) 'Filter type (1 rectangular, 2 smooth) & FWHM (max NFILE/2 for SMOOTH): [confirm 2, 10]'
+    print *,prompt, 'Filter type (1 rectangular, 2 smooth) & FWHM (max NFILE/2 for SMOOTH): [confirm 2, 10]'
     read(*,*) j_filter,n_filter2
     if(j_filter==1.and.n_filter2>nfile) then
-      write(*,*) 'Filter FWHM must be <= NFILE, retype all ...'
+      print *,'          ', 'Filter FWHM must be <= NFILE, retype all ...'
       cycle
     elseif(j_filter==2.and.2*n_filter2>nfile) then
-      write(*,*) 'Filter FWHM value must be <= NFILE/2, retype all ...'
+      print *,'          ', 'Filter FWHM value must be <= NFILE/2, retype all ...'
       cycle
     endif
     exit
   enddo
   
   do
-    write(*,*) 'Number of samples per filter FWHM [2]'
+    print *,prompt, 'Number of samples per filter FWHM [2]'
     read(*,*) n_sample2
     if(mod(n_filter2,n_sample2)==0) exit
-    write(*,*) 'Filter length must be divisible by n_sample, retype ...'
+    print *,'          ', 'Filter length must be divisible by n_sample, retype ...'
   enddo
 
   n_filter = j_filter*n_filter2         !assuming FWHM = NFILE/2 for SMOOTH filters, otherwise modify previous dialogue & here
@@ -227,7 +225,7 @@ program mp_tfilter55
 !       write(f_short,*)n_filter/2
 !       f_short = 'h'//trim(adjustl(f_short))//'f'
   else  
-    write(*,*) "Invalid filter option, STOP"
+    print *,'          ', "Invalid filter option, STOP"
     stop
   endif
   w = w/sum(w)
@@ -236,12 +234,12 @@ program mp_tfilter55
   write(f_short,*) n_filter2/n_sample2
   f_short = trim(adjustl(f_short))//f_name(1:1)//trim(adjustl(f_short2))//'f'
 
-  write(*,*) trim(f_name),' filter profile FWHM =',f_fwhm
-!     write(*,*) 'w(i)',w
+  print *,'          ', trim(f_name),' filter profile FWHM =',f_fwhm
+!     print *,'w(i)',w
   
 ! ***  Edit output file name
   string = file_master
-  write(*,*) 'Output data file_master (confirm, &append or replace): ', string
+  print *,prompt, 'Output data file_master (confirm, &append or replace): ', string
   read(*,*) string
   string = adjustl(string)
   if(trim(string)/=file_master.and.string(1:1)=='&') then
@@ -282,8 +280,8 @@ program mp_tfilter55
 
     open(1,file=file_dat_in,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
     if(ios.ne.0) then
-      write(*,*) 'File ',trim(file_dat_in),' not opened! IOS =',ios
-      write(*,*) 'Skip(1), stop execution(0)?'
+      print *,'          ', 'File ',trim(file_dat_in),' not opened! IOS =',ios
+      print *,prompt, 'Skip(1), stop execution(0)?'
       read(*,*) jj
       if(jj==1) exit file_loop
       if(jj==0) stop
@@ -346,7 +344,7 @@ program mp_tfilter55
     sample_loop: do i_sample = 1,n_sample
 
       j0 = (i_sample-1)*(n_filter2/n_sample2) !initial sample shift
-!         write(*,*) 'ifile,i_sample,j0',ifile,i_sample,j0
+!         print *,'ifile,i_sample,j0',ifile,i_sample,j0
 
       if(jfile>j0) then    
         j = mod(jfile-j0,n_filter)
@@ -357,7 +355,7 @@ program mp_tfilter55
         if(j_shell_out==1) at_pos1_out(:,i_sample) = at_pos1_out(:,i_sample)+w(j)*at_pos1_in
         if(j_shell_out==1.and.n_traj>=1) at_vel1_out(:,i_sample) = at_vel1_out(:,i_sample)+w(j)*at_vel1_in
         if(j==n_filter/2) t_dump_out(i_sample) = t_dump_in
-!             if(j==n_filter/2) write(*,*) 'i_sample,j0,j,t_dump_out(i_sample)',i_sample,j0,j,t_dump_out(i_sample)
+!             if(j==n_filter/2) print *,'i_sample,j0,j,t_dump_out(i_sample)',i_sample,j0,j,t_dump_out(i_sample)
 
         if(j==n_filter) then                     !accumulation finished, write OUTPUT
           i_save = i_save+1
@@ -368,14 +366,14 @@ program mp_tfilter55
             file_dat_out = './data/'//trim(file_master_out)//'_n'//trim(adjustl(string))//'.dat'
           endif
           open(2,file=file_dat_out,access='direct',form='unformatted',recl=4*l_rec)
-!        write(*,*) 'OUT: ifile,i_sample,j0,j,file_dat_out,t_dump',ifile,i_sample,j0,j,file_dat_out,t_dump_out(i_sample)
+!        print *,'OUT: ifile,i_sample,j0,j,file_dat_out,t_dump',ifile,i_sample,j0,j,file_dat_out,t_dump_out(i_sample)
 
           if(i_save==1) then 
-            write(*,*) 'Start:    ',file_dat_out
-            write(*,*) '                 (working ... may take a short while)'
+            print *,'          ', 'Start:    ',file_dat_out
+            print *,'          ', '                 (working ... may take a short while)'
           endif
           
-          if(i_save==10*(i_save/10)) write(*,*)trim(file_dat_out)
+          if(i_save==10*(i_save/10)) print *,'          ',trim(file_dat_out)
 
 ! *** write the header record
           if(n_traj>=1) then
@@ -455,8 +453,8 @@ program mp_tfilter55
 
   enddo file_loop	
   
-  write(*,*) 'Finished: ',file_dat_out
-  write(*,*) 'Total of',i_save,' files written'  
+  print *,'          ', 'Finished: ',file_dat_out
+  print *,'          ', 'Total of',i_save,' files written'  
                     
 end program mp_tfilter55
 

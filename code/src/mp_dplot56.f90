@@ -59,6 +59,7 @@ program mp_dplot55
   real     ::  e1_norm(3),e2_norm(3),ev_norm(3),ed_norm(3),e1p(3),e2p(3),evp(3),e1p_norm,e2p_norm,evp_norm,ep_angle,x1,y1,x2,y2
   
   character(4)   :: c_int(2),c_fil(2),version,head,atom
+  character(10)	 :: prompt,space = '          '
   character(10)  :: pg_out,string,section,c_date,c_time,c_zone,c_jt,c_slice,c_mode,c_jfile,at_name,dom_name
   character(16)  :: sim_type_par,data_type,string16,wedge_label,filter_name,c_e1(3),c_e2(3),c_x,c_y
   character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name,mp_tool
@@ -110,11 +111,12 @@ program mp_dplot55
 
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_SQL>   '
   mp_tool = 'MP_DPLOT '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*)'     *** for the moment only orthogonal output is available *** '
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *,'     *** for the moment only orthogonal output is available *** '
+  print *
       
 ! ********************* Get a time stamp and open a .LOG file *******************************
   call getcwd(cwd_path)
@@ -135,12 +137,10 @@ program mp_dplot55
   write(9,*) 
   
 ! *** Generate data file access
-  write(*,*) 'Input data file_master: '
-  read(*,*) file_master 
-        
-  write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
-  read(*,*)   nfile_min,nfile_max
+  print *,prompt, 'Data file_master & file numbers (min, max; 0 0 single file): '
+  read(*,*) file_master,nfile_min,nfile_max
   nfile_step = 1
+        
   t_single = nfile_min==0.and.nfile_max==0    
 
   if(t_single)then
@@ -164,7 +164,7 @@ program mp_dplot55
 
   open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_dat_t0),' not found! Stop execution.'
     stop
   endif
   
@@ -178,21 +178,21 @@ program mp_dplot55
     nml_in = .true.
     read(1,rec=i_rec) dat_source,version,string16
     read(string16,*) n_head
-    write(*,*)    'Input data:  ',dat_source,version,n_head
+    print *,space,    'Input data:  ',dat_source,version,n_head
     i_rec = i_rec+1                 
     read(1,rec=i_rec) header_record
     read(header_record,nml=data_header_1)  
     t0 = t_dump
 !!        write(*,nml=data_header_1)
   else
-    write(*,*) 'header record wrong or missing'
-    write(*,*) trim(header_record)
+    print *,space, 'header record wrong or missing'
+    print *,space, trim(header_record)
     stop
   endif 
   
   if(trim(input_method)/='CELL') then
-    write(*,*) 'ERROR: the present data were produced by the ',trim(input_method),' method,'
-    write(*,*) 'while direct space mapping works with the CELL data only.'
+    print *,space, 'ERROR: the present data were produced by the ',trim(input_method),' method,'
+    print *,space, 'while direct space mapping works with the CELL data only.'
     stop
   endif
 
@@ -205,15 +205,15 @@ program mp_dplot55
   read(header_record,nml=data_header_2)
 
 ! **** Read the auxiliary file <file_par.par> with structure parameters, atom names and further info
-!     write(*,*) 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
+!     print *,'Parameter file name (.par to be added) (confirm or type other name): ', file_par
 !     read(*,*) file_par
 
   file_inp = trim(file_par)//'.par'
-  write(*,*) 'Parameter file name: ', file_inp
+  print *,space, 'Parameter file name: ', file_inp
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_inp),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_inp),' not found! Stop execution.'
     stop
   endif
 
@@ -230,11 +230,11 @@ program mp_dplot55
   close(4)
 
 ! *** write overview of atom data
-  write(*,*)
-  write(*,*) 'Substance name: ',subst_name    
-  write(*,*) 'Atoms from ',trim(file_inp)
+  print *
+  print *,space, 'Substance name: ',subst_name    
+  print *,space, 'Atoms from ',trim(file_inp)
   do j=1,n_atom
-    write(*,'(5x,i2,5x,a4,3f8.4,2x,f8.4)')  j,at_name_par(j),at_base(j,:),at_occup_r(j)
+    write(*,'(15x,i2,5x,a4,3f8.4,2x,f8.4)')  j,at_name_par(j),at_base(j,:),at_occup_r(j)
     write(9,'(5x,a4,3f8.4,2x,f8.4)')  at_name_par(j),at_base(j,:),at_occup_r(j)
   enddo
 
@@ -255,12 +255,12 @@ program mp_dplot55
     allocate(vel_field1(3,n_row(1),n_row(2),n_row(3),n_atom,nfile),vel_norm1(n_row(1),n_row(2),n_row(3),n_atom,nfile))
   endif
 
-  write(*,*) 'Displacement domain type (0 = NONE, 1=[100], 2=[110], 3= 111])?'
+  print *,prompt, 'Displacement domain type (0 = NONE, 1=[100], 2=[110], 3= 111])?'
   read(*,*) n_dom		!displacement domain type (1=[100], 2=[110], 3= 111])
   if(n_dom==0) i_dom = 1
   
-  write(*,*) '          (reading input files ...)'
-  write(*,*) 
+  print *,space, '          (reading input files ...)'
+  print *
  			
 !!! *** calculate the domain segment number - new convention different from MD_TOOLS
 !
@@ -272,11 +272,11 @@ program mp_dplot55
 !			
 !			if(n_dom.eq.1) then
 !				i_dom = maxloc((abs(pos_inp)),dim=1)
-!!					write(*,*) 'maxloc',i_dom
+!!					print *,'maxloc',i_dom
 !				if(pos_inp(i_dom).gt.0.) i_dom = i_dom+3
 !			else if (n_dom.eq.2) then
 !				ii = minloc((abs(pos_inp)),dim=1)
-!!					write(*,*) 'minloc',ii
+!!					print *,'minloc',ii
 !				i2 = ii+1
 !				if(i2.gt.3) i2 = i2-3
 !				i3 = ii+2
@@ -306,14 +306,14 @@ program mp_dplot55
       endif
     endif
 
-!       write(*,*)
-!       write(*,*)'input: ',file_dat
+!       print *
+!       print *'input: ',file_dat
     write(9,*)'input: ',file_dat
 
     open(1,file='./data/'//file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
     if(ios.ne.0) then
-      write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
-      write(*,*) 'Skip(1), stop execution(0)?'
+      print *,space, 'File ',trim(file_dat),' not opened! IOS =',ios
+      print *,prompt, 'Skip(1), stop execution(0)?'
       read(*,*) jj
       if(jj==1) exit file_loop
       if(jj==0) stop
@@ -368,13 +368,13 @@ program mp_dplot55
       vel_field1(:,:,:,:,:,jt) = at_vel1_file(1:3,:,:,:,:)
     endif
 
-!       write(*,*) 'n_atom,n_row',n_atom,n_row
+!       print *,'n_atom,n_row',n_atom,n_row
 !
 !       do
-!         write(*,*) 'jat,i,j,k?'
+!         print *,'jat,i,j,k?'
 !         read(*,*) jat,i,j,k
-!         write(*,*) 'Core:', at_pos_file(:,i,j,k,jat)
-!         write(*,*) 'Shell:', at_pos1_file(:,i,j,k,jat)
+!         print *,'Core:', at_pos_file(:,i,j,k,jat)
+!         print *,'Shell:', at_pos1_file(:,i,j,k,jat)
 !       enddo
       
     do jat=1,n_atom
@@ -391,11 +391,11 @@ program mp_dplot55
 !
 !               if(n_dom==1) then
 !                 jj = maxloc((abs(res)),dim=1)
-!!					write(*,*) 'maxloc',i_dom
+!!					print *,'maxloc',i_dom
 !                 if(res(jj).gt.0.) jj = jj+3
 !               else if (n_dom==2) then
 !                 ii = minloc((abs(res)),dim=1)
-!!					write(*,*) 'minloc',ii
+!!					print *,'minloc',ii
 !                 i2 = ii+1
 !                 if(i2.gt.3) i2 = i2-3
 !                 i3 = ii+2
@@ -431,7 +431,7 @@ program mp_dplot55
               endif
             endif
             
-!               write(*,*) 'n_dom,res,jj,ii,i2,i3',n_dom,res,jj,ii,i2,i3
+!               print *,'n_dom,res,jj,ii,i2,i3',n_dom,res,jj,ii,i2,i3
 !               read(*,*)
 
             if(j_shell_out==1) then
@@ -450,16 +450,16 @@ program mp_dplot55
     do jat=1,n_atom
       displ_norm_tot(jat,jt) = sum(displ_norm(:,:,:,jat,jt))/nsuper
     enddo
-!       if(j_verb==1) write(*,*) 'jt,displ_norm_tot(:,jt)',jt,displ_norm_tot(:,jt)
+!       if(j_verb==1) print *,'jt,displ_norm_tot(:,jt)',jt,displ_norm_tot(:,jt)
 
-!         write(*,*) 'n_dom',n_dom
+!         print *,'n_dom',n_dom
 !       do
-!         write(*,*) 'jat,i,j,k?'
+!         print *,'jat,i,j,k?'
 !         read(*,*) jat,i,j,k
-!         write(*,*) 'Core:', at_pos_file(:,i,j,k,jat)
-!         write(*,*) 'Core:', displ_field(:,i,j,k,jat,jt),i_dom(i,j,k,jat,jt)
-!         write(*,*) 'Shell:', at_pos1_file(:,i,j,k,jat)
-!         write(*,*) 'Shell:', displ_field1(:,i,j,k,jat,jt)
+!         print *,'Core:', at_pos_file(:,i,j,k,jat)
+!         print *,'Core:', displ_field(:,i,j,k,jat,jt),i_dom(i,j,k,jat,jt)
+!         print *,'Shell:', at_pos1_file(:,i,j,k,jat)
+!         print *,'Shell:', displ_field1(:,i,j,k,jat,jt)
 !         if(jat==0) exit
 !       enddo
 !
@@ -470,14 +470,14 @@ program mp_dplot55
     if(ifile==nfile_min.and.sum(at_occup_r)/n_atom==1.) then
       at_charge = at_pos_file(4,1,1,1,:)          
       if(j_verb==1) then  
-        write(*,*) 'Atom (core) charges',at_charge, 'confirm or type new values'
+        print *,prompt, 'Atom (core) charges',at_charge, 'confirm or type new values'
         read(*,*) at_charge
       endif
 
       if(j_shell_out==1) then
         at_charge1 = at_pos1_file(4,1,1,1,:) 
         if(j_verb==1) then  
-          write(*,*) 'Shell charges',at_charge1, 'confirm or type new values'
+          print *,prompt, 'Shell charges',at_charge1, 'confirm or type new values'
           read(*,*) at_charge1
         endif
       endif 
@@ -490,13 +490,13 @@ program mp_dplot55
       enddo
       charge_mom_cell = charge_mom_c+charge_mom_s 
       if(j_shell_out==0) then
-        write(*,*) 'Static unit cell dipole moment:',charge_mom_c     
+        print *,space, 'Static unit cell dipole moment:',charge_mom_c     
       else
-        write(*,*) 'Static unit cell dipole moment: cores ',charge_mom_c
-        write(*,*) '                                shells',charge_mom_s
-        write(*,*) '                                total ',charge_mom_cell
+        print *,space, 'Static unit cell dipole moment: cores ',charge_mom_c
+        print *,space, '                                shells',charge_mom_s
+        print *,space, '                                total ',charge_mom_cell
       endif
-      write(*,*)
+      print *
     endif 
 
 ! ***  calculate electric polarisation of each unit cell
@@ -520,11 +520,11 @@ program mp_dplot55
 ! *** calculate the domain (quadrant) number for polar(ization)
           if(n_dom==1) then
             jj = maxloc((abs(pol)),dim=1)
-!					write(*,*) 'maxloc',i_dom
+!					print *,'maxloc',i_dom
 !               if(pol(jj).gt.0.) jj = jj+3
           else if (n_dom==2) then
             ii = minloc((abs(pol)),dim=1)
-!					write(*,*) 'minloc',ii
+!					print *,'minloc',ii
             i2 = ii+1
             if(i2.gt.3) i2 = i2-3
             i3 = ii+2
@@ -555,7 +555,7 @@ program mp_dplot55
     enddo
     polar_tot(:,jt) = polar_tot(:,jt)/nsuper
     pol_norm_tot(jt) = norm2(polar_tot(:,jt))
-!       if(j_verb==1) write(*,*) 'jt,polar_tot(:,jt),pol_norm_tot(jt)',jt,polar_tot(:,jt),pol_norm_tot(jt)
+!       if(j_verb==1) print *,'jt,polar_tot(:,jt),pol_norm_tot(jt)',jt,polar_tot(:,jt),pol_norm_tot(jt)
   enddo file_loop
 
   jt_max = jt   ! jt_max = 1 means a single explicit JT while t_single means absence of JT numbers
@@ -627,43 +627,43 @@ program mp_dplot55
   plot_loop: do      
     scale = 1
             
-!         write(*,*) 'Display: 1 displacement domains, n_dom(6[100], 12[110], 8[111]) '
-!         write(*,*) '         2 displacement magnitude, scale '
-!         write(*,*) '         3 displacement out-of-plane, scale '
-!         write(*,*) '         4 in-plane displacement vectors, scale (~50)'
-!         write(*,*) '         5 polarisation domains, n_dom(6[100], 12[110], 8[111]) '
-!         write(*,*) '         6 polarisation magnitude, scale '
-!         write(*,*) '         7 polarisation out-of-plane, scale '
-!         write(*,*) '         8 in-plane polarisation vectors, scale (~50)'
-!         write(*,*) '         0 exit (0 0)'
+!         print *,'Display: 1 displacement domains, n_dom(6[100], 12[110], 8[111]) '
+!         print *,'         2 displacement magnitude, scale '
+!         print *,'         3 displacement out-of-plane, scale '
+!         print *,'         4 in-plane displacement vectors, scale (~50)'
+!         print *,'         5 polarisation domains, n_dom(6[100], 12[110], 8[111]) '
+!         print *,'         6 polarisation magnitude, scale '
+!         print *,'         7 polarisation out-of-plane, scale '
+!         print *,'         8 in-plane polarisation vectors, scale (~50)'
+!         print *,'         0 exit (0 0)'
 
-    write(*,*) 'Display: 1 displacement in-plane (vector), scale (~20) '
-    write(*,*) '         2 displacement in direction (value), scale (~5) '
-    write(*,*) '         3 velocity in-plane (vector), scale (~1) '
-    write(*,*) '         4 velocity in direction (value), scale (~1)'
-    write(*,*) '         5 polarisation in-plane (vector), scale (~5)  '
-    write(*,*) '         6 polarisation in direction (value), scale (~1) '
-    write(*,*) '         0 exit (0 0)'
+    print *,prompt, 'Display: 1 displacement in-plane (vector), scale (~20) '
+    print *,space, '         2 displacement in direction (value), scale (~5) '
+    print *,space, '         3 velocity in-plane (vector), scale (~1) '
+    print *,space, '         4 velocity in direction (value), scale (~1)'
+    print *,space, '         5 polarisation in-plane (vector), scale (~5)  '
+    print *,space, '         6 polarisation in direction (value), scale (~1) '
+    print *,space, '         0 exit (0 0)'
     
     if(j_verb==1) then
-      write(*,*)
-      write(*,*) '         10 displacement domains, 1 '
-      write(*,*) '         11 atom mass, .01 '          
-      write(*,*) '         12 atom charge, .01 '          
-      write(*,*) '         13 displacement magnitude, scale (~20) '
-      write(*,*) '         14 displacement component, scale (~20) '
-      write(*,*) '         15 velocity magnitude, scale (~1) '
-      write(*,*) '         16 velocity component, scale (~1) '
-      write(*,*) '         17 polarisation magnitude, scale(~5)  '
-      write(*,*) '         18 polarisation component, scale (~5) '
-      write(*,*) '         19 polarisation domains, 1 '          
-      write(*,*) '         20 bond length, (~5) '          
+      print *
+      print *,space, '         10 displacement domains, 1 '
+      print *,space, '         11 atom mass, .01 '          
+      print *,space, '         12 atom charge, .01 '          
+      print *,space, '         13 displacement magnitude, scale (~20) '
+      print *,space, '         14 displacement component, scale (~20) '
+      print *,space, '         15 velocity magnitude, scale (~1) '
+      print *,space, '         16 velocity component, scale (~1) '
+      print *,space, '         17 polarisation magnitude, scale(~5)  '
+      print *,space, '         18 polarisation component, scale (~5) '
+      print *,space, '         19 polarisation domains, 1 '          
+      print *,space, '         20 bond length, (~5) '          
     endif
 
     fmin = 0.
     read(*,*) mode,scale
     if(mode==2.or.mode==4.or.mode==6) then
-      write(*,*) 'Direction vector components:'
+      print *,prompt, 'Direction vector components:'
       read(*,*) ed_norm
       ed_norm = ed_norm/norm2(ed_norm)
     endif                             
@@ -677,10 +677,10 @@ program mp_dplot55
 
 ! *** define plot geometry
     if (mode==14.or.mode==16.or.mode==18) then
-      write(*,*) 'Display plane ((0=general, 1=(hk0), 2=(hhl)), component index [1-3]'
+      print *,prompt, 'Display plane ((0=general, 1=(hk0), 2=(hhl)), component index [1-3]'
       read(*,*) j_plane,ind_c
     else
-      write(*,*) 'Display plane ((0=general, 1=(hk0), 2=(hhl)):'
+      print *,prompt, 'Display plane ((0=general, 1=(hk0), 2=(hhl)):'
       read(*,*) j_plane
     endif
 
@@ -692,7 +692,7 @@ program mp_dplot55
       e2 = (/0,0,1/)
     else						
       do
-        write(*,*) 'Input perpendicular vectors (integer) to define the Q-plane e1(3),e2(3):'
+        print *,prompt, 'Input perpendicular vectors (integer) to define the Q-plane e1(3),e2(3):'
         read(*,*) e1,e2
         if(dot_product(e1,e1).ne.0..and.dot_product(e2,e2).ne.0..and.dot_product(e1,e2)==0.) then
           exit
@@ -717,8 +717,6 @@ program mp_dplot55
       endif
     enddo
     
-!         write(*,*) 'ev,ii,jj',ev,ii,jj
-    
     e_slice = 0
     e_slice(ii) = sign(1,jj)
     n_slice = n_row(ii)           !number of horizontal slices corresponding to EV
@@ -729,9 +727,9 @@ program mp_dplot55
     jj = maxloc(e2,1)
     n_y = n_row(jj)
       
-      write(*,*) 'n_x,n_y',n_x,n_y
-      write(*,*) 'e1,e2,ev',e1,e2,ev
-      write(*,*) 'e_slice',e_slice
+      print *,space, 'n_x,n_y',n_x,n_y
+      print *,space, 'e1,e2,ev',e1,e2,ev
+      print *,space, 'e_slice',e_slice
     
     e1p = matmul(a_cell,real(e1))			
     e2p = matmul(a_cell,real(e2))
@@ -742,10 +740,10 @@ program mp_dplot55
     ep_angle = dot_product(e1p,e2p)/(e1p_norm*e1p_norm)
 
     if(j_verb==1) then
-      write(*,*) 'e1p,e1p_norm',e1p,e1p_norm
-      write(*,*) 'e2p,e2p_norm',e2p,e2p_norm
-      write(*,*) 'evp,evp_norm',evp,evp_norm
-      write(*,*) 'ep_angle',ep_angle 		
+      print *,space, 'e1p,e1p_norm',e1p,e1p_norm
+      print *,space, 'e2p,e2p_norm',e2p,e2p_norm
+      print *,space, 'evp,evp_norm',evp,evp_norm
+      print *,space, 'ep_angle',ep_angle 		
     endif
 
     
@@ -754,30 +752,30 @@ program mp_dplot55
 
     atom_loop: do
       if(mode==20) then
-        write(*,*) 'Atom pair numbers: (0 0 =END)'
+        print *,prompt, 'Atom pair numbers: (0 0 =END)'
         read(*,*) jat,j_atom
         if(jat==0.or.j_atom==0) exit atom_loop          
       elseif(mode<=4.or.(mode>=10.and.mode<17)) then
         if(n_dom/=1) then
-          write(*,*) 'Atom numbers: display & domain reference (0 = NONE, -1 = POLARISATION, 99=END)'
+          print *,prompt, 'Atom numbers: display & domain reference (0 = NONE, -1 = POLARISATION, 99=END)'
           read(*,*) jat,j_atom
         else
-          write(*,*) 'Atom number to display (99=END)'
+          print *,prompt, 'Atom number to display (99=END)'
           read(*,*) jat
           j_atom = 0
         endif
         if(jat==99.or.j_atom==99) exit atom_loop
         if(jat<1.or.jat>n_atom.or.j_atom<-1.or.j_atom>n_atom) then
-          write(*,*) 'wrong atom number(s), retype ...'
+          print *,space, 'wrong atom number(s), retype ...'
           cycle atom_loop
         endif
         at_name = at_name_par(jat)
       else
-        write(*,*) 'Atom number for domain reference (0=NONE, -1=POLARISATION, 99=END)'
+        print *,prompt, 'Atom number for domain reference (0=NONE, -1=POLARISATION, 99=END)'
         read(*,*) j_atom
         if(j_atom==99) exit atom_loop
         if(j_atom<-1.or.j_atom>n_atom) then
-          write(*,*) 'wrong atom number(s), retype ...'
+          print *,space, 'wrong atom number(s), retype ...'
           cycle atom_loop
         endif
         at_name = 'polar'
@@ -938,18 +936,18 @@ program mp_dplot55
         end select
 
       if(j_verb==1) then
-        write(*,*) 'Test output vs. input (last frame): atom, slice',jat,k
+        print *,space, 'Test output vs. input (last frame): atom, slice',jat,k
         do
-          write(*,*) 'Position: i,j? (0 0 exit)'
+          print *,prompt, 'Position: i,j? (0 0 exit)'
           read(*,*) i,j
           if(i==0.or.j==0) exit
-          write(*,*) 'Core:  at_pos_file ', at_pos_file(:,i,j,k,jat)
-          write(*,*) 'Core:  displ_field ', displ_field(:,i,j,k,jat,jt),i_dom(i,j,k,jat,jt)
+          print *,space, 'Core:  at_pos_file ', at_pos_file(:,i,j,k,jat)
+          print *,space, 'Core:  displ_field ', displ_field(:,i,j,k,jat,jt),i_dom(i,j,k,jat,jt)
           if(j_shell_out==1) then
-            write(*,*) 'Shell: at_pos1_file', at_pos1_file(:,i,j,k,jat)
-            write(*,*) 'Shell: displ_field1', displ_field1(:,i,j,k,jat,jt)
+            print *,space, 'Shell: at_pos1_file', at_pos1_file(:,i,j,k,jat)
+            print *,space, 'Shell: displ_field1', displ_field1(:,i,j,k,jat,jt)
           endif
-          write(*,*) 'Plot:  displ_plot  ', displ_plot(1,i,j)
+          print *,space, 'Plot:  displ_plot  ', displ_plot(1,i,j)
         enddo
       endif
 
@@ -1058,7 +1056,7 @@ program mp_dplot55
         do i=1,n_x         
           do j=1,n_y
             if(mask(i_dom_out(i,j))==0) cycle
-!               write(*,*)i,j,displ_plot(1,i,j),sqrt(abs(displ_plot(1,i,j)))
+!               print *,i,j,displ_plot(1,i,j),sqrt(abs(displ_plot(1,i,j)))
 !               read(*,*)
             CALL PGSCI(20+i_dom_out(i,j))
 !               CALL PGSCI(ci)
@@ -1091,23 +1089,23 @@ program mp_dplot55
     call PGCLOS
 
     if(j_auto.eq.0) then
-      write(*,*) 'Increment (OPTIONS = 0, END = 99): [1]'
+      print *,prompt, 'Increment (OPTIONS = 0, END = 99): [1]'
       read(*,*) j_shift
       if(j_shift.eq.99) exit slice_loop
 
       if(j_shift.eq.0) then
         options_loop: do
-          write(*,*) 'Options:' 
-          if(j_auto==0) write(*,*) '   1   toggle MAN to AUTO advance'          !j_auto
-          if(j_auto==1) write(*,*) '   1   toggle AUTO to MAN advance'          !j_auto
-          if(jt_max>1.and.j_frame==0)write(*,*) '   2   toggle SLICE to FRAME advance' !j_frame
-          if(jt_max>1.and.j_frame==1)write(*,*) '   2   toggle FRAME to SLICE advance' !j_frame
-          write(*,"('    3   ZOOM (actual frame:',4f6.1,')')") x1,y1,x2,y2
-          write(*,*) '   4   adjust scale (actual',scale,')'
-          write(*,"('    5   mask domains (actual :',12i2,')')",advance='no') mask
+          print *,prompt, 'Options:' 
+          if(j_auto==0) print *,space, '   1   toggle MAN to AUTO advance'          !j_auto
+          if(j_auto==1) print *,space, '   1   toggle AUTO to MAN advance'          !j_auto
+          if(jt_max>1.and.j_frame==0)print *,space, '   2   toggle SLICE to FRAME advance' !j_frame
+          if(jt_max>1.and.j_frame==1)print *,space, '   2   toggle FRAME to SLICE advance' !j_frame
+          write(*,"(10x,'    3   ZOOM (actual frame:',4f6.1,')')") x1,y1,x2,y2
+          print *,space, '   4   adjust scale (actual',scale,')'
+          write(*,"(10x,'    5   mask domains (actual :',12i2,')')",advance='no') mask
                                                            write(*,"(')')")
-          write(*,*) '   6   make a .PS copy'
-          write(*,*) '   0   EXIT'
+          print *,space, '   6   make a .PS copy'
+          print *,space, '   0   EXIT'
           read(*,*) j_op
 
           select case (j_op)
@@ -1115,7 +1113,7 @@ program mp_dplot55
               j_auto = j_auto+1
               j_auto = mod(j_auto,2)
               if(j_auto==1) then
-                write(*,*) '       increment & time delay (≥1 sec): '
+                print *,prompt, '       increment & time delay (≥1 sec): '
                 read(*,*) j_shift,j_adv
                 i_shift = 0
               endif
@@ -1124,7 +1122,7 @@ program mp_dplot55
               j_frame = j_frame+1
               j_frame = mod(j_frame,2)
             case(3)
-              write(*,*) '       corner indices (bottom left & top right, confirm/re-type):'
+              print *,prompt, '       corner indices (bottom left & top right, confirm/re-type):'
 !                 write(*,'(5x,4f6.1)') x1,y1,x2,y2
               read(*,*) x1,y1,x2,y2
 !                   x1 = x1-.5
@@ -1132,7 +1130,7 @@ program mp_dplot55
 !                   x2 = x2+.5
 !                   y2 = y2+.5
             case(4)
-              write(*,*) '         new scale factor (-1 invert sign)'
+              print *,prompt, '         new scale factor (-1 invert sign)'
               read(*,*) res2
               if(res2==-1) then
                 scale = -scale
@@ -1190,7 +1188,7 @@ program mp_dplot55
 
         jfile = jfile+1
         if(jfile==100) then
-          write(*,*)'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
+          print *,prompt,'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
           read(*,*)
           jfile = 1
         endif							
@@ -1198,10 +1196,10 @@ program mp_dplot55
 
       j_ps = PGOPEN(file_ps//'/VCPS')
       if(j_ps.LE.0) then
-        write(*,*) 'The .PS file could not be opened: check your PGPLOT installation (drivers)!'
+        print *,space, 'The .PS file could not be opened: check your PGPLOT installation (drivers)!'
         cycle slice_loop
       endif
-      write(*,*) 'Saving PS file: ',file_ps
+      print *,space, 'Saving PS file: ',file_ps
 
       CALL PGPAP(8.0,1.0)     ! define the plot area
       CALL PGSLW (2)
@@ -1277,7 +1275,7 @@ program mp_dplot55
 
 ! *** stop the movie?
       if(j_auto==1.and.i_shift==n_shift) then !stop/cont automatic show
-        write(*,*) 'Continue/stop? (1/0)'
+        print *,prompt, 'Continue/stop? (1/0)'
         read(*,*) j_auto
         i_shift = 0
         if(j_auto==0) cycle slice_loop
@@ -1297,8 +1295,6 @@ program mp_dplot55
 
       if(jt<jt0) jt = jt0
       if(jt>jt_max) jt = jt0
-      
-!             write(*,*) 'i_shift,jt,j_slice',i_shift,jt,j_slice
 
       enddo slice_loop
 

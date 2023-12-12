@@ -71,6 +71,7 @@ program mp_dos55
   logical        :: found_txt,found_ps,t_single,nml_in	
   character(4),allocatable   :: at_label(:),at_name_par(:)
   character(4)   :: version,head,atom
+  character(10)	 :: prompt,space = '          '
   character(10)  :: string,section,ax_label,pg_out,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
   character(16)  :: dat_source,string16,filter_name
   character(40)  :: subst_name,file_master,file_inp,time_stamp,x_title,y_title,at_weight_scheme(2),x_file_name
@@ -131,9 +132,10 @@ program mp_dos55
 !
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_DOS>   '
   mp_tool = 'MP_DOS '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
   write(*,*)
 
 ! ********************* Get a time stamp and open a .LOG file *******************************
@@ -161,15 +163,12 @@ program mp_dos55
   filter_fwhm = .0
 
 ! *** Generate data file access
-  write(*,*) 'Input data file_master: '
-  read(*,*) file_master 
-        
-  write(*,*) 'Read data files number min, max: '
-  read(*,*)   nfile_min,nfile_max
+  print *,prompt, 'Data file_master & file numbers (min, max): '
+  read(*,*) file_master,nfile_min,nfile_max
   nfile_step = 1
 
-  if((nfile_max-nfile_min)<10) then
-    write(*,*) 'The trajectory is too short: >= 10 snapshots needed'
+  if((nfile_max-nfile_min)<9) then
+    print *,space, 'The trajectory is too short: >= 10 snapshots needed'
     stop
   endif
     
@@ -185,7 +184,7 @@ program mp_dos55
 
   open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_dat_t0),' not found! Stop execution.'
     stop
   endif
   
@@ -197,14 +196,14 @@ program mp_dos55
     nml_in = .true.
     read(1,rec=i_rec) dat_source,version,string16
     read(string16,*) n_head
-    write(*,*)		'Input data:  ',dat_source,version,n_head
+    print *,space,		'Input data:  ',dat_source,version,n_head
     i_rec = i_rec+1   							
     read(1,rec=i_rec) header_record
     read(header_record,nml=data_header_1)	
     t0 = t_dump
 !!        write(*,nml=data_header_1)
   elseif(head.eq.'TIME'.or.head.eq.'STAT') then                                  !old w/o structure
-    write(*,*)		'Input data:  ','old header format'
+    print *,space,		'Input data:  ','old header format'
     nml_in = .false.
     read(1,rec=1) sim_type,file_par,t_ms,t0,temp,a_par,angle,n_row,n_atom,n_eq,j_force,j_shell_out,n_cond,n_rec					
     n_head = 1
@@ -212,8 +211,8 @@ program mp_dos55
     input_method = 'CELL'
     if(index(sim_type,'BULK')/=0) input_method = 'BULK'
   else
-    write(*,*) 'header record wrong or missing'
-    write(*,*) trim(header_record)
+    print *,space, 'header record wrong or missing'
+    print *,space, trim(header_record)
     stop
   endif
   
@@ -234,23 +233,23 @@ program mp_dos55
   close(1)
   
   if(sim_type=='STATIC') then
-    write(*,*) 'Phonon DOS cannot be calculated from static data.'
+    print *,space, 'Phonon DOS cannot be calculated from static data.'
     stop
   endif
 
   if(n_traj<1) then
-    write(*,*) 'Input data not containing atom velocities are not eligible for MP_DOS calculation!'
+    print *,space, 'Input data not containing atom velocities are not eligible for MP_DOS calculation!'
     stop
   endif
 
 ! **** Read the auxiliary file <file_par.par> with structure parameters, atom names and further info
-  write(*,*) 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
+  print *,prompt, 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
   read(*,*) file_par
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_inp),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_inp),' not found! Stop execution.'
     stop
   endif
 
@@ -266,7 +265,7 @@ program mp_dos55
   do
     read(4,'(a)',iostat=ios) string
     if(ios/=0) then
-      write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+      print *,space, 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
       stop
     endif
     if(string(1:6).eq.section) exit	!find the mp_simple part of the .par file
@@ -282,11 +281,11 @@ program mp_dos55
     open(4,file='/usr/local/mp_tools/ref/neutron_xs.txt',action='read',status ='old',iostat=ios)
     if(ios.ne.0) then
       do
-        write(*,*) 'File neutron_xs.txt not found, type in valid access path/filename'
+        print *,space, 'File neutron_xs.txt not found, type in valid access path/filename'
         read(*,'(a)') x_file_name
         open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
         if(ios==0) exit
-        write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+        print *,space, 'File',trim(x_file_name),' not found, try again ...'
       enddo
     endif
   endif
@@ -300,24 +299,24 @@ program mp_dos55
         cycle atom_loop
       endif
     enddo
-    write(*,*) 'b_coh for ',trim(at_label(j)),' not found,'
-    write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+    print *,space, 'b_coh for ',trim(at_label(j)),' not found,'
+    print *,space, 'check your spelling and the neutron_xs.txt table; use unit weights'
   enddo atom_loop
 
   do j=1,n_atom
     if(at_name_par(j)/=at_name_out(j)) then
-      write(*,*) 'Atom names in .PAR and .DAT do not match: ',j,at_name_par(j),at_name_out(j)
-      write(*,*) 'Prefer .DAT? (1/0)'
+      print *,space,'Atom names in .PAR and .DAT do not match: ',j,at_name_par(j),at_name_out(j)
+      print *,prompt, 'Prefer .DAT? (1/0)'
       read(*,*) ii
       if(ii==1) at_name_par = at_name_out
       exit 
     endif
   enddo			
 
-  write(*,*)
-  write(*,*) 'Neutron scattering lengths:'
+  print *
+  print *,space, 'Neutron scattering lengths:'
   do j=1,n_atom
-    write(*,*) at_label(j),at_name_out(j),b_coh(j)
+    print *,space, at_label(j),at_name_out(j),b_coh(j)
   enddo			
   
 ! **** for an MD snapshot sequence open a second data file to see the time step between recorded snapshots
@@ -332,7 +331,7 @@ program mp_dos55
 
     open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
     if(ios.ne.0) then
-      write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
+      print *,space, 'File ',trim(file_dat),' not found! Stop execution.'
       stop
     endif
 
@@ -362,18 +361,18 @@ program mp_dos55
   call omp_set_num_threads(proc_num_in)
   
   if(j_verb.ge.1) then
-    write (*,*) 'OMP processes available  = ', proc_num
-    write (*,*) 'OMP threads maximum      = ', thread_num_max
-    write (*,*) 'OMP processes requested  = ', proc_num_in
+    print *,'OMP processes available  = ', proc_num
+    print *,'OMP threads maximum      = ', thread_num_max
   endif
 
 
   if(proc_num_in.gt.1) then
     write(9,*) 'OMP threads maximum = ', thread_num_max
     write(9,*) 'OMP processes requested 	= ', proc_num_in
+    print *,'OMP processes requested  = ', proc_num_in
   else
     write(9,*) 'OpenMP not in use'
-    write(*,*) 'OpenMP not in use'
+    print *,space, 'OpenMP not in use'
   endif
   write(9,*) 
 !
@@ -387,7 +386,7 @@ program mp_dos55
   CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
   sc_r = 1./sc_r
   ifile = 0				
-  write(*,*) 'Input files:'
+  print *,space, 'Input files:'
 
   file_loop: do jfile=nfile_min,nfile_min+nfile-1
 
@@ -401,14 +400,14 @@ program mp_dos55
 
     open (1,file=file_dat,action='read',status ='old',access='direct',form='unformatted',recl=4*l_rec,iostat=ios)
     if(ios.ne.0) then
-      write(*,*) 'File ',trim(file_dat),' not opened! Exit reading / Stop execution (1/0)?'
+      print *,prompt, 'File ',trim(file_dat),' not opened! Exit reading / Stop execution (1/0)?'
       read(*,*) jj
       if(jj==1) exit file_loop
       if(jj==0) stop
     endif
 
     ifile = ifile+1				       	
-    if(jfile==1.or.jfile==10*(jfile/10)) write(*,*) file_dat
+    if(jfile==1.or.jfile==10*(jfile/10)) print *,space, file_dat
 
 ! *** for the whole sequence the same header status is assumed 
 ! *** read the input .dat file as a whole, only at_name_out, at_pos and idom are really needed
@@ -440,8 +439,8 @@ program mp_dos55
   if(ifile.ne.nfile) nfile = ifile
 
   CALL SYSTEM_CLOCK (COUNT = sc_c2)
-  write(*,*) nfile,' files read in',(sc_c2-sc_c1)*sc_r,' sec SYS time'
-  write(*,*) 
+  print *,space, nfile,' files read in',(sc_c2-sc_c1)*sc_r,' sec SYS time'
+  print *
 
   jfile = 1				!now to be used as index for the successive output files
         
@@ -451,11 +450,11 @@ program mp_dos55
   freq_step = 1./t_tot
   n_freq_plot = .5*t_tot/t_step
   n_freq_plot = n_freq_plot+1
-  write(*,*) 'n_freq_plot',n_freq_plot
+  print *,space, 'n_freq_plot',n_freq_plot
 
-  write(*,*) 't_range [ps] =',t_tot,'t_step [ps] =',t_step
-  write(*,*) 'freq_max [THz] =',f_max_plot,'freq_step_min [THz] =',1./t_tot
-  write(*,*) 
+  print *,space, 't_range [ps] =',t_tot,'t_step [ps] =',t_step
+  print *,space, 'freq_max [THz] =',f_max_plot,'freq_step_min [THz] =',1./t_tot
+  print *
   
   write(9,*) 
   write(9,*) 'Input files:',nfile,' starting from ',trim(file_dat_t0)
@@ -475,7 +474,7 @@ program mp_dos55
 
   CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				
 !$omp parallel shared(at_vel_file,cs3,wind,n_tot,nfile) private(cs_inp)
-!!				if(j_verb==1)	write(*,*) 'OMP threads available:', omp_get_num_threads( )	
+!!				if(j_verb==1)	print *,'OMP threads available:', omp_get_num_threads( )	
 !$omp do
   do ind=1,n_tot
     do j=1,3
@@ -487,7 +486,7 @@ program mp_dos55
 !$omp end parallel
 			
 !!				CALL SYSTEM_CLOCK (COUNT = sc_c2)
-!!				if(j_verb.ge.1) write(*,*) (sc_c2-sc_c1)/sc_r
+!!				if(j_verb.ge.1) print *,(sc_c2-sc_c1)/sc_r
 
   cs_plot = .0
   CALL SYSTEM_CLOCK (COUNT = sc_c1)				
@@ -503,7 +502,7 @@ program mp_dos55
 !$omp end parallel
 
 !!				CALL SYSTEM_CLOCK (COUNT = sc_c2)
-!!				if(j_verb.ge.1) write(*,*) 'OpenMP time integration',(sc_c2-sc_c1)/sc_r	
+!!				if(j_verb.ge.1) print *,'OpenMP time integration',(sc_c2-sc_c1)/sc_r	
 
   n_int = 1
   n_frame = nfile-n_int+1
@@ -517,13 +516,13 @@ program mp_dos55
             
   at_weights_loop: do	
 
-!!				write(*,*) 'Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT, negative = EDIT'	
-    write(*,*) 'Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT'	
+!!				print *,'Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT, negative = EDIT'	
+    print *,prompt, 'Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT'	
     do
       read(*,*) jj
       if(jj==0) exit at_weights_loop
       if(abs(jj)==1.or.abs(jj)==2) exit
-      write(*,*) 'Input out of range, repeat ...'
+      print *,space, 'Input out of range, repeat ...'
     enddo
 
     j_weight = abs(jj)
@@ -540,14 +539,14 @@ program mp_dos55
     write(9,'(1x,"Atoms no.:  ",50i8)') (i,i=1,n_atom)
     write(*,'(1x,a,": ",50f8.4)') trim(at_weight_scheme(j_weight)),(at_weight(i),i=1,n_atom)
     write(9,'(1x,a,": ",50f8.4)') trim(at_weight_scheme(j_weight)),(at_weight(i),i=1,n_atom)
-    write(*,*) 'Actual masks:'
+    print *,space, 'Actual masks:'
     write(*,'((50i3))') (at_mask(i),i=1,n_atom)
     if(jj<0) then
-      write(*,*)'Type in new ones:'
+      print *,prompt,'Type in new ones:'
       do
         read(*,*)(at_mask(i),i=1,n_atom)
         if(any(at_mask(1:n_atom).ge.0).and.any(at_mask(1:n_atom).le.1)) exit
-        write(*,*) 'Input out of range, repeat ...'
+        print *,space, 'Input out of range, repeat ...'
       enddo
     endif
 
@@ -571,7 +570,7 @@ program mp_dos55
 !	
     if(j_xserv==0) then
       j_xserv = PGOPEN('/xserv')
-!!					if(j_verb.ge.1) write(*,*) 'j_xserv',j_xserv
+!!					if(j_verb.ge.1) print *,space, 'j_xserv',j_xserv
       CALL PGASK(.FALSE.)     ! would not ask for <RET>
       CALL PGPAP(7.0,1.)     ! define the plot areaCC						CALL PGERAS
       CALL PGSCRN(0, 'white', IER)	!sets the color index of background to WHITE
@@ -599,15 +598,15 @@ program mp_dos55
     c_min = .0
     c_max = maxval(cs_out)
 
-    write(plot_title,'(" Vibrational DOS:  ",a,"  T =",f6.1," [K]  ",a)') trim(subst_name),temp,trim(at_weight_scheme(j_weight))
-    write(*,*) plot_title
+    write(plot_title,'("Vibrational DOS:  ",a,"  T =",f6.1," [K]  ",a)') trim(subst_name),temp,trim(at_weight_scheme(j_weight))
+    print *,space, plot_title
     do
       CALL PGSCH(1.)					!set character height					
       CALL PGSCI (1)  !white
       CALL PGSLS (1)  !full
       CALL PGSLW(2)		
       CALL PGENV(f_min,f_max,c_min,c_max,0,j_grid+1) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes w/o grid
-      CALL PGLAB('E [THz]', 'DOS [arb. units]',trim(plot_title))  !put the axis labels
+      CALL PGLAB('E [THz]', 'DOS [arb. units] ',trim(plot_title))  !put the axis labels
       CALL PGSCI (1)  !white
       CALL PGSLW(5)			!operates in steps of 5
       CALL PGLINE(n_freq_plot,ff,cs_out(1:n_freq_plot,n_atom+1))  !plots the total DOS
@@ -642,7 +641,7 @@ program mp_dos55
 
       c_min_save = c_min
       c_max_save = c_max
-      write(*,*) 'c_min,c_max (0 0 exit, 1 1 exit & save (PS, txt))',c_min,c_max
+      print *,prompt, 'c_min,c_max (0 0 exit, 1 1 exit & save (PS, txt))',c_min,c_max
       read(*,*)c_min,c_max								
       if(c_min==c_max) then
         j_ps=0
@@ -680,7 +679,7 @@ program mp_dos55
       if(.not.found_txt.and.(.not.found_ps)) exit				
       jfile = jfile+1
       if(jfile==100) then
-        write(*,*)'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
+        print *,prompt,'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
         read(*,*)
         jfile = 1
       endif							
@@ -689,10 +688,10 @@ program mp_dos55
     write(9,*) 'Output files:  ',trim(file_ps),'   ',trim(file_res)
     write(9,*)					
 
-    write(*,*)
-    write(*,*) 'Text output:  ',trim(file_res)
-    write(*,*) 'PS output  :  ',trim(file_ps)
-    write(*,*)
+    print *
+    print *,space, 'Text output:  ',trim(file_res)
+    print *,space, 'PS output  :  ',trim(file_ps)
+    print *
             
 ! **** Output the DOS to a text file (linear scale)			
     open (3,file=file_res)																		!open the output file

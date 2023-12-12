@@ -76,6 +76,7 @@ program mp_sqom55
   character(1)   :: xyz(3)=(/'X','Y','Z'/)
   character(4)   :: atom,ps_out(2),version,head
   character(5)   :: pg_ext,c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
+  character(10)	 :: prompt,space = '          '
   character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
   character(40)  :: subst_name,file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
   character(40)  :: x_label,y_label,file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in,mp_tool
@@ -162,10 +163,11 @@ program mp_sqom55
 !
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_SQOM> '
   mp_tool = 'MP_SQOM '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *
 
 ! ********************* Get a time stamp and open a .LOG file *******************************
   call getcwd(cwd_path)
@@ -214,18 +216,10 @@ program mp_sqom55
   s_trig = 0
   
 ! *** Generate data file access
-  write(*,*) 'Input data file_master: '
-  read(*,*) file_master 
+  print *,prompt, 'Data file_master & file numbers (min, max; 0 0 single file): '
+  read(*,*) file_master,nfile_min,nfile_max
+  nfile_step = 1
   
-  
-  if(j_verb==1)	then	
-    write(*,*) 'Read data files number min, step, max (0 0 no numbers, single file): '
-    read(*,*)   nfile_min,nfile_step,nfile_max
-  else
-    write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
-    read(*,*)   nfile_min,nfile_max
-    nfile_step = 1
-  endif
   t_single = nfile_max==0.and.nfile_min==0
 
   if(t_single.and.nfile_min==0)then
@@ -249,7 +243,7 @@ program mp_sqom55
 
   open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_dat_t0),' not found! Stop execution.'
     stop
   endif
   
@@ -261,7 +255,7 @@ program mp_sqom55
       nml_in = .true.
       read(1,rec=i_rec) dat_source,version,string16
       read(string16,*) n_head
-    write(*,*)		'Input data:  ',dat_source,version,n_head
+    print *,space,		'Input data:  ',dat_source,version,n_head
     i_rec = i_rec+1   							
     read(1,rec=i_rec) header_record
     read(header_record,nml=data_header_1)	
@@ -269,7 +263,7 @@ program mp_sqom55
     t_step_in = t_step
 
   elseif(head.eq.'TIME'.or.head.eq.'STAT') then                                  !old w/o structure
-    write(*,*)		'Input data:  ','old header format'
+    print *,space,		'Input data:  ','old header format'
     nml_in = .false.
     read(1,rec=1) sim_type,file_par,t_ms,t0,temp,a_par,angle,n_row,n_atom,n_eq,j_force,j_shell_out,n_cond,n_rec					
     n_head = 1
@@ -277,8 +271,8 @@ program mp_sqom55
     input_method = 'CELL'
     if(index(sim_type,'BULK')/=0) input_method = 'BULK'
   else
-    write(*,*) 'header record wrong or missing'
-    write(*,*) trim(header_record)
+    print *,space, 'header record wrong or missing'
+    print *,space, trim(header_record)
     stop
   endif 
 
@@ -310,19 +304,19 @@ program mp_sqom55
   cell_volume = a_par(1)*a_par(2)*a_par(3)		!normalisation constant
   
   if(n_cond==0) then
-    write(*,*) 'Non-periodic boundary conditions!'
-    write(*,*) 'FT will use Hann window profile - results in 2x lower resolution in Q!'
+    print *,space, 'Non-periodic boundary conditions!'
+    print *,space, 'FT will use Hann window profile - results in 2x lower resolution in Q!'
     j_wind = 1
   endif
  
 ! **** Read the auxiliary file <file_title.par> with structure parameters, atom names and further info
-  write(*,*) 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
+  print *,prompt, 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
   read(*,*) file_par
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_inp),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_inp),' not found! Stop execution.'
     stop
   endif
 
@@ -330,13 +324,13 @@ program mp_sqom55
 
   read(4,nml=mp_gen,iostat=ios)
     if(ios/=0) then
-      write(*,*) 'Error reading NML = mp_gen from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
+      print *,space, 'Error reading NML = mp_gen from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
       stop
     endif
   rewind(4)
   read(4,nml=mp_out,iostat=ios)
     if(ios/=0) then
-      write(*,*) 'Error reading NML = mp_out from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
+      print *,space, 'Error reading NML = mp_out from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
       stop
     endif
   
@@ -350,7 +344,7 @@ program mp_sqom55
   rewind(4)
   read(4,nml=mp_sqom,iostat=ios)
     if(ios/=0) then
-      write(*,*) 'Error reading NML = mp_sqom from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
+      print *,space, 'Error reading NML = mp_sqom from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
       stop
     endif
 
@@ -368,7 +362,7 @@ program mp_sqom55
   do
     read(4,'(a)',iostat=ios) string
     if(ios/=0) then
-      write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+      print *,space, 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
       stop
     endif
     if(string(1:5).eq.section) exit	!find the mp_simple part of the .par file
@@ -381,8 +375,8 @@ program mp_sqom55
   
   do j=1,n_atom
     if(at_name_par(j)/=at_name_out(j)) then
-      write(*,*) 'Not-matching  atom names in .PAR and .DAT: ',j,at_name_par(j),at_name_out(j)
-      write(*,*) 'Prefer .DAT? (1/0)'
+      print *,space, 'Not-matching  atom names in .PAR and .DAT: ',j,at_name_par(j),at_name_out(j)
+      print *,prompt, 'Prefer .DAT? (1/0)'
       read(*,*) ii
       if(ii==1) at_name_par = at_name_out
       exit 
@@ -395,11 +389,11 @@ program mp_sqom55
     open(4,file='/usr/local/mp_tools/ref/neutron_xs.txt',action='read',status ='old',iostat=ios)
     if(ios.ne.0) then
       do
-        write(*,*) 'File neutron_xs.txt not found, type in valid access path/filename'
+        print *,prompt, 'File neutron_xs.txt not found, type in valid access path/filename'
         read(*,'(a)') x_file_name
         open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
         if(ios==0) exit
-        write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+        print *,prompt, 'File',trim(x_file_name),' not found, try again ...'
       enddo
     endif
   endif
@@ -413,8 +407,8 @@ program mp_sqom55
         cycle search_loop
       endif
     enddo
-    write(*,*) 'b_coh for ',trim(at_label(j)),' not found,'
-    write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+    print *,space, 'b_coh for ',trim(at_label(j)),' not found,'
+    print *,space, 'check your spelling and the neutron_xs.txt table; use unit weights'
   enddo search_loop
   
   b_coh = .1*b_coh  !convert b_coh from FM to 10^12 cm
@@ -425,11 +419,11 @@ program mp_sqom55
     open(4,file='/usr/local/mp_tools/ref/xray_ff.txt',action='read',status ='old',iostat=ios)
     if(ios.ne.0) then
       do
-        write(*,*) 'File xray_ff.txt not found, type valid access path/filename'
+        print *,prompt, 'File xray_ff.txt not found, type valid access path/filename'
         read(*,'(a)') x_file_name
         open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
         if(ios==0) exit
-        write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+        print *,space, 'File',trim(x_file_name),' not found, try again ...'
       enddo
     endif
   endif
@@ -443,13 +437,13 @@ program mp_sqom55
         cycle atom_loop
       endif
     enddo
-    write(*,*) 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
-    write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+    print *,space, 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
+    print *,space, 'check your spelling and the neutron_xs.txt table; use unit weights'
   enddo atom_loop
   close(4)
 
   string_in = subst_name
-  write(*,*) 'Substance name (confirm, &append or replace): ', string_in
+  print *,prompt, 'Substance name (confirm, &append or replace): ', string_in
   read(*,*) string_in
   string = trim(adjustl(string_in))
   if(string_in/=subst_name) then
@@ -460,23 +454,23 @@ program mp_sqom55
     endif
   endif
 
-  write(*,*) 
-  write(*,*) 'Substance name: ', subst_name
-  write(*,*) 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
+  print *
+  print *,space, 'Substance name: ', subst_name
+  print *,space, 'Sim_type, dat_type, input method: ',sim_type,dat_type,input_method		
 
 ! *** write overview of atom parameters
-  write(*,*)
-  write(*,*) 'Atoms from ',trim(file_inp)
+  print *
+  print *,space, 'Atoms from ',trim(file_inp)
   do j=1,n_atom
-    write(*,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
+    write(*,'(15x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
     write(9,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
   enddo								
 
   if(j_verb==1) then
-    write(*,*)
-    write(*,*) 'Xray form-factors'
+    print *
+    print *,space, 'Xray form-factors'
     do j=1,n_atom
-      write(*,*) at_label(j),x_ffpar(j,:)
+      print *,space, at_label(j),x_ffpar(j,:)
     enddo	
   endif		
 
@@ -496,9 +490,9 @@ program mp_sqom55
  &  -1.65431511,3.43817854,-2.79374999E-05,& 
  &   1.52499997E-05,2.56250005E-05,3.80192327/),(/3,3/)))
 
-    write(*,*) 'Test: a_cell'
+    print *,space, 'Test: a_cell'
     do k=1,3
-      write(*,*) a_cell(k,:)
+      print *,space, a_cell(k,:)
     enddo
     
     a_cell_inv = transpose(reshape((/&
@@ -506,9 +500,9 @@ program mp_sqom55
  &   0.182117358,0.378495902,3.61057687E-06,&
  &   -2.74566946E-06,-3.28170040E-06,0.263024777/),(/3,3/)))
 
-    write(*,*) 'Test: a_cell_inv'
+    print *,space, 'Test: a_cell_inv'
     do k=1,3
-      write(*,*) a_cell_inv(k,:)
+      print *,space, a_cell_inv(k,:)
     enddo
     
     if(nsuper==1) a_cell_inv = a_cell_inv/sqrt(sum(a_cell_inv**2)/3.) 				!NSUPER==1 needs unitary matrix just to repare the angles
@@ -526,20 +520,20 @@ program mp_sqom55
   call omp_set_num_threads(proc_num_in)
 !!			thread_num = omp_get_num_threads( )				!this gives threads available at this moment: here always = 1 as we are outside of a PARALLEL range
   
+  write (*,*)
   if(j_verb.ge.1) then
-    write (*,*) 'OMP processes available  = ', proc_num
-    write (*,*) 'OMP threads maximum      = ', thread_num_max
-    write (*,*) 'OMP processes requested  = ', proc_num_in
+    write (*,*) space, 'OMP processes available  = ', proc_num
+    write (*,*) space, 'OMP threads maximum      = ', thread_num_max
   endif
 
 
   if(proc_num_in.gt.1) then
     write(9,*) 'OMP threads maximum = ', thread_num_max
     write(9,*) 'OMP processes requested 	= ', proc_num_in
-    write(*,*) 'OMP processes requested 	= ', proc_num_in
+    print *,space, 'OMP processes requested 	= ', proc_num_in
   else
     write(9,*) 'OpenMP not in use'
-    write(*,*) 'OpenMP not in use'
+    print *,space, 'OpenMP not in use'
   endif
   write(9,*) 
 !
@@ -550,8 +544,8 @@ program mp_sqom55
 
   if(sim_type/='TIMESTEP') then
     if(t_step_in/=.0) then
-      write(*,*) ' Time step in data is',t_step
-      write(*,*) ' For simulation type ',trim(sim_type),' putting t_step = .0 '
+      print *,space, ' Time step in data is',t_step
+      print *,space, ' For simulation type ',trim(sim_type),' putting t_step = .0 '
       t_step = .0						!for total scattering (unrelated snapshots)
     endif
   elseif(sim_type=='TIMESTEP') then
@@ -564,7 +558,7 @@ program mp_sqom55
 
     open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
     if(ios.ne.0) then
-      write(*,*) 'File ',trim(file_dat),' not found! Stop execution.'
+      print *,space, 'File ',trim(file_dat),' not found! Stop execution.'
       stop
     endif
 
@@ -579,8 +573,8 @@ program mp_sqom55
     t_step = t1-t0						!this is the "macroscopic" time step between recorded snapshots
 
     if(abs(t_step-t_step_in)>.01*abs(t_step_in).and.nfile>1) then
-      write(*,*) 'Not-matching values of t_step from data header and from t_dump difference :',t_step_in,t_step
-      write(*,*) '    prefer the 1st or the 2nd value? (1/2)'
+      print *,prompt, 'Not-matching values of t_step from data header and from t_dump difference :',t_step_in,t_step
+      print *,prompt, '    prefer the 1st or the 2nd value? (1/2)'
       read(*,*) jj
       if(jj==1) t_step = t_step_in
     endif
@@ -589,7 +583,7 @@ program mp_sqom55
 
 ! *** cycle over snapshot files to accumulate input data
 !
-  write(*,*) 'Input files:'
+  print *,space, 'Input files:'
 
   CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
   sc_r = 1./sc_r
@@ -616,15 +610,15 @@ program mp_sqom55
 
       open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
       if(ios.ne.0) then
-        write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
-      write(*,*) 'Skip this one (2), skip the rest (1), stop execution(0)?'
+        print *,space, 'File ',trim(file_dat),' not opened! IOS =',ios
+      print *,prompt, 'Skip this one (2), skip the rest (1), stop execution(0)?'
       read(*,*) jj
       if(jj==2) cycle file_loop
       if(jj==1) exit file_loop
       if(jj==0) stop
       endif
       ifile = ifile+1				
-      if(jfile==nfile_min.or.ifile==100*(ifile/100)) write(*,*) file_dat
+      if(jfile==nfile_min.or.ifile==100*(ifile/100)) print *,space, file_dat
 
       ind_at(1) = 0
       do j = 2,n_atom
@@ -653,7 +647,7 @@ program mp_sqom55
     endif
     nfile_0 = nfile				!for later memory
     CALL SYSTEM_CLOCK (COUNT = sc_c2)
-    write(*,*) nfile,' files read in ',(sc_c2-sc_c1)*sc_r, ' sec SYS time'
+    print *,space, nfile,' files read in ',(sc_c2-sc_c1)*sc_r, ' sec SYS time'
 
   endif  !nfile <= nfile_mem
 
@@ -661,12 +655,12 @@ program mp_sqom55
 ! *** set the time and frequency constants and the time-integration window
 
   if((nfile-1)*t_step/=t_tot) then				!nfile might have changed ...
-    write(*,*)'Updating t_tot from',t_tot,' to',(nfile-1)*t_step
+    print *,space,'Updating t_tot from',t_tot,' to',(nfile-1)*t_step
     t_tot = (nfile-1)*t_step
   endif
   
   if(t_step/=.0) then
-    write(*,*) 'MD time sequence:  t_total [ps]',t_tot,'t_step [ps]',t_step
+    print *,space, 'MD time sequence:  t_total [ps]',t_tot,'t_step [ps]',t_step
 
     if(n_int==0) n_int = nfile/2
 
@@ -678,11 +672,11 @@ program mp_sqom55
       t_width = .5*(n_int-1)*t_step		!effective width
       f_width = 1./t_width				!resolution= 4*f_max_plot/n_int
 
-      if(j_verb==1) write(*,*) 'Time integration window set to nfile/2:',n_int
-      write(*,'("Maximum energy [THz]            ",f6.2,"      energy step [THz]",f6.2)') n_freq_max*freq_step,freq_step				
-      write(*,'("Time-integration (BN) window FWHM [ps]",f8.2)') t_width
-      write(*,'("Energy resolution FWHM [THz]            ",f8.2)') f_width
-      write(*,*) 
+      if(j_verb==1) print *,space, 'Time integration window set to nfile/2:',n_int
+      write(*,'(a," Maximum energy [THz]            ",f6.2,"      energy step [THz]",f6.2)') space,n_freq_max*freq_step,freq_step				
+      write(*,'(a," Time-integration (BN) window FWHM [ps]",f8.2)') space,t_width
+      write(*,'(a," Energy resolution FWHM [THz]            ",f8.2)') space,f_width
+      print *
     else
       n_freq_max = nfile-n_int+1					!for I(Q,t)
 !			  n_int = 1
@@ -699,7 +693,7 @@ program mp_sqom55
     at_pos_min = -a_par/2.      !for n_row=1 BULK a_par represents the whole box
     at_pos_max = a_par/2.
     at_pos_centre = .0
-    write(*,*) 'at_pos_min,at_pos_max',at_pos_min,at_pos_max
+    if(j_verb==1) print *,space, 'at_pos_min,at_pos_max',at_pos_min,at_pos_max
   else
     at_pos_min = -n_row/2.
     at_pos_max = +n_row/2.         
@@ -721,21 +715,21 @@ program mp_sqom55
       if(j_plot==-6)	then
         if(input_method=='BULK') then           !!!??? nsuper==1  ????
          do i=1,3
-            write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
+            print *,prompt, xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
             read(*,*) at_pos_min(i),at_pos_max(i)
             if(at_pos_min(i)<-a_par(i)/2.) at_pos_min(i) = -a_par(i)/2.
             if(at_pos_max(i) > a_par(i)/2.) at_pos_max(i) = a_par(i)/2.
-            write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
+            print *,space, xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
             write(9,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
           enddo 
           at_pos_centre = .5*(at_pos_max+at_pos_min)
         else
          do i=1,3
-            write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
+            print *,prompt, xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
             read(*,*) at_pos_min(i),at_pos_max(i)
             if(at_pos_min(i)<-n_row(i)/2.) at_pos_min(i) = -n_row(i)/2.
             if(at_pos_max(i) > n_row(i)/2.) at_pos_max(i) = n_row(i)/2.
-            write(*,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
+            print *,space, xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
             write(9,*) xyz(i),' min, max',at_pos_min(i),at_pos_max(i)
           enddo 
           at_pos_centre = ceiling(.5*(at_pos_max+at_pos_min))
@@ -746,10 +740,10 @@ program mp_sqom55
 
 ! *** define the momentum space range          
       if(nsuper==1) then
-        write(*,*) 'Q-range [Å-1] (0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
+        print *,prompt, 'Q-range [Å-1] (0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
         read(*,*) bz_n,j_plane
       else
-        write(*,*) 'Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
+        print *,prompt, 'Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))'		
         read(*,*) n_bz,j_plane
         bz_n = real(n_bz)
       endif
@@ -766,7 +760,7 @@ program mp_sqom55
         exit
       else						
         do
-          write(*,*) 'Input perpendicular vectors to define the Q-plane e1(3),e2(3):'
+          print *,prompt, 'Input perpendicular vectors to define the Q-plane e1(3),e2(3):'
           read(*,*) e1,e2
           if(dot_product(e1,e1).ne.0..and.dot_product(e2,e2).ne.0..and.dot_product(e1,e2)==0.) then
             exit
@@ -809,10 +803,10 @@ program mp_sqom55
     cos_ep_angle = dot_product(e1p,e2p)/(e1p_norm*e1p_norm)
 
     if(j_verb==1) then
-      write(*,*) 'e1p,e1p_norm',e1p,e1p_norm
-      write(*,*) 'e2p,e2p_norm',e2p,e2p_norm
-      write(*,*) 'evp,evp_norm',evp,evp_norm
-      write(*,*) 'cos_ep_angle',cos_ep_angle 		
+      print *,space, 'e1p,e1p_norm',e1p,e1p_norm
+      print *,space, 'e2p,e2p_norm',e2p,e2p_norm
+      print *,space, 'evp,evp_norm',evp,evp_norm
+      print *,space, 'cos_ep_angle',cos_ep_angle 		
     endif
 
     if(nsuper>1) then
@@ -831,8 +825,8 @@ program mp_sqom55
       n_qy = bz_ny/tpe2			    
     endif
 
-    if(j_verb==1) write(*,*) 'bz_nx,bz_ny',bz_nx,bz_ny
-    if(j_verb==1) write(*,*) '1Q-pixels X,Y: ', n_qx,n_qy
+    if(j_verb==1) print *,space, 'bz_nx,bz_ny',bz_nx,bz_ny
+    if(j_verb==1) print *,space, '1Q-pixels X,Y: ', n_qx,n_qy
 
     if(2*(n_qx/2)/=n_qx) n_qx = n_qx+1
     if(2*(n_qy/2)/=n_qy) n_qy = n_qy+1          
@@ -840,8 +834,8 @@ program mp_sqom55
     n_qy8 = n_qy
     nsuper8 = nsuper
 
-    if(j_verb==1) write(*,*) 'Q-pixels X,Y: ', n_qx,n_qy
-    if(j_verb==1) write(*,*) 'Vertical axis:', ev
+    if(j_verb==1) print *,space, 'Q-pixels X,Y: ', n_qx,n_qy
+    if(j_verb==1) print *,space, 'Vertical axis:', ev
 
     allocate(x_ffq(n_atom,n_qx,n_qy),q2_norm(n_qx,n_qy))
 
@@ -852,14 +846,14 @@ program mp_sqom55
 
     if(input_method=='BULK'.and.nsuper==1) then
       if(j_wind==1) then
-        write(*,*) 'Using FT window, set Q_center [Å-1]:'
+        print *,prompt, 'Using FT window, set Q_center [Å-1]:'
         read(*,*) q_center
       else
         q_center = (/.0,.0,.0/)
-        write(*,*) 'Q_center [Å-1]:',q_center
+        print *,space, 'Q_center [Å-1]:',q_center
       endif
     else
-      write(*,*) 'Q_center [hkl]:'
+      print *,prompt, 'Q_center [hkl]:'
       read(*,*) q_center
     endif
 
@@ -869,7 +863,7 @@ program mp_sqom55
     qy_max = dot_product(e2,q_center)/e2_norm+.5*bz_ny
     tpq_center = twopi_s*q_center
 
-    if(j_verb==1) write(*,*) 'qx_min,qx_max,qy_min,qy_max',qx_min,qx_max,qy_min,qy_max
+    if(j_verb==1) print *,space, 'qx_min,qx_max,qy_min,qy_max',qx_min,qx_max,qy_min,qy_max
 
 ! *** generate the Q**2 and Xray form-factor tables
             
@@ -916,10 +910,10 @@ program mp_sqom55
   endif
 
     if(j_oneph==1) then
-      write(*,*) 'Single-phonon FFT start'
+      print *,space, 'Single-phonon FFT start'
     else
-      if(j_fft==1) write(*,*) 'FINUFFT start'
-      if(j_fft==0) write(*,*) 'Simple FT start'
+      if(j_fft==1) print *,space, 'FINUFFT start'
+      if(j_fft==0) print *,space, 'Simple FT start'
     endif
       
     n_out = 0
@@ -943,14 +937,14 @@ program mp_sqom55
         endif
         open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
         if(ios.ne.0) then
-          write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
-          write(*,*) 'Skip the rest (1), stop execution(0)?'
+          print *,space, 'File ',trim(file_dat),' not opened! IOS =',ios
+          print *,prompt, 'Skip the rest (1), stop execution(0)?'
           read(*,*) jj
           if(jj==1) exit frame_loop
           if(jj==0) stop
         endif
 
-        if(jfile==nfile_min.or.ifile==100*(ifile/100)) write(*,*) file_dat
+        if(jfile==nfile_min.or.ifile==100*(ifile/100)) print *,space, file_dat
 
         ind_at(1) = 0
         do j = 2,n_atom
@@ -1107,7 +1101,7 @@ program mp_sqom55
         if(j_fft==1)then
           call finufft2d1(n_fft,xf,yf,cf,iflag,eps_fft,n_qx8,n_qy8,ampl_tot,nul_opt,ier)
         else
-          write(*,*) 'ATTENTION: normal FT can take till overnight!'
+          print *,space, 'ATTENTION: normal FT can take till overnight!'
           call dirft2d1(n_fft,xf,yf,cf,iflag,n_qx8,n_qy8,ampl_tot)	
         endif							!direct FT for check
 
@@ -1117,7 +1111,7 @@ program mp_sqom55
         enddo  !j (n_atom)
       endif ! j_oneph
 
-      if(mod(ifile,200)==0) write(*,*) 'FT(Q) done frame',ifile
+      if(mod(ifile,200)==0) print *,space, 'FT(Q) done frame',ifile
       if(nfile>nfile_mem) then
         deallocate(at_pos_in)
       endif
@@ -1128,8 +1122,8 @@ program mp_sqom55
 
     call cpu_time(t2)
     CALL SYSTEM_CLOCK (COUNT = sc_c2)
-    if(j_verb==1.and.nsuper==1) write(*,*) 'Out-of-frame atoms total',n_out
-    if(j_verb==1) write(*,*) 'FINUFFT on',nfile,'snapshots CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
+    if(j_verb==1.and.nsuper==1) print *,space, 'Out-of-frame atoms total',n_out
+    if(j_verb==1) print *,space, 'FINUFFT on',nfile,'snapshots CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
       
 ! **** calculate the mean value over the whole trajectory, in fact the 0th component of timeFT = elastic scattering
 
@@ -1145,26 +1139,26 @@ program mp_sqom55
 
 !!!!CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 !!! *** Frequency loop
-!!						write(*,*) 'Choose a plot option (PS/TXT file output is ',trim(ps_out(j_ps+1)),'):'
-!!							write(*,*) '       0  EXIT'
-!!							write(*,*) '       1  explore total scattering (-1 edit atom masks)'
+!!						print *,'Choose a plot option (PS/TXT file output is ',trim(ps_out(j_ps+1)),'):'
+!!							print *,'       0  EXIT'
+!!							print *,'       1  explore total scattering (-1 edit atom masks)'
 !!						if(t_step>.0) then			
-!!							write(*,*) '       2  explore E=const maps         (-2 edit atom masks)'
-!!							write(*,*) '       3  make a stack of E=const maps (-3 reset atom masks)'
-!!							write(*,*) '       4  explore E(Q) maps            (-4 edit atom masks)'
-!!							write(*,*) '       5  make a stack of E(Q) maps    (-5 reset atom masks)'
+!!							print *,'       2  explore E=const maps         (-2 edit atom masks)'
+!!							print *,'       3  make a stack of E=const maps (-3 reset atom masks)'
+!!							print *,'       4  explore E(Q) maps            (-4 edit atom masks)'
+!!							print *,'       5  make a stack of E(Q) maps    (-5 reset atom masks)'
 !!						endif
-!!							write(*,*) '       6  change the HKL plane, range and centre (BZ)'
-!!							write(*,*) '                                       (-6 change the real space range)'
+!!							print *,'       6  change the HKL plane, range and centre (BZ)'
+!!							print *,'                                       (-6 change the real space range)'
 !!							if(input_method=='CELL') then
-!!								if(j_oneph==0) write(*,*) '       7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
-!!								if(j_oneph==1) write(*,*) '       7  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
+!!								if(j_oneph==0) print *,'       7  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
+!!								if(j_oneph==1) print *,'       7  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
 !!							endif
-!!							if(j_ps==0) write(*,*) '       8  toggle the PS/TXT output ON (mind the TXT switch in PAR)'
-!!							if(j_ps==1) write(*,*) '       8  toggle the PS/TXT output OFF (mind the TXT switch in PAR)'
-!!							if(j_qsq==0) write(*,*) '       9  toggle the S(Q)/Q^2 scaling to S(Q) (go on via 6)'
-!!							if(j_qsq==1) write(*,*) '       9  toggle the S(Q) scaling to S(Q)/Q^2 (go on via 6)'
-!!							write(*,*) '      10  Options: the time integration window width, FT window, weighting etc.'		
+!!							if(j_ps==0) print *,'       8  toggle the PS/TXT output ON (mind the TXT switch in PAR)'
+!!							if(j_ps==1) print *,'       8  toggle the PS/TXT output OFF (mind the TXT switch in PAR)'
+!!							if(j_qsq==0) print *,'       9  toggle the S(Q)/Q^2 scaling to S(Q) (go on via 6)'
+!!							if(j_qsq==1) print *,'       9  toggle the S(Q) scaling to S(Q)/Q^2 (go on via 6)'
+!!							print *,'      10  Options: the time integration window width, FT window, weighting etc.'		
 !!							read(*,*) j_plot
 !!					endif
 
@@ -1182,13 +1176,13 @@ program mp_sqom55
     endif
     
     if(j_atc1/=0.or.j_atc2/=0) then
-      write(*,'("Atom masks reset:",50i3)')(at_mask(i),i=1,n_atom),'   ',j_atc1,j_atc2
+      write(*,'(a," Atom masks reset:",50i3)') space,(at_mask(i),i=1,n_atom),'   ',j_atc1,j_atc2
     else
-      write(*,'("Actual atom masks:",50i3)')(at_mask(i),i=1,n_atom)
+      write(*,'(a," Actual atom masks:",50i3)') space,(at_mask(i),i=1,n_atom)
     endif
 
     if(j_plot==-1.or.j_plot==-2.or.j_plot==-4)	then	!edit atom masks
-      write(*,*)'Type in atom masks:'
+      print *,prompt,'Type in atom masks:'
       do
         read(*,*)(at_mask(i),i=1,n_atom)
         if(all(at_mask(1:n_atom).ge.0).and.all(at_mask(1:n_atom).le.1)) then 
@@ -1200,7 +1194,7 @@ program mp_sqom55
           j_atc2 = at_mask(3)
           exit
         else
-          write(*,*) 'Input out of range, repeat ...'
+          print *,space, 'Input out of range, repeat ...'
         endif
       enddo
     endif
@@ -1217,10 +1211,10 @@ program mp_sqom55
       n_plot = 1
       i_step = 1
       n_freq_min  = 1
-      write(*,*) 'Total scattering (instant integration range)'
+      print *,space, 'Total scattering (instant integration range)'
 
     elseif(abs(j_plot)==2) then
-      write(*,*) 'E=const map E_plot [THz]:'
+      print *,prompt, 'E=const map E_plot [THz]:'
       read(*,*) f_map_min
         j_disp = 0									! E = const map
         n_freq_min  = nint(f_map_min/freq_step)+1
@@ -1228,7 +1222,7 @@ program mp_sqom55
         n_plot =1
 
       elseif(abs(j_plot)==3) then
-      write(*,*) 'E=const map stack:  E_min, E_step [THz], n_step (≤8 for PGPLOT screen):'
+      print *,prompt, 'E=const map stack:  E_min, E_step [THz], n_step (≤8 for PGPLOT screen):'
       read(*,*) f_map_min,f_map_step,n_plot
       do
         j_disp = 0									! E = const map
@@ -1244,20 +1238,20 @@ program mp_sqom55
     elseif(abs(j_plot)==4.or.abs(j_plot)==5) then
       do
         if(j_sq==1) then				
-          write(*,*) 'E(Q) map: type/confirm initial and final points Q1, Q2 [hkl]:'
+          print *,prompt, 'E(Q) map: type/confirm initial and final points Q1, Q2 [hkl]:'
         else
-          write(*,*) 'I(Q,t) map: type/confirm initial and final points Q1, Q2 [hkl]:'
+          print *,prompt, 'I(Q,t) map: type/confirm initial and final points Q1, Q2 [hkl]:'
         endif
         read(*,*) q1_3d,q2_3d					
         q1 =q1_3d-q_v
         q2 =q2_3d-q_v	
 
         if(dot_product(q1,ev).ne.0.)then
-          write(*,*) 'Q1 not in the Q-plane:',q1,(dot_product(q1,ev))
+          print *,space, 'Q1 not in the Q-plane:',q1,(dot_product(q1,ev))
           cycle
         endif
         if(dot_product(q2,ev).ne.0.)then
-          write(*,*) 'Q2 not in the Q-plane:',q2,(dot_product(q2,ev))
+          print *,space, 'Q2 not in the Q-plane:',q2,(dot_product(q2,ev))
           cycle
         endif
         exit
@@ -1270,7 +1264,7 @@ program mp_sqom55
       dq_p = .0
       
       if(abs(j_plot)==5) then
-        write(*,*) 'perpendicular Q_step length [rlu]:'
+        print *,prompt, 'perpendicular Q_step length [rlu]:'
         read(*,*) q_step
         n_plot = n_plot_max
         dq = q2-q1
@@ -1286,7 +1280,7 @@ program mp_sqom55
 
   plot_loop: do i_plot=1,n_plot,i_step		!executed just once for j_plot= 1,2,4
   
-    if(j_verb==1.and.(j_plot==3.or.j_plot==5)) write(*,*) 'Plot no.:',i_plot
+    if(j_verb==1.and.(j_plot==3.or.j_plot==5)) print *,space, 'Plot no.:',i_plot
 
 ! **** now AT_MASK are (re)set, we can make the right replica of CS_ATOM
     cs = (.0,.0)
@@ -1351,11 +1345,11 @@ program mp_sqom55
       q2_x = dot_product(e1,q2+(i_plot-n_plot/2-1)*dq_p)/e1_norm
       q2_y = dot_product(e2,q2+(i_plot-n_plot/2-1)*dq_p)/e2_norm
       if(q1_x.lt.qx_min.or.q1_x.gt.qx_max.or.q1_y.lt.qy_min.or.q1_y.gt.qy_max)then
-        write(*,*) 'Q1 out of the map range:',q1_x,q1_y
+        print *,space, 'Q1 out of the map range:',q1_x,q1_y
         cycle
       endif
       if(q2_x.lt.qx_min.or.q2_x.gt.qx_max.or.q2_y.lt.qy_min.or.q2_y.gt.qy_max)then
-        write(*,*) 'Q2 out of the map range:',q2_x,q2_y
+        print *,space, 'Q2 out of the map range:',q2_x,q2_y
         cycle
       endif
             
@@ -1474,7 +1468,7 @@ program mp_sqom55
 
       CALL SYSTEM_CLOCK (COUNT = sc_c2)
       call cpu_time(t2)
-      if(j_verb==1.and.(j_plot==2.or.j_plot==4))write(*,*) 'Time FT (normal, optimised & OMP):  PROC time ', t2-t1,' SYS time',(sc_c2-sc_c1)*sc_r
+      if(j_verb==1.and.(j_plot==2.or.j_plot==4))print *,space, 'Time FT (normal, optimised & OMP):  PROC time ', t2-t1,' SYS time',(sc_c2-sc_c1)*sc_r
 
       n_frame = nfile-n_int+1
     
@@ -1485,7 +1479,7 @@ program mp_sqom55
 
 ! *** apply the speckle filter
     if(j_plot>0.and.s_trig>0.) then				!the speckle filter can be turned off effectively by setting s_trig=0
-      if(j_verb==1) write(*,*) 'Speckle filter s_trig:',s_trig
+      if(j_verb==1) print *,space, 'Speckle filter s_trig:',s_trig
       if(j_disp==0) then
         nq_tot = n_qx*n_qy
       elseif(j_disp==1) then
@@ -1595,11 +1589,11 @@ program mp_sqom55
 ! *** interpolate or smooth CS_PLOT by FFT for a more presentable graphical resolution (best in Log_scale)
     if(j_interp/=0) then            !do post-treatment
       if(cut_off==.0) cut_off = maxval(cs_out)
-      write(*,*) 'Interpolation factor X,Y (INTEGER) (0 0=OFF, 1=NO INTERP, try 2,3,...)',j_interp_x,j_interp_y
-!!            write(*,*) 'Smoothing factor (1=NO SMOOTH, try 2,3,...)',j_cut
-      write(*,*) 'Smoothing factor X,Y (REAL) (1=NO SMOOTH, try 2.,3.5,...)',cut_x,cut_y
-      write(*,*) 'I_max(REAL) =',cut_off
-      write(*,*) 'confirm or type new (5) values:'
+      print *,space, 'Interpolation factor X,Y (INTEGER) (0 0=OFF, 1=NO INTERP, try 2,3,...)',j_interp_x,j_interp_y
+!!            print *,'Smoothing factor (1=NO SMOOTH, try 2,3,...)',j_cut
+      print *,space, 'Smoothing factor X,Y (REAL) (1=NO SMOOTH, try 2.,3.5,...)',cut_x,cut_y
+      print *,space, 'I_max(REAL) =',cut_off
+      print *,prompt, 'confirm or type new (5) values:'
       read(*,*) j_interp_x,j_interp_y,cut_x,cut_y,cut_off
       j_interp = j_interp_x+j_interp_y
       if(j_interp==0) then      !switching post-treatment off
@@ -1659,7 +1653,7 @@ program mp_sqom55
       f_max = (n_qyg-1)*t_step
     endif
     
-    write(*,*) 'c_min_save',c_min_save,c_max_save
+    if(j_verb==1) print *,space, 'c_min_save',c_min_save,c_max_save
     if(c_min_save==0..and.c_max_save==0.) then
       if(j_sq==1) then
         c_min = anint(minval(cs_pgplot)-1.)
@@ -1668,7 +1662,7 @@ program mp_sqom55
         c_min = minval(cs_pgplot)
         c_max = maxval(cs_pgplot)
       endif
-      write(*,*) 'c_min,c_max',c_min,c_max
+      print *,space, 'c_min,c_max',c_min,c_max
     endif
     if(j_logsc==1.and.c_min<-16.) c_min = -16.
 			
@@ -1815,11 +1809,11 @@ program mp_sqom55
       if(abs(j_plot)==3.or.abs(j_plot)==5)	exit scale_loop	!the stacks go straight out of the scale_loop
 
       if(abs(j_plot)<=1) then
-        write(*,'("Modify intensity scale: min,max (0 0 or 9 9 EXIT)",2f8.1)') c_min,c_max
+        write(*,'(1x,a,"Adjust intensity scale: min,max (0 0 or 9 9 EXIT)",2f8.1)') prompt,c_min,c_max
       elseif(abs(j_plot)==2) then
-        write(*,'("Modify intensity scale: min,max (0 0 change E_plot, 9 9 EXIT)",2f8.1)') c_min,c_max
+        write(*,'(1x,a,"Adjust intensity scale: min,max (0 0 change E_plot, 9 9 EXIT)",2f8.1)') prompt,c_min,c_max
       elseif(abs(j_plot)==4) then
-        write(*,'("Modify intensity scale: min,max (0 0 change Q1,Q2, 2 2 linear scans, 9 9 EXIT)",2f8.1)') c_min,c_max
+        write(*,'(1x,a,"Adjust intensity scale: min,max (0 0 change Q1,Q2, 2 2 linear scans, 9 9 EXIT)",2f8.1)') prompt,c_min,c_max
       endif
 
       read(*,*)c_min,c_max								
@@ -1836,7 +1830,7 @@ program mp_sqom55
 
     c_min = c_min_save
     c_max = c_max_save
-				
+    
 ! **** make an optional hardcopy and .txt output
     if (j_ps.eq.1.and.j_plot>0) then				!j_ps; don't make hardcopy upon 1st pass	
       jfile = 1
@@ -1869,7 +1863,7 @@ program mp_sqom55
         if(.not.found_txt.and.(.not.found_ps)) exit				
         jfile = jfile+1
         if(jfile==100) then
-          write(*,*)'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
+          print *,prompt,'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
           read(*,*)
           jfile = 1
         endif							
@@ -1889,7 +1883,7 @@ program mp_sqom55
       write(9,*) 'Q center:  ',q_center
       if(j_disp==0) then
         if(nsuper==1) then
-          write(*,*) 'Q range [Å-1]: ',bz_n
+          print *,space, 'Q range [Å-1]: ',bz_n
         else		
           write(9,*) 'Q range (number of BZ):',bz_n
         endif
@@ -1915,7 +1909,7 @@ program mp_sqom55
       
 ! **** Output the intensity map to a text file (linear scale)			
       if(j_txt==1) then			
-        write(*,*) file_res
+        print *,space, file_res
         open (3,file=file_res)																		!open the output file
         write(3,*) '*****    MP_SQ49: total scattering cross-section     *****'
         write(3,*) 
@@ -1933,7 +1927,7 @@ program mp_sqom55
 
         if(j_disp==0) then
           if(nsuper==1) then
-            write(*,*) 'Q range [Å-1]: ',bz_n
+            print *,space, 'Q range [Å-1]: ',bz_n
           else		
             write(9,*) 'Q range (number of BZ):',bz_n
           endif
@@ -1966,13 +1960,13 @@ program mp_sqom55
       endif		!j_txt
 
 ! **** Prepare and plot the same on .PS		
-      write(*,*) file_ps
+!       print *,space, file_ps
 !       call get_environment_variable("PGPLOT_PNG_WIDTH",string)
-!       write(*,*)   "PGPLOT_PNG_WIDTH",'  ',string   
+!       print *,  "PGPLOT_PNG_WIDTH",'  ',string   
 !       call get_environment_variable("PGPLOT_PNG_HEIGHT",string)
-!       write(*,*)   "PGPLOT_PNG_HEIGHT",'  ',string   
+!       print *,  "PGPLOT_PNG_HEIGHT",'  ',string   
       IF (PGOPEN(file_ps//'/'//trim(pg_out)).LE.0) then
-        write(*,*) 'Could not open ',file_ps//'/'//trim(pg_out),' missing or incorrect PGPLOT PNG driver!'
+        print *,space, 'Could not open ',file_ps//'/'//trim(pg_out),' missing or incorrect PGPLOT PNG driver!'
         pg_out = 'vcps'
         pg_ext = '.ps'
         if(t_single)then
@@ -1980,7 +1974,7 @@ program mp_sqom55
         else			
           file_ps  = trim(file_master)//'_sq'//trim(c_nfile_min)//trim(c_nfile)//trim(c_jfile)//trim(pg_ext)
         endif
-        write(*,*) 'The PS format will be used',file_ps//'/'//trim(pg_out),' from now on!'					  
+        print *,space, 'The PS format will be used',file_ps//'/'//trim(pg_out),' from now on!'					  
       endif
       if(index(pg_out,'png')/=0) then
         CALL PGSCRN(1, 'white', IER)	
@@ -2066,7 +2060,9 @@ program mp_sqom55
       CALL PGSCRN(0, 'white', IER)	
       CALL PGSCRN(1, 'black', IER)  !sets the color index back
     endif
-    CALL PGCLOS					
+    CALL PGCLOS
+    print *,space, file_ps
+					
   endif		!j_ps = 1
           
 !
@@ -2075,7 +2071,7 @@ program mp_sqom55
   if(j_scan.ge.1)then
     scan_loop: do
       plot_unit = PGOPEN('/xserv')
-      write(*,*) 'plot_unit',plot_unit
+      print *,space, 'plot_unit',plot_unit
 
       CALL PGASK(.FALSE.)     ! would not ask for <RET>
       CALL PGPAP(7.0,1.5)     ! define the plot areaCC						CALL PGERAS
@@ -2085,10 +2081,10 @@ program mp_sqom55
 
       page_loop:do ii=1,4
         if(j_sq==1) then
-          write(*,*) 'Q [rlu], E [THz]? (0 0 = END; Q = -9: E = const; Q=const: E = -9 ) '
+          print *,prompt, 'Q [rlu], E [THz]? (0 0 = END; Q = -9: E = const; Q=const: E = -9 ) '
           read(*,*) qq_plot,ff_plot
         else
-           write(*,*) 'Q [rlu], t [ps]? (0 0 = END; Q = -9: t = const; Q=const: t = -9 ) '
+           print *,prompt, 'Q [rlu], t [ps]? (0 0 = END; Q = -9: t = const; Q=const: t = -9 ) '
           read(*,*) qq_plot,ff_plot
         endif
 
@@ -2100,12 +2096,12 @@ program mp_sqom55
         endif
       
         if(qq_plot.eq.-9.and.(ff_plot.lt.0..or.ff_plot.gt.f_max))then !E_const: E out of range
-          write(*,*) 'Plot position out of range'
+          print *,space, 'Plot position out of range'
           cycle page_loop	
         endif	
 
         if(ff_plot.eq.-9.and.(qq_plot.lt.min(q_min,q_max).or.qq_plot.gt.max(q_min,q_max))) then
-          write(*,*) 'Plot position out of range'
+          print *,space, 'Plot position out of range'
           cycle page_loop 																							!Q=const: Q out of range
         endif
 !
@@ -2117,7 +2113,6 @@ program mp_sqom55
               qq(j) = q_min+(j-1)*(q_max-q_min)/real(n_qdisp)
             enddo
             j_freq = nint(ff_plot/freq_step)+1
-            write(*,*) 'j_freq,ff_plot,freq_step',j_freq,ff_plot,freq_step
             if(ii==1)then
               c_min = minval(cs_pgplot(1:n_qdisp,j_freq))
               c_max = maxval(cs_pgplot(1:n_qdisp,j_freq))
@@ -2143,11 +2138,11 @@ program mp_sqom55
             c_min_save = c_min
             c_max_save = c_max
             if(ii.eq.1)then
-              write(*,*) 'No c_min/c_max adjustment in 1st panel'
+              print *,space, 'No c_min/c_max adjustment in 1st panel'
               c_min = .0
               c_max = .0
             else
-              write(*,*) 'c_min, c_max',c_min, c_max,' better values? (0 0 = END)'
+              print *,prompt, 'c_min, c_max',c_min, c_max,' better values? (0 0 = END)'
               read(*,*) c_min, c_max
             endif
             if(c_min==c_max.and.c_min==.0) then
@@ -2164,7 +2159,6 @@ program mp_sqom55
           ff_min = 0.
           ff_max = f_max
           j_freq = nint(ff_max/freq_step)+1
-            write(*,*) 'j_q,j_freq,ff_plot,freq_step',j_q,j_freq,ff_plot,freq_step
           do j=1,n_freq_plot
             ff(j) = ff_min+(j-1)*(ff_max-ff_min)/real(n_freq_plot-1)
           enddo
@@ -2192,11 +2186,11 @@ program mp_sqom55
             c_min_save = c_min
             c_max_save = c_max
             if(ii.eq.1)then
-              write(*,*) 'No c_min/c_max adjustment in 1st panel'
+              print *,space, 'No c_min/c_max adjustment in 1st panel'
               c_min = .0
               c_max = .0
             else
-              write(*,*) 'c_min, c_max',c_min, c_max,' better values? (0 0 = END)'
+              print *,prompt, 'c_min, c_max',c_min, c_max,' better values? (0 0 = END)'
               read(*,*) c_min, c_max
             endif
             if(c_min==c_max.and.c_min==.0) then
@@ -2209,7 +2203,7 @@ program mp_sqom55
           enddo
         endif
       enddo	page_loop
-      write(*,*) 'Make a copy of the graphics before you close it [RET]'
+      print *,prompt, 'Make a copy of the graphics before you close it [RET]'
       read(*,*)
     enddo scan_loop				
   endif		!j_scan = 1
@@ -2227,36 +2221,36 @@ program mp_sqom55
 
   do
     if(j_plot==0.or.abs(j_plot)==3.or.abs(j_plot)==5.or.j_exit==1) then
-      write(*,*) 'Choose a plot option (FILE output is ',trim(ps_out(j_ps+1)),'):'
-      write(*,*) '       1  explore total scattering     (-1 edit atom masks)'
+      print *,prompt, 'Choose a plot option (FILE output is ',trim(ps_out(j_ps+1)),'):'
+      print *,space, '       1  explore total scattering     (-1 edit atom masks)'
       if(t_step>.0) then			
-        write(*,*) '       2  explore E=const maps         (-2 edit atom masks)'
-        write(*,*) '       3  make a stack of E=const maps (-3 reset atom masks)'
+        print *,space, '       2  explore E=const maps         (-2 edit atom masks)'
+        print *,space, '       3  make a stack of E=const maps (-3 reset atom masks)'
         if(j_sq==1)then
-          write(*,*) '       4  explore E(Q) maps            (-4 edit atom masks)'
+          print *,space, '       4  explore E(Q) maps            (-4 edit atom masks)'
         else
-          write(*,*) '       4  explore I(Q,t) maps            (-4 edit atom masks)'
+          print *,space, '       4  explore I(Q,t) maps            (-4 edit atom masks)'
         endif
-        write(*,*) '       5  make a stack of E(Q) maps    (-5 reset atom masks)'
+        print *,space, '       5  make a stack of E(Q) maps    (-5 reset atom masks)'
       endif
-      write(*,*) '       6  change the HKL plane, range and centre (BZ)'
-      write(*,*) '                                       (-6 change the real space range)'
-      write(*,*) '       7  toggle the FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
+      print *,space, '       6  change the HKL plane, range and centre (BZ)'
+      print *,space, '                                       (-6 change the real space range)'
+      print *,space, '       7  toggle the FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
       if(input_method=='CELL') then
-        if(j_oneph==0) write(*,*) '       8  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
-        if(j_oneph==1) write(*,*) '       8  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
+        if(j_oneph==0) print *,space, '       8  toggle the NU_FFT mode to ONE_PHONON (go on via 6)'
+        if(j_oneph==1) print *,space, '       8  toggle the ONE_PHONON mode to NU_FFT (go on via 6)'
       endif
-  !!							if(j_ps==0) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output ON (mind the TXT switch in PAR)'
-  !!							if(j_ps==1) write(*,*) '       8  toggle the ',trim(pg_out),'/TXT output OFF (mind the TXT switch in PAR)'
-      if(j_qsq==0) write(*,*) '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
-      if(j_qsq==1) write(*,*) '       9  toggle the S(Q) scaling to S(Q)/Q^2'
-      write(*,*) '      10  options: change the time integration window width, weighting etc.'		!include here the straight FT option
-      write(*,*) 
-      write(*,*) '       0  EXIT'
+  !!							if(j_ps==0) print *,'       8  toggle the ',trim(pg_out),'/TXT output ON (mind the TXT switch in PAR)'
+  !!							if(j_ps==1) print *,'       8  toggle the ',trim(pg_out),'/TXT output OFF (mind the TXT switch in PAR)'
+      if(j_qsq==0) print *,space, '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
+      if(j_qsq==1) print *,space, '       9  toggle the S(Q) scaling to S(Q)/Q^2'
+      print *,space, '      10  options: change the time integration window width, weighting etc.'		!include here the straight FT option
+      print *
+      print *,space, '       0  EXIT'
 
       read(*,*) j_plot
       if(t_step==.0.and.j_plot>1.and.j_plot<6) then
-        write(*,*) 'Inelastic options not accessible with t_step = 0'
+        print *,space, 'Inelastic options not accessible with t_step = 0'
         cycle
       endif										
     endif
@@ -2285,17 +2279,17 @@ program mp_sqom55
     endif
 
     if(j_plot==10) then
-      write(*,*) 'Present values: '									
-      write(*,*)'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
-      write(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
-      write(*,*) 'Input new values(after j_weight, j_wind or j_fft change go on via 6):'
+      print *,space, 'Present values: '									
+      print *,space,'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
+      print *,space, j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
+      print *,prompt, 'Input new values(after j_weight, j_wind or j_fft change go on via 6):'
       read(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
-      write(*,*) 'New values: '									
-      write(*,*)'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
-      write(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
+      print *,space, 'New values: '									
+      print *,space,'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
+      print *,space, j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
       if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd	
       if(f_max>f_max_plot) then
-        write(*,*) 'Setting f_max =',f_max_plot
+        print *,space, 'Setting f_max =',f_max_plot
         f_max = f_max_plot
       endif			
       if(j_sq==1) then
@@ -2304,8 +2298,8 @@ program mp_sqom55
         f_width = 1./t_width
         if (n_int/=1) freq_step = 1./((n_int-1)*t_step)
         n_freq_plot = f_max/freq_step+1
-        write(*,*) 'Time-integration (BN window FWHM) [ps]',t_width
-        write(*,*) 'Energy resolution [THz]',f_width
+        print *,space, 'Time-integration (BN window FWHM) [ps]',t_width
+        print *,space, 'Energy resolution [THz]',f_width
       else
         n_freq_plot = f_max/t_step+1
       endif

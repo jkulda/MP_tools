@@ -119,6 +119,7 @@ program mp_pdf55
   real 		:: 			 arg,c_min,c_max,c_max2,c1,c2,x_start,x_end,pdf_step,q_step,ro_0,c_smooth,rnd(5),data_in(128)
   
   character(4)   :: version,head,atom,ps_out(2),size_out(2)
+  character(10)	 :: prompt,space = '          '
   character(10)  :: at_weight_scheme(3),pg_out,pg_ext,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
   character(16)  :: sim_type_par,string16,filter_name
   character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name,string,mp_tool
@@ -188,21 +189,21 @@ program mp_pdf55
 !!      do i=1,4
 !!      CALL RANDOM_SEED(GET = old_seed)  ! Read current seed
 !!      call random_number(rand1)
-!!      write(*,*) 'default',rand1,old_seed
+!!      print *,'default',rand1,old_seed
 !!      enddo
 !!
 !!      CALL RANDOM_SEED(PUT = new_seed) ! Define seed
 !!      do i=1,4
 !!      CALL RANDOM_SEED(GET = old_seed)  ! Read current seed
 !!      call random_number(rand1)
-!!      write(*,*) 'new',rand1,old_seed
+!!      print *,'new',rand1,old_seed
 !!      enddo
 !!
 !!      CALL RANDOM_SEED(PUT = new_seed) ! check the reproducibility
 !!      do i=1,4
 !!      CALL RANDOM_SEED(GET = old_seed)  ! Read current seed
 !!      call random_number(rand1)
-!!      write(*,*) 'new_again',rand1,old_seed
+!!      print *,'new_again',rand1,old_seed
 !!      enddo
 !! 
 !! C *** Output of test:
@@ -227,10 +228,11 @@ program mp_pdf55
 
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_PDF>   '
   mp_tool = 'MP_PDF '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *
   
 ! ********************* Get a time stamp and open a .LOG file *******************************
 
@@ -270,18 +272,10 @@ program mp_pdf55
   j_ext = 0
   
 ! *** Generate data file access
-  write(*,*) 'Input data file_master: '
-  read(*,*) file_master 
-        
-  if(j_verb==1)	then	
-    write(*,*) 'Read data files number min, step, max (0 0 no numbers, single file): '
-    read(*,*)   nfile_min,nfile_step,nfile_max
-  else
-    write(*,*) 'Read data files number min, max (0 0 no numbers, single file): '
-    read(*,*)   nfile_min,nfile_max
-    if(nfile_max<nfile_min) nfile_max = nfile_min
-    nfile_step = 1
-  endif
+  print *,prompt, 'Data file_master & file numbers (min, max; 0 0 single file): '
+  read(*,*) file_master,nfile_min,nfile_max
+  nfile_step = 1
+
   t_single = nfile_min==0.and.nfile_max==0
 
   if(t_single)then
@@ -303,7 +297,7 @@ program mp_pdf55
 
   open (1,file=file_dat_t0,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_dat_t0),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_dat_t0),' not found! Stop execution.'
     stop
   endif
   
@@ -317,13 +311,13 @@ program mp_pdf55
     nml_in = .true.
     read(1,rec=i_rec) dat_source,version,string16
     read(string16,*) n_head
-    write(*,*)		'Input data:  ',dat_source,version,n_head
+    print *,space,		'Input data:  ',dat_source,version,n_head
     i_rec = i_rec+1   							
     read(1,rec=i_rec) header_record
     read(header_record,nml=data_header_1)	
     t0 = t_dump
   elseif(head.eq.'TIME'.or.head.eq.'STAT') then                                  !old w/o structure
-    write(*,*)		'Input data:  ','old header format'
+    print *,space,		'Input data:  ','old header format'
     nml_in = .false.
    read(1,rec=1) sim_type,file_par,t_ms,t0,temp,a_par,angle,n_row,n_atom,n_eq,j_force,j_shell_out,n_cond,n_rec					
      n_head = 1
@@ -331,8 +325,8 @@ program mp_pdf55
      input_method = 'CELL'
      if(index(sim_type,'BULK')/=0) input_method = 'BULK'
   else
-    write(*,*) 'header record wrong or missing'
-    write(*,*) trim(header_record)
+    print *,space, 'header record wrong or missing'
+    print *,space, trim(header_record)
     stop
   endif 
   
@@ -375,13 +369,13 @@ program mp_pdf55
   close(1)
   
 ! **** Read the auxiliary file <file_par.par> with structure parameters, atom names and further info
-  write(*,*) 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
+  print *,prompt, 'Parameter file name (.par to be added) (confirm or type other name): ', file_par
   read(*,*) file_par
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_inp),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_inp),' not found! Stop execution.'
     stop
   endif
 
@@ -430,10 +424,10 @@ program mp_pdf55
   rewind(4)
   read(4,nml=mp_pdf)
   
-  allocate(ind_pseudo(n_atom,n_atom+n_pseudo_max+1),at_name_pseudo(n_pseudo_max+1))       !1st pseudo is TOT by default
+  allocate(ind_pseudo(n_atom,n_atom+n_pseudo_max+1),at_name_pseudo(n_atom+n_pseudo_max+1))       !1st pseudo is TOT by default
   ind_pseudo = 0
   at_name_pseudo = ''
-  at_name_pseudo(1) = 'TOT'
+  at_name_pseudo(n_atom+1) = 'TOT'
   ind_pseudo = 0
   do j=1,n_atom
     ind_pseudo(j,j) = 1
@@ -448,7 +442,7 @@ program mp_pdf55
   ext_dy = .0
   
   if(j_acc==3) then
-    write(*,*) 'Setting J_ACC = 2 to the recommended MC integration algorithm (check for other J_ACC choices in .PAR)'
+    print *,space, 'Setting J_ACC = 2 to the recommended MC integration algorithm (check for other J_ACC choices in .PAR)'
     j_acc = 2
   endif
   
@@ -458,7 +452,7 @@ program mp_pdf55
   do
     read(4,'(a)',iostat=ios) string
     if(ios/=0) then
-      write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+      print *,space, 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
       stop
     endif
     if(string(1:5).eq.section) exit	!find the mp_simple part of the .par file
@@ -475,7 +469,7 @@ program mp_pdf55
     do
       read(4,'(a)',iostat=ios) string
       if(ios/=0) then
-        write(*,*) 'Section title: PARTIAL_PDF  not found (can be added in dialogue)'    !n_part,n_pseudo
+        print *,space, 'Section title: PARTIAL_PDF  not found (can be added in dialogue)'    !n_part,n_pseudo
         n_part = 0
         found = .false.
         exit
@@ -509,7 +503,7 @@ program mp_pdf55
     do
       read(4,'(a)',iostat=ios) string
       if(ios/=0) then
-        write(*,*) 'Section title: PSEUDO_ATOMS not found (can be added in dialogue)'
+        print *,space, 'Section title: PSEUDO_ATOMS not found (can be added in dialogue)'
         n_pseudo = 1
         found = .false.
         exit
@@ -519,8 +513,8 @@ program mp_pdf55
     enddo
     
     if(found) then
-      do j=2,n_pseudo_max
-        read(4,*,iostat=ios) at_name_pseudo(j),ind_pseudo(1:n_atom,n_atom+j)	              ! pseudo_atom name and indices
+      do j=1,n_pseudo_max
+        read(4,*,iostat=ios) at_name_pseudo(n_atom+j+1),ind_pseudo(1:n_atom,n_atom+j+1)	              ! pseudo_atom name and indices
         if(ios/=0) then
           n_pseudo = j-1
           exit
@@ -535,13 +529,14 @@ program mp_pdf55
 ! *** Check atom names against the .PAR input       
   do j=1,n_atom
     if(at_name_par(j)/=at_name_out(j)) then
-      write(*,*) 'Not-matching  atom names in .PAR and .DAT: ',j,at_name_par(j),at_name_out(j)
-      write(*,*) 'Prefer .DAT? (1/0)'
+      print *,space, 'Not-matching  atom names in .PAR and .DAT: ',j,at_name_par(j),at_name_out(j)
+      print *,prompt, 'Prefer .DAT? (1/0)'
       read(*,*) ii
       if(ii==1) at_name_par = at_name_out
       exit 
     endif
-  enddo			
+  enddo		
+  at_name_pseudo(1:n_atom)= at_name_par
 
 ! *** read neutron scattering lengths (always)
   open(4,file='neutron_xs.txt',action='read',status ='old',iostat=ios)
@@ -549,11 +544,11 @@ program mp_pdf55
     open(4,file='/usr/local/mp_tools/ref/neutron_xs.txt',action='read',status ='old',iostat=ios)
     if(ios.ne.0) then
       do
-        write(*,*) 'File neutron_xs.txt not found, type in valid access path/filename'
+        print *,prompt, 'File neutron_xs.txt not found, type in valid access path/filename'
         read(*,'(a)') x_file_name
         open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
         if(ios==0) exit
-        write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+        print *,space, 'File',trim(x_file_name),' not found, try again ...'
       enddo
     endif
   endif
@@ -567,8 +562,8 @@ program mp_pdf55
         cycle bc_loop
       endif
     enddo
-    write(*,*) 'b_coh for ',trim(at_label(j)),' not found,'
-    write(*,*) 'check your spelling and the neutron_xs.txt table; use unit weights'
+    print *,space, 'b_coh for ',trim(at_label(j)),' not found,'
+    print *,space, 'check your spelling and the neutron_xs.txt table; use unit weights'
   enddo bc_loop
   close(4)
   b_coh = .1*b_coh  !convert b_coh from FM to 10^12 cm
@@ -579,11 +574,11 @@ program mp_pdf55
     open(4,file='/usr/local/mp_tools/ref/xray_ff.txt',action='read',status ='old',iostat=ios)
     if(ios.ne.0) then
       do
-        write(*,*) 'File xray_ff.txt not found, type valid access path/filename'
+        print *,prompt, 'File xray_ff.txt not found, type valid access path/filename'
         read(*,'(a)') x_file_name
         open(4,file=trim(x_file_name),action='read',status ='old',iostat=ios)
         if(ios==0) exit
-        write(*,*) 'File',trim(x_file_name),' not found, try again ...'
+        print *,space, 'File',trim(x_file_name),' not found, try again ...'
       enddo
     endif
   endif
@@ -597,46 +592,46 @@ program mp_pdf55
         cycle xff_loop
       endif
     enddo
-    write(*,*) 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
-    write(*,*) 'check atom name spelling and the neutron_xs.txt table; use unit weights'
+    print *,space, 'Xray formfactor for ',trim(at_label(j))//trim(at_name_ext(j)),' not found,'
+    print *,space, 'check atom name spelling and the neutron_xs.txt table; use unit weights'
   enddo xff_loop
   close(4)
 
 
 ! *** write overview of atom data
-  write(*,*) 'Input method:  ',input_method
+  print *,space, 'Input method:  ',input_method
   if(input_method=='CELL') at_occup_r = at_occup_r/sum(at_occup_r)
 
-  write(*,*)
-  write(*,*) 'Substance name: ',subst_name	  
-  write(*,*) 'Atoms from ',trim(file_inp)
+  print *
+  print *,space, 'Substance name: ',subst_name	  
+  print *,space, 'Atoms from ',trim(file_inp)
   do j=1,n_atom
-    write(*,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
+    write(*,'(a,5x,a4,3f8.4,2x,2f8.4)')	space,at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
     write(9,'(5x,a4,3f8.4,2x,2f8.4)')	at_name_par(j),at_base(j,:),at_occup_r(j),b_coh(j)
   enddo
   b_sum = sum(at_occup_r(1:n_atom)*b_coh(1:n_atom))
   at_sum = sum(at_occup_r(1:n_atom))
 
-  write(*,*) 
+  print *
 
 ! **** use the .PAR value of a_par in case of input in LATTICE units      
   if(a_par(1)*a_par(2)*a_par(3)==1.and.a_par_pdf(1)*a_par_pdf(2)*a_par_pdf(3)/=0.) then
     a_par = a_par_pdf
-    write(*,*) 'Setting a_par to',a_par
+    print *,space, 'Setting a_par to',a_par
   endif
 
 ! **** setup the MC integration 
 !
   if(n_h==0) then
     write(string,*) n_h_max
-    write(*,*) 'MC sampling pairs per frame ([x 10^6]: '                !,trim(adjustl(string)),' max):'
+    print *,prompt, 'MC sampling pairs per frame ([x 10^6]: '                !,trim(adjustl(string)),' max):'
     read(*,*)   n_h
   endif
 
 ! **** check the suitability of the chosen MC integration algorithm 
   if(n_cond==0.and.j_acc>0) then                         !box with periodic bound_cond
-    write(*,*) 'ATTENTION: the simulated data are not subject to periodic boundary conditions!'
-    write(*,*) 'ATTENTION: an adapted MC integration algorithm has to be adopted, setting *** j_acc = 0 ***'
+    print *,space, 'ATTENTION: the simulated data are not subject to periodic boundary conditions!'
+    print *,space, 'ATTENTION: an adapted MC integration algorithm has to be adopted, setting *** j_acc = 0 ***'
     j_acc = 0
   endif
 
@@ -644,38 +639,37 @@ program mp_pdf55
 
   if(j_acc>0) then                         !box with periodic bound_cond
     if(pdf_range>minval(a_par*n_row)) then
-      write(*,*) 'PDF range',pdf_range,' exceeds box size',minval(a_par*n_row)
-      write(*,*) 'Setting PDF range to',minval(a_par*n_row)
+      print *,space, 'PDF range',pdf_range,' exceeds box size',minval(a_par*n_row)
+      print *,space, 'Setting PDF range to',minval(a_par*n_row)
       pdf_range = minval(a_par*n_row)        
     endif
     n_h_max = real(n_tot)**2/(2.*n_mc)    !(1+n_tot/n_mc)*n_atom*product(n_row)/2 product(n_row)/2 is roughly the volume of sphere with radius of pdf_range_max !n_mc=1e6
 
     if(n_h.gt.n_h_max) then                   !n_h_max is in units of n_mc to avoid overflow for large boxes
-      write(*,*) 'WARNING: n_h exceeds max number of 10^6 atom pairs ',n_h_max
-      write(*,*) 'type in a reduced n_h (<',n_h_max,'):'
+      print *,space, 'WARNING: n_h exceeds max number of 10^6 atom pairs ',n_h_max
+      print *,prompt, 'type in a reduced n_h (<',n_h_max,'):'
       read(*,*)   n_h
     endif
 
   else                                      !box with non-periodic bound_cond (j_acc==0)
-    write(*,*) 'ATTENTION: simple MC w/o periodic boundary conditions!'
-     write(*,*) 'a_par,pdf_range',a_par,pdf_range
+    print *,space, 'ATTENTION: simple MC w/o periodic boundary conditions!'
+     print *,space, 'a_par,pdf_range',a_par,pdf_range
     do
       if(pdf_range> .333*minval(a_par*n_row)) then
-        write(*,*) 'Box with non-periodic boundary conditions:'
-        write(*,*) 'PDF range',pdf_range,' exceeds 1/3 box size',.333*minval(a_par*n_row)
+        print *,space, 'Box with non-periodic boundary conditions:'
+        print *,space, 'PDF range',pdf_range,' exceeds 1/3 box size',.333*minval(a_par*n_row)
         pdf_range = int(.333*minval(a_par*n_row))        
-        write(*,*) 'Setting PDF range to',pdf_range
+        print *,space, 'Setting PDF range to',pdf_range
       endif      
 
       n_at1 = n_tot*product(a_par-2.*pdf_range*(/1.,1.,1./))/product(a_par)    !this just a first estimate of n_at1
       n_at2 = n_tot*1.3333*pi*pdf_range**3/product(a_par)                      !this just a first estimate of n_at2_max
       n_h_max =  real(n_at1*n_at2)/n_mc               
-      write(*,*) 'n_tot,n_at1,n_at2,n_h_max',n_tot,n_at1,n_at2,n_h_max
 
       if(n_h<=n_h_max) exit                       !n_h_max is in units of n_mc to avoid overflow for large boxes
       
-      write(*,*) 'WARNING: n_h exceeds max number of 10^6 atom pairs!'
-      write(*,*) 'Reduce pdf_range and/or n_h :',pdf_range,n_h_max
+      print *,space, 'WARNING: n_h exceeds max number of 10^6 atom pairs!'
+      print *,space, 'Reduce pdf_range and/or n_h :',pdf_range,n_h_max
       read(*,*)   pdf_range,n_h
     enddo        
   endif
@@ -685,7 +679,7 @@ program mp_pdf55
   pdf_range = (n_pdf-1)*pdf_step             !update pdf_range to be consistent with n_pdf
   n_int = n_h*n_mc                           !number of MC cycles per snapshot
   int_mode = 'Monte Carlo'
-  write(*,*) trim(int_mode),' integration over',n_h,'*10^6 cell pairs'
+  print *,space, trim(int_mode),' integration over',n_h,'*10^6 cell pairs'
 
  
 ! **** establish the overlay PDF_GRID 
@@ -706,11 +700,11 @@ program mp_pdf55
     enddo
   endif
   
-  if(j_verb==1) write(*,*) 'Overlay grid size, step and offset:',n_pdf_grid,d_pos,pdf_pix_shift
-  if(j_verb==1) write(*,*) 'a_par_grid',a_par_grid
+  if(j_verb==1) print *,space, 'Overlay grid size, step and offset:',n_pdf_grid,d_pos,pdf_pix_shift
+  if(j_verb==1) print *,space, 'a_par_grid',a_par_grid
 
   n_pix_step = nint(norm2(a_par_grid)/pdf_step)       !we shall avoid correlations within the 1st pixel range
-  if(j_verb==1) write(*,*) 'pdf_range,n_pdf,n_pix_step',pdf_range,n_pdf,n_pix_step
+  if(j_verb==1) print *,space, 'pdf_range,n_pdf,n_pix_step',pdf_range,n_pdf,n_pix_step
  
   
 ! *********************  OpenMP initialization start  *******************************      
@@ -724,9 +718,9 @@ program mp_pdf55
 
 
   if(proc_num_in.gt.1) then			
-    write(*,*) 
-    write(*,*) 'OMP threads max          = ', thread_num_max
-    write(*,*) 'OMP processes requested  = ', proc_num_in										
+    print *
+    print *,space, 'OMP threads max          = ', thread_num_max
+    print *,space, 'OMP processes requested  = ', proc_num_in										
     write(9,*) 
     write(9,*) 'OMP threads max          = ', thread_num_max
     write(9,*) 'OMP processes requested  = ', proc_num_in
@@ -734,30 +728,30 @@ program mp_pdf55
     write(9,*) 'OMP threads allocated    = ', thread_num
   else
     write(9,*) 'OpenMP not in use'
-    write(*,*) 'OpenMP not in use'
+    print *,space, 'OpenMP not in use'
   endif
-  write(*,*) 
+  print *
   write(9,*) 
 !
 ! ********************* OpenMP initialization end *******************************      
 
 ! *** initialise the random_number generator
   call random_seed(size=seed_size)               !returns size of seed into seed_size
-  if(j_verb==1) write(*,*) 'Random_numbers seed_size',seed_size
+  if(j_verb==1) print *,space, 'Random_numbers seed_size',seed_size
   allocate(numbers(seed_size))
 
   if(j_rand==0) then                     
-    write(*,*) 'Random_number: j_rand =',j_rand,'  the system will supply unique, machine dependent seeds each time this code runs'
+    print *,space, 'Random_number: j_rand =',j_rand,'  the system will supply unique, machine dependent seeds each time this code runs'
     call random_seed(get=numbers)               !Gets actual seeds 
     if(j_verb==1) then
-      write(*,*) 'Random_number seed size:',seed_size
-      write(*,*) 'Random_seed:',numbers
-      write(*,*) 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
+      print *,space, 'Random_number seed size:',seed_size
+      print *,space, 'Random_seed:',numbers
+      print *,space, 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
     endif
   elseif(j_rand==1) then                     !if j_rand==1 generate k-dependent standard seeds for each of the OMP threads
-    write(*,*) 'Random_number: j_rand =',j_rand,'  the system will supply k-dependent standard seeds for each of the OMP threads (use only for testing the consistence of OMP_on/OMP_off results)'
+    print *,space, 'Random_number: j_rand =',j_rand,'  the system will supply k-dependent standard seeds for each of the OMP threads (use only for testing the consistence of OMP_on/OMP_off results)'
   elseif(j_rand>1) then                     !if j_rand>1 generate a seed for later reference & numerical reproducibility checks
-    write(*,*) 'Random_number: j_rand =',j_rand,'  this seeding reference can be used to exactly reproduce this MC-run later on'
+    print *,space, 'Random_number: j_rand =',j_rand,'  this seeding reference can be used to exactly reproduce this MC-run later on'
     numbers(1) = rand(huge(1)/j_rand)   !this is to seed the RAND generator
     do i=1,seed_size
       numbers(i) = huge(1)*rand(0)    !use a trivial random number generator to produce the seeds (they could even be all the same small ones, but ...)
@@ -767,11 +761,10 @@ program mp_pdf55
       call random_number(rnd(i))
     enddo
     if(j_verb==1) then
-      write(*,*) 'Random_seed:',numbers
-      write(*,*) 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
+      print *,space, 'Random_seed:',numbers
+      print *,space, 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
     endif
   endif
-  write(*,*)
 
 ! *** Allocate and clear the histogram arrays for accumulation across several snapshots	       
   allocate (at_pos_in(4*n_tot),at_ind_in(4*n_tot),ind_at1(n_tot))
@@ -820,14 +813,14 @@ program mp_pdf55
     endif
 
 !     CALL SYSTEM_CLOCK (COUNT = sc_c2)
-    write(*,*)
-    write(*,*)'Input: ',trim(file_dat)
+    print *
+    print *,space,'Input: ',trim(file_dat)
     write(9,*)'Input: ',trim(file_dat)
 
     open(1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
     if(ios.ne.0) then
-      write(*,*) 'File ',trim(file_dat),' not opened! IOS =',ios
-      write(*,*) 'Skip(1), stop execution(0)?'
+      print *,space, 'File ',trim(file_dat),' not opened! IOS =',ios
+      print *,prompt, 'Skip(1), stop execution(0)?'
       read(*,*) jj
       if(jj==1) exit file_loop
       if(jj==0) stop
@@ -849,7 +842,7 @@ program mp_pdf55
     i_rec = i_rec+1
     read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot)				
     close(1)
-     write(*,*) 'Read finished'
+     print *,space, 'Read finished'
 
 
 ! **** shortlisting atom_1 candidates in a non-periodic box (j_acc==0)
@@ -879,11 +872,11 @@ program mp_pdf55
         n_at2 = nint(n_h*n_mc/real(n_at1))
         n_int = n_at1*n_at2
       else
-        write(*,*) 'WARNING: n_h exceeds max number of 10^6 atom pairs ',nint((n_at1*1000)/1.e6)
-        write(*,*) 'restart with an adequate n_h and use a larger number of frames'
+        print *,space, 'WARNING: n_h exceeds max number of 10^6 atom pairs ',nint((n_at1*1000)/1.e6)
+        print *,space, 'restart with an adequate n_h and use a larger number of frames'
         stop
       endif
-      write(*,*) 'Atom_1 & atom_2 pools:',n_at1,n_at2
+      print *,space, 'Atom_1 & atom_2 pools:',n_at1,n_at2
       
       do i=1,n_at1
         at_occup_1(at_ind_in(4*(ind_at1(i)-1)+4)) = at_occup_1(at_ind_in(4*(ind_at1(i)-1)+4))+1
@@ -923,7 +916,7 @@ program mp_pdf55
 
           do j=1,3                                                  !handle basis atoms displaced out of the nominal box
             if(d_ind(j)<=0.or.d_ind(j)>n_pdf_grid(j)) then
-              write(*,*)'i,d_ind(:)',i,d_ind(:)
+              print *,prompt,'i,d_ind(:)',i,d_ind(:)
               read(*,*)
             endif
           enddo
@@ -931,9 +924,9 @@ program mp_pdf55
 
          if(ind_pdf(d_ind(1),d_ind(2),d_ind(3))/= 0) then
             jj = ind_pdf(d_ind(1),d_ind(2),d_ind(3))
-            write(*,*) 'Overlay grid cell already taken (you can accept a few by RETURN, else slightly decrease pdf_pix in .PAR):'
-            write(*,*) 'at_ind_in,at_pos_in,d_ind',at_ind_in(4*(i-1)+1:4*(i-1)+4),'  ',at_pos_in(4*(i-1)+1:4*(i-1)+3),'  ',d_ind
-            write(*,*) 'IN:jj,at_pos_in',jj,at_pos_in(4*(jj-1)+1:4*(jj-1)+3)
+            print *,space, 'Overlay grid cell already taken (you can accept a few by RETURN, else slightly decrease pdf_pix in .PAR):'
+            print *,space, 'at_ind_in,at_pos_in,d_ind',at_ind_in(4*(i-1)+1:4*(i-1)+4),'  ',at_pos_in(4*(i-1)+1:4*(i-1)+3),'  ',d_ind
+            print *,space, 'IN:jj,at_pos_in',jj,at_pos_in(4*(jj-1)+1:4*(jj-1)+3)
            read(*,*)
            n_skip0 = n_skip0+1
           endif
@@ -944,13 +937,13 @@ program mp_pdf55
     endif
     
     CALL SYSTEM_CLOCK (COUNT = sc_c2)
-    write(*,*) 
-    if(j_verb==1) write(*,*) 'Input finished         ',(sc_c2-sc_c1)/sc_r,' sec'
+    print *
+    if(j_verb==1) print *,space, 'Input finished         ',(sc_c2-sc_c1)/sc_r,' sec'
     
     if(n_skip0>0) then
-      write(*,*) 'Number of atoms skipped due to overlay grid cell double occupancy:', n_skip0
+      print *,space, 'Number of atoms skipped due to overlay grid cell double occupancy:', n_skip0
       if(n_skip0>10)then
-        write(*,*) 'Modify .PAR pdf_pix (0), continue (1)?'
+        print *,prompt, 'Modify .PAR pdf_pix (0), continue (1)?'
         read(*,*) jj
         if(jj==0) stop
       endif
@@ -958,8 +951,8 @@ program mp_pdf55
   
 ! *************  the integration loop: cycle over the site pairs to accumulate the PDFs ******************
 
-    write(*,*)    
-    write(*,*) 'Accumulating the PDFs ...'     
+    print *   
+    print *,space, 'Accumulating the PDFs ...'     
 
 ! *** basic MC for small boxes without periodic boundary conditions (n_cond=0) - simply taking pairs of atoms
 !
@@ -993,7 +986,7 @@ program mp_pdf55
         enddo    !n_at2
       enddo      !n_at1
 
-     if(j_verb==1) write(*,*)'number of preset and really accumulated MC events',n_int,j_int
+     if(j_verb==1) print *,space,'number of preset and really accumulated MC events',n_int,j_int
       rdf_p2 = rdf_p2+real(l_rdf_p2(:,:,:,1))
       l_rdf_p2 = .0
     endif     !j_acc==0
@@ -1028,9 +1021,9 @@ program mp_pdf55
           call random_number(rnd(i))
         enddo
         if(j_verb==1) then
-          write(*,*) 'k =',k
-          write(*,*) 'Random_seed:',numbers
-          write(*,*) 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
+          print *,space, 'k =',k
+          print *,space, 'Random_seed:',numbers
+          print *,space, 'Reference 1st 5 random numbers:',(rnd(i),i=1,5)
         endif
       endif
 
@@ -1100,7 +1093,7 @@ program mp_pdf55
 
           do j =1,3                                !n_pdf_grid is the supercell size on the overlay grid
             if(at_ind2(j).lt.1.or.at_ind2(j).gt.n_pdf_grid(j)) then
-              write(*,*)'m,at_ind,d_ind,at_ind2,diff_pos',m,at_ind,d_ind,at_ind2,diff_pos
+              print *,prompt,'Something goes wrong: m,at_ind,d_ind,at_ind2,diff_pos',m,at_ind,d_ind,at_ind2,diff_pos
               read(*,*)
             endif
           enddo
@@ -1142,8 +1135,8 @@ program mp_pdf55
 !$omp end do
 !$omp end parallel
 
-      write(*,*)'MC hits to empty overlay grid cells [%]:',(100.*n_skip1)/(real(n_h*n_mc)+real(n_skip1))
-      write(*,*)'MC hits out of PDF range [%]:',(100.*n_skip2)/(real(n_h*n_mc))
+      print *,space,'MC hits to empty overlay grid cells [%]:',(100.*n_skip1)/(real(n_h*n_mc)+real(n_skip1))
+      print *,space,'MC hits out of PDF range [%]:',(100.*n_skip2)/(real(n_h*n_mc))
       n_skip2_tot = n_skip2_tot+n_skip2
 
 ! *** sum up contributions from individual cycles and estimate statistical error at the a_par(1) position
@@ -1158,15 +1151,15 @@ program mp_pdf55
       ind_pdf = 0
     endif  !j_acc=2
     
-    if(j_verb==1) write(*,*) 'PDF size, MC events, file number, PDF histogram sum',n_pdf,n_int,ifile,sum(rdf_p2)       
+    if(j_verb==1) print *,space, 'PDF size, MC events, file number, PDF histogram sum',n_pdf,n_int,ifile,sum(rdf_p2)       
             
   enddo file_loop
 
   
   CALL SYSTEM_CLOCK (COUNT = sc_c1)
-  write(*,*) 
-  write(*,*) 'Accumulation finished         ',(sc_c1-sc_c2)/sc_r,' sec'
-  write(*,*) 
+  print *
+  print *,space, 'Accumulation finished         ',(sc_c1-sc_c2)/sc_r,' sec'
+  print *
 
 ! *** estimate statistical error (Poisson statistics, sqrt(n)^-1) at the a_par(1) position
   n_pdf4 = (n_pdf-1)/4
@@ -1226,7 +1219,7 @@ program mp_pdf55
               i_cut = i_cut-1
               exit
             endif
-            write(*,*) 'R_min cutoff not found, i_cut,sum_sq1',i_cut,sum_sq1
+            print *,space, 'R_min cutoff not found, i_cut,sum_sq1',i_cut,sum_sq1
           enddo   !k
         else
           i_cut = n_pix_step/2-1
@@ -1241,7 +1234,7 @@ program mp_pdf55
               i_cut = i_cut+1
               exit
             endif
-            write(*,*) 'R_min cutoff not found, i_cut,sum_sq1',i_cut,sum_sq1
+            print *,space, 'R_min cutoff not found, i_cut,sum_sq1',i_cut,sum_sq1
           enddo   !k
        endif
     
@@ -1259,25 +1252,25 @@ program mp_pdf55
     enddo
 
     if(j_verb==1) then
-      write(*,*) 'PDF norm(i,j) [eff number of channels]'
+      print *,space, 'PDF norm(i,j) [eff number of channels]'
       do ii=1,n_atom
-          write(*,*) ii,rdf_norm(ii,:) 
+          print *,space, ii,rdf_norm(ii,:) 
       enddo      
-      write(*,*) 
+      print *
 
-      write(*,*) 'R_min(i,j) [A]'
+      print *,space, 'R_min(i,j) [A]'
       do ii=1,n_atom
-          write(*,*) ii,r_min(ii,:) 
+          print *,space, ii,r_min(ii,:) 
       enddo      
-      write(*,*)
+      print *
     endif 
 
 ! *** analyse R_min cutoff effects
     if(j_verb==1) then    
-      write(*,*) 'at1 at2    R_min    ' 
+      print *,space, 'at1 at2    R_min    ' 
       do i=1,n_atom
         do j= 1,i
-          write(*,*) at_name_par(i),at_name_par(j),.5*(r_min(i,j)+r_min(j,i))    
+          print *,space, at_name_par(i),at_name_par(j),.5*(r_min(i,j)+r_min(j,i))    
         enddo
       enddo
     endif
@@ -1331,30 +1324,31 @@ program mp_pdf55
     n_atom_tot = n_atom+n_pseudo             
     allocate(rdf_p2_ws(n_atom,n_atom,n_pdf),rdf_p2_plot(n_atom_tot,n_atom_tot,n_pdf),at_name_plot(n_atom_tot),rdf_fft(2*n_pdf-2)) 
 
-    at_name_plot(1:n_atom) = at_name_par       
-    if(n_pseudo>0) at_name_plot(n_atom+1:n_atom_tot) = at_name_pseudo(1:n_pseudo)
+!     at_name_plot(1:n_atom) = at_name_par       
+!     if(n_pseudo>0) at_name_plot(n_atom+1:n_atom_tot) = at_name_pseudo(1:n_pseudo)
+    at_name_plot = at_name_pseudo       
 
-    write(*,*)
+    print *
     write(9,*)
-    write(*,'(1x,"Lattice parameter: ",3(1x,f8.4))')  a_par
+    write(*,'(11x,"Lattice parameter: ",3(1x,f8.4))')  a_par
     write(9,'(1x,"Lattice parameter: ",3(1x,f8.4))')  a_par
-    write(*,'(1x,"Atoms:           ",51(1x,a8))')  (at_name_plot(i),i=1,n_atom+1)
+    write(*,'(11x,"Atoms:           ",51(1x,a8))')  (at_name_plot(i),i=1,n_atom+1)
     write(9,'(1x,"Atoms:           ",51(1x,a8))')  (at_name_plot(i),i=1,n_atom+1)
-    write(*,'(1x,"Atoms no.:         ",51(1x,i8))') (i,i=1,n_atom+1)
+    write(*,'(11x,"Atoms no.:         ",51(1x,i8))') (i,i=1,n_atom+1)
     write(9,'(1x,"Atoms no.:         ",51(1x,i8))') (i,i=1,n_atom+1)
-    write(*,'(1x,"Occupancy nominal: ",51(1x,f8.4))') (at_occup_r(i),i=1,n_atom),1.                      !1. for TOT
+    write(*,'(11x,"Occupancy nominal: ",51(1x,f8.4))') (at_occup_r(i),i=1,n_atom),1.                      !1. for TOT
     write(9,'(1x,"Occupancy nominal: ",51(1x,f8.4))') (at_occup_r(i),i=1,n_atom),1.
-    write(*,'(1x,"Occupancy real 1:  ",51(1x,f8.4))') (at_occup_1(i),i=1,n_atom),1.                      !1. for TOT
+    write(*,'(11x,"Occupancy real 1:  ",51(1x,f8.4))') (at_occup_1(i),i=1,n_atom),1.                      !1. for TOT
     write(9,'(1x,"Occupancy real 1:  ",51(1x,f8.4))') (at_occup_1(i),i=1,n_atom),1.
-    write(*,'(1x,"Occupancy real 2:  ",51(1x,f8.4))') (at_occup_2(i),i=1,n_atom),1.                      !1. for TOT
+    write(*,'(11x,"Occupancy real 2:  ",51(1x,f8.4))') (at_occup_2(i),i=1,n_atom),1.                      !1. for TOT
     write(9,'(1x,"Occupancy real 2:  ",51(1x,f8.4))') (at_occup_2(i),i=1,n_atom),1.
-    write(*,'(1x,a," weights:  ",50(1x,f8.4))') trim(at_weight_scheme(j_weight)),(sum(ind_pseudo(:,j)*at_weight),j=1,n_atom+1)
+    write(*,'(11x,a," weights:  ",50(1x,f8.4))') trim(at_weight_scheme(j_weight)),(sum(ind_pseudo(:,j)*at_weight),j=1,n_atom+1)
     write(9,'(1x,a," weights:  ",50(1x,f8.4))') trim(at_weight_scheme(j_weight)),(sum(ind_pseudo(:,j)*at_weight),j=1,n_atom+1)
-    write(*,'(1x,"Mean rel_error:    ",50(1x,f8.4))') (rdf_err(i),i=1,n_atom),rdf_tot_err						
-    write(*,*) 
-    write(*,'(1x,"Atom density [Å-3] and masks",e14.6,4x,(50i3))')ro_0,(at_mask(i),i=1,n_atom)        
+    write(*,'(11x,"Mean rel_error:    ",50(1x,f8.4))') (rdf_err(i),i=1,n_atom),rdf_tot_err						
+    print *
+    write(*,'(11x,"Atom density [Å-3] and masks",e14.6,4x,(50i3))')ro_0,(at_mask(i),i=1,n_atom)        
     write(9,'(1x,"Atom density [Å-3] and masks",e14.6,4x,(50i3))')ro_0,(at_mask(i),i=1,n_atom)        
-    write(*,*) 
+    print *
     
     if(minval(at_mask(1:n_atom))==1) then  !if all masks =1 don't put them into plot title
       masks = ''
@@ -1378,19 +1372,19 @@ program mp_pdf55
     endif
 
       if(j_verb==1) then
-        write(*,*) 'at_weight',at_weight
-        write(*,*) 'at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
-        write(*,*) 'at_weight matrix'
+        print *,space, 'at_weight',at_weight
+        print *,space, 'at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
+        print *,space, 'at_weight matrix'
         do ii=1,n_atom
-            write(*,*) ii,at_weight_matrix(ii,:) 
+            print *,space, ii,at_weight_matrix(ii,:) 
         enddo      
-        write(*,*) 
+        print *
       endif
            
 ! *** generate the smoothing profile (Gauss) and ...
 !
     if(j_mode<=2) then
-      write(*,'(a,f5.2,a)') 'Gaussian smooth FWHM in steps of',pdf_step,'Å (1 no smoothing, 4 - 20 useful)'
+      write(*,'(1x,a,a,f5.2,a)') prompt,'Gaussian smooth FWHM in steps of',pdf_step,'Å (1 no smoothing, 4 - 20 useful)'
       read(*,*) smooth_fwhm
   
       if(nint(smooth_fwhm)==1) then
@@ -1412,7 +1406,7 @@ program mp_pdf55
     f_smooth = f_smooth/sum(f_smooth(1:n_smooth))				!profile normalized to unit integral
 
 ! *** ... apply it to calculate g(r)
-    if(n_smooth>1) write(*,*) 'Applying Gaussian smoothing with FWHM=',nint(smooth_fwhm),' steps of',pdf_step,'[A^]'
+    if(n_smooth>1) print *,space, 'Applying Gaussian smoothing with FWHM=',nint(smooth_fwhm),' steps of',pdf_step,'[A^]'
     write(smooth,'("Smooth FWHM",f5.2," [A]")') pdf_step*smooth_fwhm
 
 
@@ -1438,15 +1432,6 @@ program mp_pdf55
     endif
     deallocate(f_smooth)
  
-!     arg = ro_0
-!     write(*,*) 'Confirm/modify ro_0',arg
-!     read(*,*) arg
-!     if(arg/=ro_0) then
-!       a_par = a_par*(ro_0/arg)**.3333333
-!       write(*,*) 'Modified lattice parameter:',a_par
-!       ro_0 = arg
-!     endif
-!     
 ! *** calculate G(r) components & total
     if(j_mode>=2) then
       do j=1,n_atom
@@ -1458,8 +1443,8 @@ program mp_pdf55
 
 ! *** calculate S(Q) components & total
     if(j_mode>=3) then
-      write(*,*) 'S(Q) q_step, q_range:',q_step,(n_pdf-1)*q_step
-      write(*,*) 'Hann smooth FWHM in Q_steps (<=1. no smoothing)'
+      print *,space, 'S(Q) q_step, q_range:',q_step,(n_pdf-1)*q_step
+      print *,prompt, 'Hann smooth FWHM in Q_steps (<=1. no smoothing)'
       read(*,*) smooth_fwhm
     
       if(smooth_fwhm<=1.) then
@@ -1470,7 +1455,7 @@ program mp_pdf55
         do i=1,min(n_pdf,nint(n_pdf/(smooth_fwhm-1.)))
           ft_wind(i) = .5*(1.+cos(pi*(smooth_fwhm-1.)*(i-1)/real(n_pdf-1)))       ! FT window == Hann profile
         enddo
-        if(n_smooth>1) write(*,*) 'Applying Gaussian smoothing with FWHM=',smooth_fwhm,' steps of',q_step,'[A-1]'
+        if(n_smooth>1) print *,space, 'Applying Gaussian smoothing with FWHM=',smooth_fwhm,' steps of',q_step,'[A-1]'
         write(smooth,'("Smooth FWHM",f5.2," [A-1]")') q_step*smooth_fwhm
       endif
    
@@ -1550,7 +1535,7 @@ program mp_pdf55
       call PGSLCT(j_xserv)
     endif   
     if (j_xserv.LE.0) then    
-      write(*,*) 'Could not open PGPLOT /xserv'
+      print *,space, 'Could not open PGPLOT /xserv'
       STOP
     endif
   
@@ -1595,8 +1580,8 @@ program mp_pdf55
       c_max = .1*(int(10*c_max)+1)
     endif
           
-    write(*,*) 
-    write(*,*) 'Vertical scale c_min,c_max',c_min,c_max
+    print *
+    print *,space, 'Vertical scale c_min,c_max',c_min,c_max
     
     write(plot_header,'(a,"    ",a," weights  ")') trim(file_dat_t0),trim(at_weight_scheme(j_weight))
     plot_header = trim(subst_name)//'  '//trim(pdf_out(j_mode))//'  '//trim(plot_header)//trim(masks)//'  '//trim(smooth)
@@ -1669,15 +1654,15 @@ program mp_pdf55
       CALL PGSCH(.6)
       CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp))
      
-      write(*,*) 'Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)'
+      print *,prompt, 'Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)'
       c1 = c_min
       c2 = c_max
       read(*,*) c1,c2
       if(c1==.0.and.c2==.0) then
         exit
       elseif(c1==-1.and.c2==-1) then              
-        write(*,*) 'Confirm/adjust plot range, max =',(n_pdf-1)*(x(2)-x(1))
-        write(*,'("x_start, x_end ",2f7.1,":  ")',advance='no') x_start,x_end 
+        print *,prompt,'Confirm/adjust plot range, max =',(n_pdf-1)*(x(2)-x(1))
+        write(*,'(1x,a,"x_start, x_end ",2f7.1,":  ")',advance='no') space,x_start,x_end 
         read(*,*) x_start,x_end 
         if(x_start<=.0) x_start = x(1)
         if(x_end>(n_pdf-1)*(x(2)-x(1))) x_end = (n_pdf-1)*(x(2)-x(1))
@@ -1727,7 +1712,7 @@ program mp_pdf55
         if(.not.found_txt.and.(.not.found_ps)) exit				
         jfile = jfile+1
         if(jfile==100) then
-          write(*,*)'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
+          print *,prompt,'Tidy up .txt/.ps files to restart count from 01 and type [RET]'
           read(*,*)
           jfile = 1
         endif	
@@ -1816,7 +1801,7 @@ program mp_pdf55
       CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp))
 
       CALL PGCLOS
-      write(*,*) ' Postscript output written to: ',file_ps	
+      print *,space, 'Postscript output written to: ',file_ps	
       write(9,*)
       if(j_acc==2) then
         write(9,*) 'Integration ',trim(int_mode),'  ',n_int,'cell pairs, j_rand',j_rand
@@ -1873,7 +1858,7 @@ program mp_pdf55
           enddo
         endif
         close(4)
-        write(*,*) ' Text output written to: ',file_res	  
+        print *,space, 'Text output written to: ',file_res	  
         write(9,*) ' Text output written to: ',file_res	  
 
       endif 																							!j_txt
@@ -1882,26 +1867,26 @@ program mp_pdf55
 ! ***   all done, now decide what comes next
   
    way_point: do
-      write(*,*) 'Choose output options (MODE is ',trim(pdf_out(j_mode)),', FILE output is ',trim(ps_out(j_ps+1)),', SIZE is ',trim(size_out(j_out+1)),'):'
-      write(*,*) '       1   REPLOT the last graph '
-      write(*,'("        2   select max ",i2," partial PDFs & replot")') n_part_max
-      write(*,*) '       3   adjust partials scales & replot '
-      write(*,*) '       4   modify atom WEIGHTS (',trim(at_weight_scheme(j_weight)),')'
-      write(*,*) '       5   edit atom MASKS ',trim(masks(8:))
-      write(*,'("        6   create/modify max ",i2," PSEUDO_ATOMS ")') n_pseudo_max
-      write(*,*) '       7   toggle FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
+      print *,prompt, 'Choose output options (MODE is ',trim(pdf_out(j_mode)),', FILE output is ',trim(ps_out(j_ps+1)),', SIZE is ',trim(size_out(j_out+1)),'):'
+      print *,space, '       1   REPLOT the last graph '
+      write(*,'(10x,"        2   select max ",i2," partial PDFs & replot")') n_part_max
+      print *,space, '       3   adjust partials scales & replot '
+      print *,space, '       4   modify atom WEIGHTS (',trim(at_weight_scheme(j_weight)),')'
+      print *,space, '       5   edit atom MASKS ',trim(masks(8:))
+      write(*,'(10x,"        6   create/modify max ",i2," PSEUDO_ATOMS ")') n_pseudo_max
+      print *,space, '       7   toggle FILE output ',trim(ps_out(mod(j_ps+1,2)+1)),' (mind the J_TXT switch in .PAR)'
       if(j_ext==0)then
-        write(*,*) '       8   import external ',trim(pdf_out(j_mode)),' curve '
+        print *,space, '       8   import external ',trim(pdf_out(j_mode)),' curve '
       else
-        write(*,*) '       8   change/close external ',trim(pdf_out(j_mode)),' curve ',file_inp
+        print *,space, '       8   change/close external ',trim(pdf_out(j_mode)),' curve ',file_inp
       endif
 
-!!!					write(*,*) '       8   toggle .TXT output SIZE to ',trim(size_out(mod(j_out+1,2)+1))
-      write(*,*) '       9   RESTART with updated weights, masks & pseudo_atoms '
-      write(*,*)        
-      write(*,*) '       10  select the PDF MODE, actual: ',trim(pdf_out(j_mode))
+!!!					print *,'       8   toggle .TXT output SIZE to ',trim(size_out(mod(j_out+1,2)+1))
+      print *,space, '       9   RESTART with updated weights, masks & pseudo_atoms '
+      print *      
+      print *,space, '       10  select the PDF MODE, actual: ',trim(pdf_out(j_mode))
       
-      write(*,*) '       0   EXIT'  
+      print *,space, '       0   EXIT'  
 
       read(*,*) jj
       
@@ -1910,11 +1895,11 @@ program mp_pdf55
           cycle plot_loop
 
         case(2) 
-          write(*,*) '("Confirm/modify up to ", i2," pairs of partial/pseudo PDF indices (0 0 erase, -1 -1 skip the rest):")',n_part_max
+          print *,prompt, '("Confirm/modify up to ", i2," pairs of partial/pseudo PDF indices (0 0 erase, -1 -1 skip the rest):")',n_part_max
           do j=1,n_part_max
             j1 = ind_part(1,j)
             j2 = ind_part(2,j) 
-            write(*,'(i2,": [",i2,",",i2,"]  ")',advance='no') j,j1,j2
+            write(*,'(10x,i2,": [",i2,",",i2,"]  ")',advance='no') j,j1,j2
             read(*,*) j1,j2
             if(j1==-1.and.j2==-1) exit
             ind_part(1,j) = j1
@@ -1934,21 +1919,21 @@ program mp_pdf55
           cycle plot_loop
 
         case(3) 
-          write(*,"('Confirm/modify total scale factor ',4f4.1)") tot_scale
+          write(*,"(1x,a,'Confirm/modify total scale factor ',4f4.1)") prompt,tot_scale
           read(*,*) tot_scale
-          write(*,'("Confirm/modify partial scale factors ",4f4.1,"(-1 unit asymptote)")') part_scale(1:n_part)
+          write(*,'(1x,a,"Confirm/modify partial scale factors ",4f4.1,"(-1 unit asymptote)")') space,part_scale(1:n_part)
           read(*,*) part_scale(1:n_part)
           if(j_ext==1) then
-            write(*,'("Confirm/modify external data scale factor",4f6.3)') ext_scale(1:n_part_ext)
+            write(*,'(1x,a,"Confirm/modify external data scale factor",4f6.3)') space,ext_scale(1:n_part_ext)
             read(*,*) ext_scale(1:n_part_ext)
-            write(*,'("Confirm/modify external data y-shift ",4f6.3)') ext_dy(1:n_part_ext)
+            write(*,'(1x,a,"Confirm/modify external data y-shift ",4f6.3)') space,ext_dy(1:n_part_ext)
             read(*,*) ext_dy(1:n_part_ext)
           endif
           cycle plot_loop
 
         case(4) 
           do
-            write(*,*) 'Atom weights (1= unit, 2= neutron b_c, 3= Xray f(Q))'	
+            print *,prompt, 'Choose atom weights (1= unit, 2= neutron b_c, 3= Xray f(Q))'	
             read(*,*) j_weight
             if(j_weight<=3) exit
           enddo
@@ -1963,51 +1948,45 @@ program mp_pdf55
           cycle way_point
               
         case(5) 
-          write(*,'(" Actual masks:",(50i3))') (at_mask(i),i=1,n_atom)
-          write(*,*)'Type in new ones (0/1):'
+          write(*,'(1x,a," Actual masks:",(50i3))') prompt,(at_mask(i),i=1,n_atom)
+          print *,space,'Type in new ones (0/1):'
           do
             read(*,*)(at_mask(i),i=1,n_atom)
             if(any(at_mask(1:n_atom).ge.0).and.any(at_mask(1:n_atom).le.1)) exit
-            write(*,*) 'Input out of range, repeat ...'
+            print *,space, 'Input out of range, repeat ...'
           enddo
           cycle way_point
 
         case(6) 
           pseudo_loop: do
             if(n_pseudo==0) then
-              write(*,*) 'No actual pseudo_atoms '
+              print *,prompt, 'No actual pseudo_atoms '
             else
-              write(*,*) 'Actual pseudo_atoms:'
-              do i=1,n_pseudo
-                write(*,*) trim(at_name_pseudo(i)),n_atom+i,'  masks:',ind_pseudo(:,n_atom+i)
+              print *,prompt, 'Actual pseudo_atoms:'
+              do i=1,n_pseudo+1
+                print *,space, trim(at_name_pseudo(n_atom+i)),n_atom+i,'  masks:',ind_pseudo(:,n_atom+i)
               enddo
             endif
             
-            write(*,'("Modify (number), create (max+1) or exit (0): ")',advance = 'no')
+            write(*,'(1x,a,"Modify (number), create (max+1) or exit (0): ")',advance = 'no') space
             read(*,*) j
+            i = j-n_atom-1
             
-            if(j>n_pseudo_max) then
-              write(*,*) 'Maximum number of pseudo-atoms reached, consider modifying existing ones'
-              write(*,'("Modify (number): ")',advance = 'no')
-              read(*,*) j
-              j = j-n_atom
-            endif
-              
-            if(j<=0) then
+            if(i<0) then
               exit pseudo_loop
-            elseif(j==1) then
-              write(*,*) 'The TOT pseudo cannot be modified'
+            elseif(i==0) then
+              print *,space, 'The TOT pseudo cannot be modified'
               cycle pseudo_loop
-            elseif(j>1.and.j<=n_pseudo) then
-              write(*,'("New indices: ")',advance = 'no')
-              read(*,*)ind_pseudo(:,j)
+            elseif(i>=1.and.i<=n_pseudo_max) then
+             if(i>n_pseudo) then
+              n_pseudo = n_pseudo+1
+              i = n_pseudo
+              endif
+              write(*,'(1x,a,"Type pseudo_atom name (<=4 char) & masks (n_atom): ")',advance = 'no') prompt
+              read(*,*) at_name_pseudo(n_atom+i+1),ind_pseudo(:,n_atom+i+1)
               cycle pseudo_loop
             else
-              write(*,'("Type pseudo_atom name (<=4 char): ")',advance = 'no')
-              read(*,*) at_name_pseudo(n_pseudo+1)
-              write(*,'("Type pseudo_atom indices (n_atom): ")',advance = 'no')
-              read(*,*)ind_pseudo(:,n_pseudo+1)
-              n_pseudo = n_pseudo+1
+              write(*,'(1x,a,"Index out of range (possibly increase N_PSEUDO_MAX in .PAR")',advance = 'no') space
               cycle pseudo_loop
             endif 
           enddo pseudo_loop                
@@ -2020,15 +1999,15 @@ program mp_pdf55
 
         case(8)
           if(j_ext/=0) deallocate(x_ext,y_ext)
-          write(*,*) 'Confirm or modify input file name ("=" close file):'
+          print *,prompt, 'Confirm or modify input file name ("=" close file):'
           read(*,*) file_inp
           if(index(file_inp,'=')/=0) then
             j_ext = 0
             cycle way_point
           else
             open(4,file=trim(file_inp),iostat=ios)
-            if(ios.ne.0) write(*,*) 'File ',trim(file_inp),' not opened! IOS =',ios
-            write(*,*) 'number of lines to skip, to read, column X, column Y(1) ... Y(4)? (pad by 0 for not used)'
+            if(ios.ne.0) print *,space, 'File ',trim(file_inp),' not opened! IOS =',ios
+            print *,prompt, 'number of lines to skip, to read, column X, column Y(1) ... Y(4)? (pad by 0 for not used)'
             read(*,*) n_ext_skip,n_x,j_x,ind_ext
 
             n_part_ext = 0
@@ -2036,7 +2015,7 @@ program mp_pdf55
               if(ind_ext(j)>0) n_part_ext = n_part_ext+1
             enddo
             if(n_part_ext==0) then
-              write(*,*) 'Number of external data columns must be >0'
+              print *,space, 'Number of external data columns must be >0'
               cycle way_point
             endif
           
@@ -2057,7 +2036,7 @@ program mp_pdf55
           
             do i=1,n_x
               read(4,*,iostat=ios) data_in(1:n_line)
-              if(i==1) write(*,*) data_in(1:n_line)
+              if(i==1) print *,space, data_in(1:n_line)
               if(ios==-1) then
                 n_x = i-1
                 exit
@@ -2068,7 +2047,7 @@ program mp_pdf55
               enddo
             enddo
             close(4)
-            write(*,*) n_x,'data points read in'
+            print *,space, n_x,'data points read in'
             j_ext = 1
            endif 
            cycle way_point
@@ -2078,7 +2057,7 @@ program mp_pdf55
 
         case(10) 
           do
-            write(*,*) 'Select the output MODE: ',(j,'  ',trim(pdf_out(j)),j=1,n_mode),'_unscaled'
+            print *,prompt, 'Select the output MODE: ',(j,'  ',trim(pdf_out(j)),j=1,n_mode),'_unscaled'
             read(*,*) j_mode         
             if(j_mode>=1.and.j_mode<=n_mode) exit plot_loop
           enddo
@@ -2110,18 +2089,18 @@ FUNCTION rand(idum)
   INTEGER(4) idum,IA,IM,IQ,IR,MASK
   PARAMETER (IA=16807,IM=2147483647,IQ=127773,IR=2836,MASK=123459876)
   INTEGER(4) k,rand
-!       write(*,*) 'R: idum0',idum
+!       print *,'R: idum0',idum
   idum=ieor(idum,MASK)
-!      write(*,*) 'R: idum1',idum
+!      print *,'R: idum1',idum
   k=idum/IQ
-!     write(*,*) 'R: k',k
+!     print *,'R: k',k
   idum=IA*(idum-k*IQ)-IR*k
-!     write(*,*) 'R: idum2',idum
+!     print *,'R: idum2',idum
   rand = idum-IM/2
-!     write(*,*) 'R: rand',rand
+!     print *,'R: rand',rand
   idum=ieor(idum,MASK)
-!     write(*,*) 'R: idum2',idum
-!     write(*,*) 
+!     print *,'R: idum2',idum
+!     print *,
   return
 END      
       

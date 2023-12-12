@@ -101,6 +101,7 @@ program mp_dbin55
 
   logical :: found,found_txt,t_single
   character(4)   :: at_name_in,at_name_in2,at_name_in3,head,sim_type_lc,pg_out,version
+  character(10)	 :: prompt,space = '          '
   character(10)  :: c_date,c_time,c_zone,ext,number
   character(16)  :: filter_name,pos_units
   character(40)  :: subst_name,string,section,mp_tool
@@ -157,10 +158,11 @@ program mp_dbin55
 ! 
 ! ********************* Initialization *******************************      
   version = '1.56'
+  prompt = 'MP_DBIN>  '
   mp_tool = 'MP_DBIN '//version
 
-  write(*,*) '*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
-  write(*,*)
+  print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
+  print *
   dat_source = 'MP_TOOLS'
 
 ! ********************* Get a time stamp and open a .LOG file *******************************
@@ -204,13 +206,13 @@ program mp_dbin55
   pos_units = 'ANGSTROM'
    
 ! *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
-  write(*,*) 'Parameter file name (.par will be added)'
+  print *,prompt, 'Parameter file name (.par will be added)'
   read(*,*) file_par
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) 'File ',trim(file_inp),' not found! Stop execution.'
+    print *,space, 'File ',trim(file_inp),' not found! Stop execution.'
     stop
   endif
 
@@ -229,7 +231,7 @@ program mp_dbin55
   call up_case(pos_units)
   
   if(pos_units/='ANGSTROM') then
-    write(*,*) 'Position units ', trim(pos_units),' not implemented with DL_POLY data type, ANGSTROM needed! '
+    print *,space, 'Position units ', trim(pos_units),' not implemented with DL_POLY data type, ANGSTROM needed! '
     stop
   endif
   
@@ -237,7 +239,7 @@ program mp_dbin55
   if(ext/=''.and.index(ext,'.')==0) ext='.'//ext
 
   string = subst_name
-  write(*,*) 'Substance name (confirm, &append or replace): ', string
+  print *,prompt, 'Substance name (confirm, &append or replace): ', string
   read(*,*) string
   string = trim(adjustl(string))
   if(string/=subst_name) then
@@ -248,9 +250,9 @@ program mp_dbin55
     endif
   endif
 
-  write(*,*) 
-  write(*,*) 'Substance name: ', subst_name
-  write(*,*) 'Sim_type, dat_type, input method, position units: ',sim_type,dat_type,input_method,pos_units		
+  print *
+  print *,space, 'Substance name: ', subst_name
+  print *,space, 'Sim_type, dat_type, input method, position units: ',sim_type,dat_type,input_method,pos_units		
   
   allocate(at_name_par(n_atom),at_label(n_atom),at_base_in(n_atom,3),at_base(n_atom,3))   !at_base would include at_base_shift & saved in data file header
   allocate(ind_l(n_atom),i_site(n_atom,n_atom),at_occup(n_atom))
@@ -264,7 +266,7 @@ program mp_dbin55
   do
     read(4,'(a)',iostat=ios) string
     if(ios/=0) then
-      write(*,*) 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
+      print *,space, 'Section title:  ',trim(section),'  not found, check ', trim(file_inp)
       stop
     endif
     if(string(1:6).eq.section) exit	!find the mp_simple part of the .par file
@@ -294,28 +296,28 @@ program mp_dbin55
   enddo
   
   n_label = j_label
-  write(*,*) 'Atom labels ',n_label
+  print *,space, 'Atom labels ',n_label
   do j=1,n_label
-    write(*,*) ind_l(j),at_label(j),(i_site(j,i),i=1,ind_l(j))
+    print *,space, ind_l(j),at_label(j),(i_site(j,i),i=1,ind_l(j))
   enddo	
 
-  write(*,*) trim(subst_name),' structure info (atoms): '	  
+  print *,space, trim(subst_name),' structure info (atoms): '	  
   do j=1,n_atom
     if(input_method=='CELL'.or.input_method=='FAST') then
-      write(*,*) j,at_name_par(j),at_base_in(j,:)
+      print *,space, j,at_name_par(j),at_base_in(j,:)
     else
-      write(*,*) j,at_name_par(j)
+      print *,space, j,at_name_par(j)
     endif
   enddo 
 			
   angle = 90.				!assuming orthogonal lattice
 
-  write(*,*) 'Read snapshots number: min, max'
+  print *,prompt, 'Read snapshots number: min, max'
   read(*,*) nfile_min, nfile_max 
   nfile_step = 1
 
   write(9,*) 'Read snapshots number: min, step, max',nfile_min, nfile_step,nfile_max
-  write(*,*) 'Saved snapshot numbers start:'
+  print *,prompt, 'Saved snapshot numbers start:'
   read(*,*) n_save_min 
   write(9,*) 'Saved snapshot numbers start:',n_save_min   
    
@@ -324,10 +326,10 @@ program mp_dbin55
   i_save = n_save_min
   i_traj = 0
 
-  write(*,*) 'Master for MD trajectory filename: '
+  print *,prompt, 'Master for MD trajectory filename: '
   read(*,*) file_master
 
-  write(*,*) 'Read input files number (0 0 no numbers): min,max'
+  print *,prompt, 'Read input files number (0 0 no numbers): min,max'
   read(*,*) nt_min,nt_max
   nt_step = 1
   t_single = (nt_min==0.and.nt_max==0)
@@ -351,11 +353,11 @@ program mp_dbin55
 
   file_inp = trim(data_path)//trim(adjustl(file_trajectory))//trim(ext)
 
-  write(*,*) 'Input trajectory file:  ',trim(file_inp)
+  print *,space,'Input trajectory file:  ',trim(file_inp)
 
   open (1,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) "Can't open the file ",trim(file_inp),'!'
+    print *,space, "Can't open the file ",trim(file_inp),'!'
     stop
   endif
 
@@ -374,7 +376,7 @@ program mp_dbin55
       exit
     endif        
     if(i.eq.nskip) then
-      write(*,*) 'MP_BIN: trajectory header not found'
+      print *,space, 'MP_BIN: trajectory header not found'
       stop
     endif
   enddo 
@@ -393,10 +395,10 @@ program mp_dbin55
                                                                   !n_tot_in total number of atoms in cells n_atom*nrow**3
                                                                      
   if(n_cond==0) then
-    write(*,*) 'Non-periodic boundary conditions! Continue? (1/0)'
+    print *,prompt, 'Non-periodic boundary conditions! Continue? (1/0)'
     read(*,*) j
     if(j==0) stop
-    write(*,*) 'This may have adverse effects on further treatment ...'		  
+    print *,space, 'This may have adverse effects on further treatment ...'		  
   endif
                                                                   
   do j=1,3
@@ -413,26 +415,26 @@ program mp_dbin55
   angle(3) = dot_product(a_cell(1,:),a_cell(2,:))/(a_par(1)*a_par(2))
   angle = acos(angle)
 
-  if(j_verb==1) then
-    write(*,*) 'angle_rad',angle
-    write(*,*) 'angle_deg',angle*180./pi
-  endif
+!   if(j_verb==1) then
+!     print *,'angle_rad',angle
+!     print *,'angle_deg',angle*180./pi
+!   endif
 
   a_cell_1 = a_cell
   call gjinv(a_cell_1,3,3,a_cell_inv,3,ierr)
   if(ierr==1) then
-    write(*,*) 'Singular cell vector matrix, check your HISTORY file!'
+    print *,space, 'Singular cell vector matrix, check your HISTORY file!'
     stop
   endif
   
   if(j_verb==1) then
-    write(*,*) 'a_cell'
+    print *,space, 'a_cell'
     do k=1,3
-      write(*,*) a_cell(k,:)
+      print *,space, a_cell(k,:)
     enddo
-    write(*,*) 'a_cell_inv'
+    print *,space, 'a_cell_inv'
     do k=1,3
-      write(*,*) a_cell_inv(k,:)
+      print *,space, a_cell_inv(k,:)
     enddo
   endif	
 
@@ -458,44 +460,44 @@ program mp_dbin55
 ! *** analyse the input
   if(at_name_in.eq.at_name_in2) then
     j_shell = 0				
-    write(*,*) 'No shells'               !', supercell is:',nrow,'^3',' j_shell =,',j_shell
+    print *,space, 'No shells'               !', supercell is:',nrow,'^3',' j_shell =,',j_shell
   else if(trim(at_name_in)//'s'.eq.at_name_in2.and.at_name_in.eq.at_name_in3) then
     j_shell = 1
     n_tot_in = n_tot_in/2
-    write(*,*) 'Found a shell candidate   ',at_name_in2		!,' j_shell =',j_shell    !', supercell is:',nrow,'^3'
+    print *,space, 'Found a shell candidate   ',at_name_in2		!,' j_shell =',j_shell    !', supercell is:',nrow,'^3'
   else
-    write(*,*) 'Strange primary data, please check them!'
-    write(*,*) at_name_in,trim(at_name_in)//'s'
-    write(*,*) at_name_in2
-    write(*,*) at_name_in3
+    print *,space, 'Strange primary data, please check them!'
+    print *,space, at_name_in,trim(at_name_in)//'s'
+    print *,space, at_name_in2
+    print *,space, at_name_in3
     stop
   endif
   
   if(n_traj==0) then
-    write(*,*) 'Type in nominal temperature [K]:'
+    print *,prompt, 'Type in nominal temperature [K]:'
     read(*,*) temp_par
   endif
   
   if(n_traj>=1.and.at_veloc_in(1)==at_veloc2(1).and.at_veloc_in(2)==at_veloc2(2).and.at_veloc_in(3)==at_veloc2(3)) then
-    write(*,*) 'Strange velocities:'
-    write(*,*) at_veloc_in   
-    write(*,*) at_veloc2          
-    write(*,*) 'Type in nominal temperature [K]:'
+    print *,space, 'Strange velocities:'
+    print *,space, at_veloc_in   
+    print *,space, at_veloc2          
+    print *,prompt, 'Type in nominal temperature [K]:'
     read(*,*) temp_par
   endif
   
   if(j_shell==1) then
-    write(*,*)'Core & shell data found'
-    if(j_shrec==0) write(*,*)'Shell data NOT to be recorded (change this in .PAR)'
-    if(j_shrec==1) write(*,*)'Shell data WILL be recorded'
+    print *,space,'Core & shell data found'
+    if(j_shrec==0) print *,space,'Shell data NOT to be recorded (change this in .PAR)'
+    if(j_shrec==1) print *,space,'Shell data WILL be recorded'
     if(j_shrec==1) write(9,*)'Shell data WILL be recorded'
   endif
   j_shell_out = j_shell*j_shrec
 
-  write(*,*) 'Simulation type = ',sim_type
-  write(*,*) 'Trajectory recording mode =', n_traj
-  write(*,*) 'Boundary conditions ', n_cond
-  write(*,*) 'Trajectory time start [ps]:',t_dump
+  print *,space, 'Simulation type = ',sim_type
+  print *,space, 'Trajectory recording mode =', n_traj
+  print *,space, 'Boundary conditions ', n_cond
+  print *,space, 'Trajectory time start [ps]:',t_dump
   if(n_traj==0) write(9,*) 'Using nominal temperature [K] ',temp_par
 
   write(9,*) 'Simulation type = ',sim_type
@@ -507,7 +509,7 @@ program mp_dbin55
 ! *** handle the supercell parameters and the origin of the supercell coordinate system
   if(input_method=='CELL'.or.input_method=='FAST') then
     if(nsuper==1) then
-      write(*,*) 'CELL and FAST input methods not compatible with N_ROW = 1; use BULK'
+      print *,space, 'CELL and FAST input methods not compatible with N_ROW = 1; use BULK'
       stop
     endif
     n_tot = n_atom*nsuper
@@ -533,6 +535,7 @@ program mp_dbin55
   ifile = 1
 
   trajectory_loop: do i_traj=nt_min,nt_max
+    print *
     if(t_single) then
       file_trajectory = file_master
     else
@@ -549,13 +552,13 @@ program mp_dbin55
 
     file_inp = trim(data_path)//trim(adjustl(file_trajectory))//trim(ext)
 
-    write(*,*) 'Input trajectory file:  ',trim(file_inp)
+    if(.not.t_single) print *,space, 'Input trajectory file:  ',trim(file_inp)
 
     t1 = .0
     do 
       inquire (file=file_inp,exist=found)
       if(.not.found) then
-        if(t1==0.) write(*,*) 'File ',trim(file_inp),' not found! Waiting for it ...'			!if(t1==0.) 
+        if(t1==0.) print *,space, 'File ',trim(file_inp),' not found! Waiting for it ...'			!if(t1==0.) 
         CALL SLEEP(10)
         t1 = t1+10.
       else
@@ -565,7 +568,7 @@ program mp_dbin55
 
   open (1,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
-    write(*,*) "Can't open the file ",trim(file_inp),'!'
+    print *,space, "Can't open the file ",trim(file_inp),'!'
     stop
   endif
     
@@ -578,13 +581,13 @@ program mp_dbin55
     do 						
       read(1,*,iostat=ios) line
       if(ios<0) then   !end of file 
-!!						write(*,*) 'End of trajectory file: ',ios
+!!						print *,'End of trajectory file: ',ios
         exit frame_loop 
       endif 
 !!          if(ios>0) cycle     !corrupt input data, go on
       if(ios>0) then
-        write(*,*) 'Line after:',line
-        write(*,*) 'Input error, corrupt trajectory data?'
+        print *,space, 'Line after:',line
+        print *,space, 'Input error, corrupt trajectory data?'
         stop
       endif
       if(index(line,head).ne.0) exit
@@ -622,14 +625,12 @@ program mp_dbin55
         
     if(i_traj==nt_min.and.ifile==nfile_min) then
       if(nsuper/=1) then
-        write(*,*) 'Lattice parameter estimate =',a_par 
+        print *,space, 'Lattice parameter estimate =',a_par 
       else
-        write(*,*) 'Simulation box size =',a_par
+        print *,space, 'Simulation box size =',a_par
       endif			
     endif
     
-!     if(j_verb==1) write(*,*) 'at_pos_centre',at_pos_centre
-
     angle(1) = dot_product(a_cell(2,:),a_cell(3,:))/(a_par(2)*a_par(3))
     angle(2) = dot_product(a_cell(1,:),a_cell(3,:))/(a_par(1)*a_par(3))
     angle(3) = dot_product(a_cell(1,:),a_cell(2,:))/(a_par(1)*a_par(2))
@@ -638,7 +639,7 @@ program mp_dbin55
     a_cell_1 = a_cell
     call gjinv(a_cell_1,3,3,a_cell_inv,3,ierr)       !!! a_cell would get destroyed here !!!
     if(ierr==1) then
-      write(*,*) 'Singular cell vector matrix, check your HISTORY file!'
+      print *,space, 'Singular cell vector matrix, check your HISTORY file!'
       stop
     endif 
 
@@ -657,7 +658,7 @@ program mp_dbin55
     endif
      
 ! ***  read-in the text of a snapshot in one go
-    if(ifile==nfile_min) write(*,*) 'reading the 1st snapshot (takes a few seconds) ...'
+    if(ifile==nfile_min) print *,space, 'reading the 1st snapshot (takes a few seconds) ...'
 
     allocate(at_pos_c(4,n_tot),SOURCE=0.0)
     if(n_traj>=1) allocate(at_veloc_c(4,n_tot),SOURCE=0.0)
@@ -678,12 +679,9 @@ program mp_dbin55
 ! *** first read the CORE data  
 
       read(1,*,iostat=ios_t) at_name_in,at_no,at_mass_in,at_charge_in,at_displ_in
-        if(ios_t/=0) write(*,*) 'Error on ASCII input IOS: ',ios_t 
-!!						if(ios>0) cycle frame_loop     !corrupt input data, jump out to new snapshot
+        if(ios_t/=0) print *,space, 'Error on ASCII input IOS: ',ios_t 
 
       if(ios_t<0.or.at_name_in.eq.head) then 
-!!          	write(*,*) 'End of snapshot' 
-!!          	backspace(1)
         exit read_loop    !end of snapshot, end of file
       endif
 
@@ -693,7 +691,7 @@ program mp_dbin55
 
       if(n_traj>=1) read(1,*,iostat=ios_t) at_veloc_in
       if(ios_t/=0) then
-        write(*,*) 'Input problem: ios_t,inrec,ifile,at_name_in,head',ios_t,inrec,ifile,at_name_in,head
+        print *,space, 'Input problem: ios_t,inrec,ifile,at_name_in,head',ios_t,inrec,ifile,at_name_in,head
       endif
       if(n_traj==2) read(1,*) at_force_in
 
@@ -702,7 +700,7 @@ program mp_dbin55
       if(j_shell.eq.1) then
         read(1,*) at_name_in2,at_no,at_mass_in2,at_charge_in2,at_displ_in
         if(trim(at_name_in)//'s'.ne.at_name_in2) then
-          write(*,*)'wrong core-shell sequence',inrec,at_name(inrec),at_name_in
+          print *,space,'wrong core-shell sequence',inrec,at_name(inrec),at_name_in
           stop
         endif
         read(1,*) at_pos_in2
@@ -722,7 +720,7 @@ program mp_dbin55
           endif
         enddo
         if(jl.ne.j) then			!after "normal" loop exit
-          write(*,*) 'atom ',at_name_in,' not found in .PAR'
+          print *,space, 'atom ',at_name_in,' not found in .PAR'
           stop
         endif
       else
@@ -733,7 +731,7 @@ program mp_dbin55
           endif
         enddo
         if(jl.ne.j) then			!after "normal" loop exit
-          write(*,*) 'atom ',at_name_in,' not found in .PAR'
+          print *,space, 'atom ',at_name_in,' not found in .PAR'
           stop
         endif
       endif
@@ -741,11 +739,9 @@ program mp_dbin55
 ! *** transform the atom positions to pseudo-cubic r.l.u. coordinates 
 ! *** DL_POLY data are always CENTRED and in ANGSTROM units  
 !
-!         if(nsuper/=1) then
         at_pos_in = matmul(a_cell_inv,at_pos_in)    			! at_pos_in are in Eucleidian direct space coordinates, we need to get them into the lattice coordinates to be able to use periodic boundary contions for FT
                                                           ! for nsuper=1 nothing happens as a_cell and a_cell_inv are unit matrices
         if(j_shell_out==1) at_pos_in2 = matmul(a_cell_inv,at_pos_in2)     
-!         endif
         
 ! *** index BULK data 
       if(input_method=='BULK') then         !jl identifes label (chem species), jat basis position in CELL
@@ -773,25 +769,24 @@ program mp_dbin55
                 if(maxval(abs(pos_inp-anint(pos_inp))).le.eps_x) exit !atom found
               enddo
               if(maxval(abs(pos_inp-anint(pos_inp))).gt.eps_x) then
-                write(*,*) 'Identification by position not succeeded: frame, record, atom ',ifile,inrec,at_label(jl)
-                write(*,*) 'Input position ',at_pos_in
-                write(*,*) 'Candidates (JAT, ATOM, BASIS POSITION, MAX_DIFF,EPS_X): '
+                print *,space, 'Identification by position not succeeded: frame, record, atom ',ifile,inrec,at_label(jl)
+                print *,space, 'Input position ',at_pos_in
+                print *,space, 'Candidates (JAT, ATOM, BASIS POSITION, MAX_DIFF,EPS_X): '
                 do ii=1,ind_l(jl)
                   pos_inp = at_pos_in-at_base_in(i_site(jl,ii),:)
-                  write(*,*) i_site(jl,ii),at_name_par(i_site(jl,ii)),at_base_in(i_site(jl,ii),:),maxval(abs(pos_inp-anint(pos_inp))),eps_x
+                  print *,space, i_site(jl,ii),at_name_par(i_site(jl,ii)),at_base_in(i_site(jl,ii),:),maxval(abs(pos_inp-anint(pos_inp))),eps_x
                 enddo
-                write(*,*) 'Type JAT and confirm/modify AT_POS_IN:'
+                print *,prompt, 'Type JAT and confirm/modify AT_POS_IN:'
                 read(*,*) jat,at_pos_in
-                write(*,*) 'Other possible solutions:'
-                write(*,*) '  1/check the ATOMS basis, 2/ try to slightly increase EPS_X, 3/ use the BULK input method, 4/edit the trajectory file '
-                write(*,*) '      (working ...) '
+                print *,space, 'Other possible solutions:'
+                print *,space, '  1/check the ATOMS basis, 2/ try to slightly increase EPS_X, 3/ use the BULK input method, 4/edit the trajectory file '
+                print *,space, '      (working ...) '
               endif
             endif
           endif     
         endif     !j_basis
 
 !! *** calculate cell indices ix,iy,iz from atomic positions shifted to cell origin 
-!           write(*,*) 'at_pos_in,at_base_in(jat,:),at_ind_base',at_pos_in,at_base_in(jat,:),at_ind_base
 
         at_ind_in = anint(at_pos_in-at_base_in(jat,:))+at_ind_base  !they will serve as pointers to the right order of atom records
         at_pos_in = at_pos_in+at_base_shift			!now the supercell will be centred & basis origin in at_base_shift
@@ -808,19 +803,16 @@ program mp_dbin55
         jrec = nsuper*(jat-1)+nlayer*(at_ind_in(3)-1)+n_row(1)*(at_ind_in(2)-1)+at_ind_in(1)
       
         if(jrec>n_tot.or.jat<1.or.jat>n_atom) then
-          write(*,*) 'JREC wrong:',jrec,' > ',n_tot,' check n_tot_in, n_row and j_centred in the .PAR'
-          write(*,*) 'jrec,at_ind_in',jrec,at_ind_in
-          write(*,*) 'at_pos_in',at_pos_in,at_pos_in2
-          write(*,*) 'n_tot,nsuper,nlayer,n_row',n_tot,nsuper,nlayer,n_row
+          print *,space, 'JREC wrong:',jrec,' > ',n_tot,' check n_tot_in, n_row and j_centred in the .PAR'
+          print *,space, 'jrec,at_ind_in',jrec,at_ind_in
+          print *,space, 'at_pos_in',at_pos_in,at_pos_in2
+          print *,space, 'n_tot,nsuper,nlayer,n_row',n_tot,nsuper,nlayer,n_row
           stop
         endif
 
         at_ind(1:3,jrec) = at_ind_in
         at_ind(4,jrec) = jat
       endif		!input_method CELL
-
-!           write(*,*) 'jrec,at_pos_in,at_ind(:,jrec)',jrec,at_pos_in,at_ind(:,jrec) 
-!           read(*,*)
      
 ! *** enforce atom positions within the box limits by periodic boundary conditions (in case non-periodic case these atoms have no weight due to the FT window; for nsuper=1 no need - it's guaranteed) 
 !
@@ -835,16 +827,10 @@ program mp_dbin55
         enddo
       endif
 
-!           write(*,*) '5 jrec,at_pos_in,at_ind(:,jrec)',jrec,at_pos_in,at_ind(:,jrec) 
-!           read(*,*)
-
 ! *** prepare the output data     ! at_pos_in for BULK with n_row=1 will be recorded in ANGSTROM units 
 !
       at_pos_c(1:3,jrec) = at_pos_in     
       at_pos_c(4,jrec) = at_charge_in	
-
-!           write(*,*) '6 jrec,at_pos_c(1:4,jrec),at_ind(:,jrec)',jrec,at_pos_c(1:4,jrec),at_ind(:,jrec) 
-!           read(*,*)
 
       if(n_traj>=1) then
         at_veloc_c(1:3,jrec) = at_veloc_in
@@ -892,7 +878,7 @@ program mp_dbin55
 
     call cpu_time(t2)
     if(i_traj==nt_min.and.ifile==nfile_min) then												!analyze in detail the 1st snapshot
-      write(*,*) '1st snapshot: total of',jrec,' atoms read in',t2-t1,' sec'
+      print *,space, '1st snapshot: total of',jrec,' atoms read in',t2-t1,' sec'
     endif
      
 ! *** normalize the kinetic energy and get the true temperature  				
@@ -903,9 +889,9 @@ program mp_dbin55
       enddo
 
       if(j_verb==1.and.i_traj==nt_min.and.ifile==nfile_min) then
-        write(*,*)
-        write(*,*) 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
-        if(j_shell.eq.1) write(*,*) 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
+        print *
+        print *,space, 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
+        if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
       endif
 
 ! *** get the true temperature
@@ -915,22 +901,22 @@ program mp_dbin55
         temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B) !the true temperature
         if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
           temp = (temp_r_c+temp_r_s)*.5						!hi-T limit: independent C and S vibrations
-          if(j_read.le.j_test) write(*,*) 'Hi-T limit: independent C and S vibrations'
+          if(j_read.le.j_test) print *,space, 'Hi-T limit: independent C and S vibrations'
         else
           temp = temp_r_c+temp_r_s	!low-T limit: strongly bound C and S vibrations
-          if(j_read.le.j_test) write(*,*) 'Low-T limit: strongly bound C and S vibrations'
+          if(j_read.le.j_test) print *,space, 'Low-T limit: strongly bound C and S vibrations'
         endif        
-        if(j_read.le.j_test) write(*,*) 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
+        if(j_read.le.j_test) print *,space, 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
         if(j_read.le.j_test) write(9,*) 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
       else
         temp = temp_r_c
         temp_r_s = .0
-        if(j_read.le.j_test) write(*,*) 'Real temperature: cores only ',temp
+        if(j_read.le.j_test) print *,space, 'Real temperature: cores only ',temp
         if(j_read.le.j_test) write(9,*) 'Real temperature: cores only ',temp
       endif
     else
       temp = temp_par
-      if(j_read.le.j_test) write(*,*) 'Using nominal temperature [K] ',temp
+      if(j_read.le.j_test) print *,space, 'Using nominal temperature [K] ',temp
     endif
       
        
@@ -941,17 +927,17 @@ program mp_dbin55
     if(input_method=='CELL'.or.input_method=='FAST') then
       at_occup_r = (1.*nsuper_r)/nsuper
       if(i_traj==nt_min.and.ifile==nfile_min) then
-        write(*,*) 'Occupancies: nominal 		real'
+        print *,space, 'Occupancies: nominal 		real'
         do ii=1,n_atom
-          write(*,*) '     ',at_name_out(ii),at_occup(ii),at_occup_r(ii)
+          print *,space, '     ',at_name_out(ii),at_occup(ii),at_occup_r(ii)
         enddo
       endif
     else 
       at_occup_r = nsuper_r/real(n_tot)
       if(i_traj==nt_min.and.ifile==nfile_min) then
-        write(*,*) 'Bulk concentrations:'
+        print *,space, 'Bulk concentrations:'
         do ii=1,n_atom
-          write(*,*) '     ',at_name_out(ii),at_occup_r(ii)
+          print *,space, '     ',at_name_out(ii),at_occup_r(ii)
         enddo
       endif
     endif 		!i_traj==nt_min.and.ifile==nfile_min   
@@ -968,7 +954,7 @@ program mp_dbin55
       file_dat = './data/'//trim(file_par)//'_n'//trim(adjustl(string))//'.dat'
     endif
 
-    if(i_save==n_save_min.or.i_save==10*(i_save/10)) write(*,*)trim(file_dat)
+    if(i_save==n_save_min.or.i_save==10*(i_save/10)) print *,space,trim(file_dat)
     i_save = i_save+1
 
     call cpu_time(t1)
@@ -981,7 +967,7 @@ program mp_dbin55
       n_head = 4                        !number of header lines for non-orthogonal lattices
     endif
     write(string,*) n_head
-    if(j_verb==1.and.ifile==nfile_min) write(*,*) 'n_head',n_head
+    if(j_verb==1.and.ifile==nfile_min) print *,space, 'n_head',n_head
 
     header_record = dat_source//version//string//'   '//trim(time_stamp)
     i_rec = 1
@@ -1010,7 +996,6 @@ program mp_dbin55
     i_rec = i_rec+1
     write(2,rec=i_rec)rec_zero										!the last one has to be padded by 0
     write(2,rec=i_rec) (at_ind(:,jr(ii)),ii=(i-1)*l_rec4+1,n_tot) 
-!!				write(*,*)'at_ind,i_rec',i_rec
     
     do i=1,n_rec-1
       i_rec = i_rec+1
@@ -1075,12 +1060,11 @@ program mp_dbin55
         write(2,rec=i_rec) (at_force_s(:,jr(ii)),ii=(i-1)*l_rec4+1,n_tot)
       endif
     endif 
-!!  				write(*,*)'at_shells,i_rec',i_rec
 
     close(2)
 
     if(j_verb==1.and.ifile==nfile_min)         call cpu_time(t2)
-    if(j_verb==1.and.ifile==nfile_min) write(*,*)'New binary output',t2-t1,' sec'
+    if(j_verb==1.and.ifile==nfile_min) print *,space,'New binary output',t2-t1,' sec'
   
       backspace(1) 
 
@@ -1097,14 +1081,13 @@ program mp_dbin55
 
     enddo frame_loop
     close(1) 
-!!				write(*,*) 'End frame_loop, i_traj',i_traj
 
   enddo trajectory_loop
   deallocate(at_name,at_ind,e_kin,at_occup_r,nsuper_r,i_series)
     if(j_shell.eq.1) deallocate(e_kin_s)
   
   CALL SYSTEM_CLOCK (COUNT = sc_c2)
-  write(*,*) 'Trajectory files finished: ',i_save-n_save_min,' .dat files written in',(sc_c2-sc_c1)/sc_r,' sec (SYS)'
+  print *,space, 'Trajectory files finished: ',i_save-n_save_min,' .dat files written in',(sc_c2-sc_c1)/sc_r,' sec (SYS)'
   write(9,*) 'Trajectory files finished: ',i_save-n_save_min,' .dat files written in',(sc_c2-sc_c1)/sc_r,' sec (SYS)'
   write(9,*) 
 
