@@ -1781,7 +1781,11 @@ program mp_pdf55
         if(ind_part(1,j)==0.or.ind_part(2,j)==0) cycle
         if(part_scale(j)==0) cycle
         CALL PGSCI (j+1)  !red-green-blue
-        CALL PGSLW(2)
+        if (j_mode==5.or.tot_scale==0)then
+          CALL PGSLW(5)
+        else
+          CALL PGSLW(2)
+        endif
         CALL PGLINE(n_plot,x(i_start:i_end),part_scale(j)*rdf_p2_plot(ind_part(1,j),ind_part(2,j),i_start:i_end))  !plots the curve
         write(plot_title,'(a,a," x",f7.3)') at_name_plot(ind_part(1,j)),at_name_plot(ind_part(2,j)),part_scale(j)
         y_plot = y_plot-.04*(c_max-c_min)
