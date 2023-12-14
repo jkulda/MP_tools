@@ -297,6 +297,48 @@ program mp_sqom55
   endif 
   close(1)
 
+! **** for a TIMESTEP snapshot sequence open a second data file to check the time step between recorded snapshots
+
+  if(sim_type/='TIMESTEP') then
+    if(t_step_in/=.0) then
+      print *,space, ' Time step in data is',t_step
+      print *,space, ' For simulation type ',trim(sim_type),' putting t_step = .0 '
+      t_step = .0						!for total scattering (unrelated snapshots)
+    endif
+  elseif(sim_type=='TIMESTEP') then
+    if((nfile_min+nfile_step)<=9999) then     ! check real t_step from t_dump
+      write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
+    elseif((nfile_min+nfile_step)>=10000) then
+      write(string,'(i8)') nfile_min+nfile_step
+      file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
+    endif
+
+    open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
+    if(ios.ne.0) then
+      print *,space, 'File ',trim(file_dat),' not found! Stop execution.'
+      stop
+    endif
+
+    if(nml_in) then      !new structure with namelist
+      read(1,rec=2) header_record
+      read(header_record,nml=data_header_1)	
+      t1 = t_dump
+    else                                  !old w/o structure
+      read(1,rec=1) string16,string16,t_ms,t1						!char(16): sim_type,file_par, char(4): at_name
+    endif 
+    close(1)
+    t_step = t1-t0						!this is the "macroscopic" time step between recorded snapshots
+
+    if(abs(t_step-t_step_in)>.01*abs(t_step_in).and.nfile>1) then
+      print *,prompt, 'Not-matching values of t_step from data header and from t_dump difference :',t_step_in,t_step
+      print *,prompt, '    prefer the 1st or the 2nd value? (1/2)'
+      read(*,*) jj
+      if(jj==1) t_step = t_step_in
+    endif
+  endif
+  t_tot = (nfile-1)*t_step
+
+
 ! *** cell and box geometry
   nlayer = n_row(1)*n_row(2) 
   nsuper = n_row(1)*n_row(2)*n_row(3) 
@@ -445,7 +487,7 @@ program mp_sqom55
   string_in = subst_name
   print *,prompt, 'Substance name (confirm, &append or replace): ', string_in
   read(*,*) string_in
-  string = trim(adjustl(string_in))
+  string_in = trim(adjustl(string_in))
   if(string_in/=subst_name) then
     if(string_in(1:1)=='&') then
       subst_name = trim(subst_name)//string_in(2:)
@@ -539,47 +581,6 @@ program mp_sqom55
 !
 ! ********************* OpenMP initialization end *******************************      
 !
-
-! **** for a TIMESTEP snapshot sequence open a second data file to check the time step between recorded snapshots
-
-  if(sim_type/='TIMESTEP') then
-    if(t_step_in/=.0) then
-      print *,space, ' Time step in data is',t_step
-      print *,space, ' For simulation type ',trim(sim_type),' putting t_step = .0 '
-      t_step = .0						!for total scattering (unrelated snapshots)
-    endif
-  elseif(sim_type=='TIMESTEP') then
-    if((nfile_min+nfile_step)<=9999) then     ! check real t_step from t_dump
-      write(file_dat,'("./data/",a,"_n",i4.4,".dat")') trim(file_master),nfile_min+nfile_step
-    elseif((nfile_min+nfile_step)>=10000) then
-      write(string,'(i8)') nfile_min+nfile_step
-      file_dat = './data/'//trim(file_master)//'_n'//trim(adjustl(string))//'.dat'
-    endif
-
-    open (1,file=file_dat,status ='old',access='direct',action='read',form='unformatted',recl=4*l_rec,iostat=ios)
-    if(ios.ne.0) then
-      print *,space, 'File ',trim(file_dat),' not found! Stop execution.'
-      stop
-    endif
-
-    if(nml_in) then      !new structure with namelist
-      read(1,rec=2) header_record
-      read(header_record,nml=data_header_1)	
-      t1 = t_dump
-    else                                  !old w/o structure
-      read(1,rec=1) string16,string16,t_ms,t1						!char(16): sim_type,file_par, char(4): at_name
-    endif 
-    close(1)
-    t_step = t1-t0						!this is the "macroscopic" time step between recorded snapshots
-
-    if(abs(t_step-t_step_in)>.01*abs(t_step_in).and.nfile>1) then
-      print *,prompt, 'Not-matching values of t_step from data header and from t_dump difference :',t_step_in,t_step
-      print *,prompt, '    prefer the 1st or the 2nd value? (1/2)'
-      read(*,*) jj
-      if(jj==1) t_step = t_step_in
-    endif
-  endif
-  t_tot = (nfile-1)*t_step
 
 ! *** cycle over snapshot files to accumulate input data
 !
@@ -910,10 +911,10 @@ program mp_sqom55
   endif
 
     if(j_oneph==1) then
-      print *,space, 'Single-phonon FFT start'
+      print *,space, 'Single-phonon FFT start ...'
     else
-      if(j_fft==1) print *,space, 'FINUFFT start'
-      if(j_fft==0) print *,space, 'Simple FT start'
+      if(j_fft==1) print *,space, 'FINUFFT start ...'
+      if(j_fft==0) print *,space, 'Simple FT start ...'
     endif
       
     n_out = 0
@@ -1123,7 +1124,8 @@ program mp_sqom55
     call cpu_time(t2)
     CALL SYSTEM_CLOCK (COUNT = sc_c2)
     if(j_verb==1.and.nsuper==1) print *,space, 'Out-of-frame atoms total',n_out
-    if(j_verb==1) print *,space, 'FINUFFT on',nfile,'snapshots CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
+    print *,space, 'FINUFFT on',nfile,'snapshots CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
+    print *,space
       
 ! **** calculate the mean value over the whole trajectory, in fact the 0th component of timeFT = elastic scattering
 
@@ -1161,7 +1163,6 @@ program mp_sqom55
 !!							print *,'      10  Options: the time integration window width, FT window, weighting etc.'		
 !!							read(*,*) j_plot
 !!					endif
-
 
   dq_p = .0
 
@@ -1544,21 +1545,22 @@ program mp_sqom55
       CALL PGSLCT(map_unit(i_plot))
     endif
 
-    if(abs(j_plot)<=1) then
+
+    if(abs(j_plot)<=1) then  
       if(j_qsq==1) then
-        plot_title1 = 'S(Q)'//'  '//trim(file_master)//trim(masks)
+        plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q)'
       else
-        plot_title1 = 'S(Q)/Q**2'//'  '//trim(file_master)//trim(masks)
+        plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q)/Q**2'
       endif
     else
       if(j_sq==1) then
         if(j_qsq==1) then
-          plot_title1 = 'S(Q,ω)'//'  '//trim(file_master)//trim(masks)
+          plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q,ω)'
         else
-          plot_title1 = 'S(Q,ω)/Q**2'//'  '//trim(file_master)//trim(masks)
+          plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q,ω)/Q**2'
         endif
       else
-        plot_title1 = 'I(Q,t)'//'  '//trim(file_master)//trim(masks)
+        plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'I(Q,t)'
       endif           
     endif
 
@@ -1711,14 +1713,31 @@ program mp_sqom55
       TR(4) = -TR(6)
     endif
 
+! ***  re-generate 1st snapshot file name
+    jfile = nfile_min
+    if(t_single)then
+      write(file_dat,'("./data/",a,".dat")') trim(file_master)
+    else
+      if(jfile<=9999) then
+        write(file_dat,'(a,"_n",i4.4)') trim(file_master),jfile
+      elseif(jfile>=10000) then
+        write(string,'(i8)') jfile
+        file_dat = trim(file_master)//'_n'//trim(adjustl(string))
+      endif
+      write(string,'(i4.4)') nfile_max
+      file_dat = trim(file_dat)//'....'//trim(adjustl(string))//".dat"      
+    endif
+    
     call PGSLCT(map_unit(i_plot))
       CALL PGPAP(p_size,1.)     ! define the plot area as a square, the Qy range is adapted to match the real (Å-1) size of Qx
 
       if(j_disp==0) then
         if(abs(j_plot)<=1) then
-          write(plot_title2,'("  Q = [",3f6.2,"]  Total scattering  ",a,2x,a)') q_center,trim(at_weight_scheme(j_weight)),trim(mode)
+          write(plot_title2,'(a,"  Total scattering  ",a,2x,a)') trim(file_dat),trim(at_weight_scheme(j_weight)),trim(mode)
+!           write(plot_title2,'("  Q = [",3f6.2,"]  Total scattering  ",a,2x,a)') q_center,trim(at_weight_scheme(j_weight)),trim(mode)
         else 
-          write(plot_title2,'("  Q = [",3f6.2,"]  E =",f6.3," [THz]  dE =",f6.3," [THz] ",a,2x,a)') q_center,f_plot,f_width,trim(at_weight_scheme(j_weight)),trim(mode)
+!           write(plot_title2,'("  Q = [",3f6.2,"]  E =",f6.3," [THz]  dE =",f6.3," [THz] ",a,2x,a)') q_center,f_plot,f_width,trim(at_weight_scheme(j_weight)),trim(mode)
+          write(plot_title2,'(a,"  E =",f6.3," [THz]  dE =",f6.3," [THz] ",a,2x,a)') file_dat,f_plot,f_width,trim(at_weight_scheme(j_weight)),trim(mode)
         endif
 
         if(j_interp/=0) then
@@ -1870,7 +1889,8 @@ program mp_sqom55
       enddo
 
       write(9,*) 
-      write(9,*) 'Input files:  ',trim(file_dat_t0),' to ',trim(file_dat)
+      write(9,*) 'Substance:    ',subst_name
+      write(9,*) 'Input files:  ','./data/',trim(file_dat)
       write(9,*) '  t0,t_step,n_row(3),n_atom:',t0,t_step,n_row,n_atom
       write(9,*) '  temperature [K]',temp
       write(9,'(" Atoms:        ",20(a,3x))') (at_name_par(j),j=1,n_atom)
@@ -1911,14 +1931,15 @@ program mp_sqom55
       if(j_txt==1) then			
         print *,space, file_res
         open (3,file=file_res)																		!open the output file
-        write(3,*) '*****    MP_SQ49: total scattering cross-section     *****'
+        write(3,*) '*****    ',trim(mp_tool),': total scattering cross-section     *****'
         write(3,*) 
-        write(3,*) 'Input files:  ',trim(file_dat_t0),' to ',trim(file_dat)
+        write(3,*) 'Substance:    ',subst_name
+        write(3,*) 'Input files:  ','./data/',trim(file_dat)
         write(3,*) '  t0,t_step,n_row(3),n_atom:',t0,t_step,n_row,n_atom
         write(3,*) '  temperature [K]',temp
         write(3,'(" Atoms:        ",20(a,3x))') (at_name_par(j),j=1,n_atom)
         write(3,'(" Occupations:",20f7.3)') (at_occup_r(j),j=1,n_atom)
-        write(3,'(a," b_coh:      ",20f7.3)') trim(at_weight_scheme(j_weight)),(b_coh(j),j=1,n_atom)
+        write(3,'(1x,a," b_coh:      ",20f7.3)') trim(at_weight_scheme(j_weight)),(b_coh(j),j=1,n_atom)
         write(3,'(" Atom masks: ",i3,19i7)') (at_mask(j),j=1,n_atom)
         write(3,'(" Atom pair correlation: ",2i3)') j_atc1,j_atc2
         write(3,*) 'Time-integration (BN window FWHM) [ps]:',t_width

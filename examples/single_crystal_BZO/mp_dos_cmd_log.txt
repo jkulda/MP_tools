@@ -1,0 +1,43 @@
+2023-12-04 17:45:10 BZO> mp_dos6
+ *** Program MP_DOS 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_DOS>   Data file_master & file numbers (min, max):
+bzo200d 1 20
+           Input data:  MP_TOOLS        1.56           4
+ MP_DOS>   Parameter file name (.par to be added) (confirm or type other name): bzo200d
+,
+
+           Neutron scattering lengths:
+           Ba  Ba     5.07000017
+           Zr  Zr     7.15999985
+           O   O1     5.80299997
+           O   O2     5.80299997
+           O   O3     5.80299997
+ OMP processes requested  =            2
+           Input files:
+           ./data/bzo200d_n0001.dat
+           ./data/bzo200d_n0010.dat
+           ./data/bzo200d_n0020.dat
+                     20  files read in  0.213000014      sec SYS time
+
+           n_freq_plot          10
+           t_range [ps] =  0.760017395     t_step [ps] =   4.00009155E-02
+           freq_max [THz] =   12.4997139     freq_step_min [THz] =   1.31575930
+
+ MP_DOS>   Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT
+2
+ Atoms:             Ba      Zr      O1      O2      O3
+ Atoms no.:         1       2       3       4       5
+ Neutron weights:  25.7049 51.2656 33.6748 33.6748 33.6748
+           Actual masks:
+  1  1  1  1  1
+           Vibrational DOS:  BZO200d  T = 199.6 [K]  Neutron weights
+ MP_DOS>   c_min,c_max (0 0 exit, 1 1 exit & save (PS, txt))   0.00000000       2.50818706
+1 1
+
+           Text output:  bzo200d_dos_0001_0020_01.txt
+           PS output  :  bzo200d_dos_0001_0020_01.ps
+
+ MP_DOS>   Atom weights: 1= uniform, 2= neutron coherent (b_c^2); 0= EXIT
+0
+2023-12-04 17:47:36 BZO>

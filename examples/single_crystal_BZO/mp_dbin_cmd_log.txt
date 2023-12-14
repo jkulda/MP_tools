@@ -1,0 +1,51 @@
+2023-12-04 17:38:14 BZO> mp_dbin6
+ *** Program MP_DBIN 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_DBIN>  Parameter file name (.par will be added)
+bzo200d
+ MP_DBIN>  Substance name (confirm, &append or replace): BZO200d
+,
+
+           Substance name: BZO200d
+           Sim_type, dat_type, input method, position units: TIMESTEP        DL_POLY         CELL            ANGSTROM
+           Atom labels            3
+                      1 Ba             1
+                      1 Zr             2
+                      3 O              3           4           5
+           BZO200d structure info (atoms):
+                      1 Ba     0.00000000       0.00000000       0.00000000
+                      2 Zr    0.500000000      0.500000000      0.500000000
+                      3 O1    0.500000000      0.500000000       0.00000000
+                      4 O2     0.00000000      0.500000000      0.500000000
+                      5 O3    0.500000000       0.00000000      0.500000000
+ MP_DBIN>  Read snapshots number: min, max
+1 5
+ MP_DBIN>  Saved snapshot numbers start:
+1
+ MP_DBIN>  Master for MD trajectory filename:
+BZO200_dense
+ MP_DBIN>  Read input files number (0 0 no numbers): min,max
+0 0
+           Input trajectory file:  ./data/BZO200_dense.txt
+           Found a shell candidate   Bas
+           Core & shell data found
+           Shell data NOT to be recorded (change this in .PAR)
+           Simulation type = TIMESTEP
+           Trajectory recording mode =           2
+           Boundary conditions            3
+           Trajectory time start [ps]:   64.0400009
+
+           Lattice parameter estimate =   4.19393730       4.19393730       4.19393730
+           reading the 1st snapshot (takes a few seconds) ...
+           1st snapshot: total of      163840  atoms read in   2.42826509      sec
+           Low-T limit: strongly bound C and S vibrations
+           Real temperature: core/shell/total    180.498047       18.4861412       198.984192
+           Occupancies: nominal 		real
+                Ba     1.00000000       1.00000000
+                Zr     1.00000000       1.00000000
+                O1     1.00000000       1.00000000
+                O2     1.00000000       1.00000000
+                O3     1.00000000       1.00000000
+           ./data/bzo200d_n0001.dat
+           Trajectory files finished:            5  .dat files written in   12.7189999      sec (SYS)
+2023-12-04 17:42:34 BZO>

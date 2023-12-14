@@ -1,0 +1,113 @@
+2023-12-04 18:17:31 BZO> mp_sql6
+ *** Program MP_SQL 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_SQL>   Data file_master & file numbers (min, max; 0 0 single file):
+bzo200d 1 1
+           Input data:  MP_TOOLS        1.56           4
+ MP_SQL>   Parameter file name (.par to be added) (confirm or type other name): bzo200d
+           Modes J_MODE=1..2 not available with MP_SQL, setting J_MODE=6 for I(Q)
+
+ MP_SQL>   Substance name (confirm, &append or replace): BZO200d
+,
+
+           Substance name: BZO200d
+           Sim_type, dat_type, input method: TIMESTEP        DL_POLY         CELL
+
+           Atoms from bzo200d.par (name, occupancy,neutron b_coh, Xray formfactor parameters)
+                Ba    0.2500  0.2500  0.2500    0.2000    0.5070   20.1807  3.2137 19.1136  0.2833 10.9054 20.0558  0.7763 51.7460  3.0290
+                Zr    0.7500  0.7500  0.7500    0.2000    0.7160   18.1668  1.2148 10.0562 10.1483  1.0112 21.6054 -2.6479 -0.1028  9.4145
+                O1    0.7500  0.7500  0.2500    0.2000    0.5803    3.0485 13.2771  2.2868  5.7011  1.5463  0.3239  0.8670 32.9089  0.2508
+                O2    0.2500  0.7500  0.7500    0.2000    0.5803    3.0485 13.2771  2.2868  5.7011  1.5463  0.3239  0.8670 32.9089  0.2508
+                O3    0.7500  0.2500  0.7500    0.2000    0.5803    3.0485 13.2771  2.2868  5.7011  1.5463  0.3239  0.8670 32.9089  0.2508
+ n_head,n_row,product(n_row)           4          32          32          32       32768
+           Input files:
+           ./data/bzo200d_n0001.dat
+                      1  files read in    9.00000054E-03  sec SYS time
+ MP_SQL>   Q-range [Å-1] (0=END)
+10
+
+           NOTE: NUFFT_3D requires about   7 Gb memory, in case of problems quit other applications or reduce Q-range!
+
+           Preparing FT ...
+           Doing FT ...
+
+           FINUFFT on           1 snapshot CPU_TIME   63.4057350       SYS_TIME   42.4590034
+
+           Doing Gauss integration ...
+
+           Gaussian smooth FWHM in Q_steps of 0.020[Å-1] (1 no smoothing = default)
+7
+           Atoms:              Ba       Zr       O1       O2       O3
+           Atoms no.:          1        2        3        4        5
+           Occupancy:          0.2000   0.2000   0.2000   0.2000   0.2000
+           Amplitudes:         1.0000   1.0000   1.0000   1.0000   1.0000
+           Scale factors:      1.0000   1.0000   1.0000   1.0000   1.0000
+
+           Actual masks:
+             1  1  1  1  1
+
+           Vertical scale c_min,c_max  -2.00000000       5.80000019
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+ MP_SQL>   Choose output options (MODE is I(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Unit weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000       1.00000000       1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external I(Q) curve
+                  9   RESTART with updated weights & masks
+
+                  0   EXIT
+4
+ MP_SQL>   Atom weights ( 1= uniform, 2= neutron b_c^2, 3= Xray f(Q))
+2
+
+ MP_SQL>   Choose output options (MODE is I(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Neutron weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000       1.00000000       1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external I(Q) curve
+                  9   RESTART with updated weights & masks
+
+                  0   EXIT
+9
+           Gaussian smooth FWHM in Q_steps of 0.020[Å-1] (1 no smoothing = default)
+7
+           Atoms:              Ba       Zr       O1       O2       O3
+           Atoms no.:          1        2        3        4        5
+           Occupancy:          0.2000   0.2000   0.2000   0.2000   0.2000
+           Amplitudes:         0.5070   0.7160   0.5803   0.5803   0.5803
+           Scale factors:      1.0000   1.0000   1.0000   1.0000   1.0000
+
+           Actual masks:
+             1  1  1  1  1
+
+           Vertical scale c_min,c_max  -2.00000000       5.80000019
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+-2 6
+ MP_SQL>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+            Postscript output written to: bzo200d_sql_0001_07.ps
+            Text output written to: bzo200d_sql_0001_07.txt
+
+ MP_SQL>   Choose output options (MODE is I(Q), FILE output is ON
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Neutron weights
+                  5   edit atom MASKS
+                  6   edit atom scale factors    1.00000000       1.00000000       1.00000000       1.00000000       1.00000000
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external I(Q) curve
+                  9   RESTART with updated weights & masks
+
+                  0   EXIT
+0
+2023-12-04 18:23:14 BZO>

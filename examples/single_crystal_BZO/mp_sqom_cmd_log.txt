@@ -1,0 +1,106 @@
+2023-12-14 17:13:16 BZO> mp_sqom6
+ *** Program MP_SQOM 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_SQOM>  Data file_master & file numbers (min, max; 0 0 single file):
+bzo200d 1 20
+           Input data:  MP_TOOLS        1.56           4
+ MP_SQOM>  Parameter file name (.par to be added) (confirm or type other name): bzo200d
+,
+ MP_SQOM>  Substance name (confirm, &append or replace): BZO200d
+&_demo
+
+           Substance name: BZO200d_demo
+           Sim_type, dat_type, input method: TIMESTEP        DL_POLY         CELL
+
+           Atoms from bzo200d.par
+               Ba    0.2500  0.2500  0.2500    1.0000  0.5070
+               Zr    0.7500  0.7500  0.7500    1.0000  0.7160
+               O1    0.7500  0.7500  0.2500    1.0000  0.5803
+               O2    0.2500  0.7500  0.7500    1.0000  0.5803
+               O3    0.7500  0.2500  0.7500    1.0000  0.5803
+
+           OMP processes requested 	=            2
+           Input files:
+           ./data/bzo200d_n0001.dat
+                     20  files read in    5.00000007E-02  sec SYS time
+           MD time sequence:  t_total [ps]  0.760017395     t_step [ps]   4.00009155E-02
+           Maximum energy [THz]             15.00      energy step [THz]  2.50
+           Time-integration (BN) window FWHM [ps]    0.20
+           Energy resolution FWHM [THz]                5.00
+
+ MP_SQOM>  Number of Brillouin zones (1 ... , 0=END), Q-plane (0=general, 1=(hk0), 2=(hhl))
+5 1
+ MP_SQOM>  Q_center [hkl]:
+2 2 0
+           FINUFFT start ...
+           FINUFFT on          20 snapshots CPU_TIME   1.15383708       SYS_TIME  0.825000048
+
+           Actual atom masks:  1  1  1  1  1
+           Total scattering (instant integration range)
+           c_min,c_max  -5.00000000       5.00000000
+ MP_SQOM>  Adjust intensity scale: min,max (0 0 or 9 9 EXIT)    -5.0     5.0
+-5 4
+ MP_SQOM>  Adjust intensity scale: min,max (0 0 or 9 9 EXIT)    -5.0     4.0
+0 0
+ MP_SQOM>  Choose a plot option (FILE output is ON):
+                  1  explore total scattering     (-1 edit atom masks)
+                  2  explore E=const maps         (-2 edit atom masks)
+                  3  make a stack of E=const maps (-3 reset atom masks)
+                  4  explore E(Q) maps            (-4 edit atom masks)
+                  5  make a stack of E(Q) maps    (-5 reset atom masks)
+                  6  change the HKL plane, range and centre (BZ)
+                                                  (-6 change the real space range)
+                  7  toggle the FILE output OFF (mind the J_TXT switch in .PAR)
+                  8  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+                  9  toggle the S(Q)/Q^2 scaling to S(Q)
+                 10  options: change the time integration window width, weighting etc.
+
+                  0  EXIT
+1
+           Actual atom masks:  1  1  1  1  1
+           Total scattering (instant integration range)
+ MP_SQOM>  Adjust intensity scale: min,max (0 0 or 9 9 EXIT)    -5.0     4.0
+0 0
+           bzo200d_sq_0001_0020_07.txt
+           bzo200d_sq_0001_0020_07.png
+ MP_SQOM>  Choose a plot option (FILE output is ON):
+                  1  explore total scattering     (-1 edit atom masks)
+                  2  explore E=const maps         (-2 edit atom masks)
+                  3  make a stack of E=const maps (-3 reset atom masks)
+                  4  explore E(Q) maps            (-4 edit atom masks)
+                  5  make a stack of E(Q) maps    (-5 reset atom masks)
+                  6  change the HKL plane, range and centre (BZ)
+                                                  (-6 change the real space range)
+                  7  toggle the FILE output OFF (mind the J_TXT switch in .PAR)
+                  8  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+                  9  toggle the S(Q)/Q^2 scaling to S(Q)
+                 10  options: change the time integration window width, weighting etc.
+
+                  0  EXIT
+2
+           Actual atom masks:  1  1  1  1  1
+ MP_SQOM>  E=const map E_plot [THz]:
+0
+ MP_SQOM>  Adjust intensity scale: min,max (0 0 change E_plot, 9 9 EXIT)    -5.0     4.0
+-7 -1
+ MP_SQOM>  Adjust intensity scale: min,max (0 0 change E_plot, 9 9 EXIT)    -7.0    -1.0
+9 9
+           bzo200d_sq_0001_0020_11.txt
+           bzo200d_sq_0001_0020_11.png
+ MP_SQOM>  Choose a plot option (FILE output is ON):
+                  1  explore total scattering     (-1 edit atom masks)
+                  2  explore E=const maps         (-2 edit atom masks)
+                  3  make a stack of E=const maps (-3 reset atom masks)
+                  4  explore E(Q) maps            (-4 edit atom masks)
+                  5  make a stack of E(Q) maps    (-5 reset atom masks)
+                  6  change the HKL plane, range and centre (BZ)
+                                                  (-6 change the real space range)
+                  7  toggle the FILE output OFF (mind the J_TXT switch in .PAR)
+                  8  toggle the NU_FFT mode to ONE_PHONON (go on via 6)
+                  9  toggle the S(Q)/Q^2 scaling to S(Q)
+                 10  options: change the time integration window width, weighting etc.
+
+                  0  EXIT
+0
+ %PGPLOT, PGCLOS: no graphics device has been selected
+2023-12-14 17:18:37 BZO>

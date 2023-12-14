@@ -1,0 +1,241 @@
+2023-12-04 17:58:42 BZO> mp_pdf6
+ *** Program MP_PDF 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_PDF>   Data file_master & file numbers (min, max; 0 0 single file):
+bzo200d 1 1
+           Input data:  MP_TOOLS        1.56           4
+ MP_PDF>   Parameter file name (.par to be added) (confirm or type other name): bzo200d
+,
+           Input method:  CELL
+
+           Substance name: BZO200d
+           Atoms from bzo200d.par
+               Ba    0.2500  0.2500  0.2500    0.2000  0.5070
+               Zr    0.7500  0.7500  0.7500    0.2000  0.7160
+               O1    0.7500  0.7500  0.2500    0.2000  0.5803
+               O2    0.2500  0.7500  0.7500    0.2000  0.5803
+               O3    0.7500  0.2500  0.7500    0.2000  0.5803
+
+           Monte Carlo integration over         450 *10^6 cell pairs
+
+           OMP threads max          =            4
+           OMP processes requested  =            2
+
+           Random_number: j_rand =           5   this seeding reference can be used to exactly reproduce this MC-run later on
+
+           Input: ./data/bzo200d_n0001.dat
+           Read finished
+
+
+           Accumulating the PDFs ...
+           MC hits to empty overlay grid cells [%]:   39.2940140
+           MC hits out of PDF range [%]:   10.6777258
+
+           Accumulation finished            79.2949982      sec
+
+
+           Lattice parameter:    4.1939   4.1939   4.1939
+           Atoms:                Ba       Zr       O1       O2       O3       TOT
+           Atoms no.:                 1        2        3        4        5        6
+           Occupancy nominal:    0.2000   0.2000   0.2000   0.2000   0.2000   1.0000
+           Occupancy real 1:     0.1998   0.1995   0.2005   0.2000   0.2003   1.0000
+           Occupancy real 2:     0.2000   0.2001   0.2000   0.2000   0.2000   1.0000
+           Unit weights:     1.0000   1.0000   1.0000   1.0000   1.0000   5.0000
+           Mean rel_error:       0.0516   0.0516   0.0516   0.0516   0.0516   0.0103
+
+           Atom density [Å-3] and masks  0.677804E-01      1  1  1  1  1
+
+ MP_PDF>   Gaussian smooth FWHM in steps of 0.04Å (1 no smoothing, 4 - 20 useful)
+3
+           Applying Gaussian smoothing with FWHM=           3  steps of   3.99999991E-02 [A^]
+
+           Vertical scale c_min,c_max   0.00000000       4.80000019
+ MP_PDF>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+-1 -1
+ MP_PDF>   Confirm/adjust plot range, max =   133.919952
+           x_start, x_end     0.0  100.0:  0 20
+ MP_PDF>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+           Postscript output written to: bzo200d_pdf_0001_22.ps
+           Text output written to: bzo200d_pdf_0001_22.txt
+ MP_PDF>   Choose output options (MODE is g(r), FILE output is ON, SIZE is XXL):
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Unit)
+                  5   edit atom MASKS
+                  6   create/modify max  4 PSEUDO_ATOMS
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external g(r) curve
+                  9   RESTART with updated weights, masks & pseudo_atoms
+
+                  10  select the PDF MODE, actual: g(r)
+                  0   EXIT
+10
+ MP_PDF>   Select the output MODE:            1   g(r)           2   G(r)           3   F(Q)           4   S(Q)           5   Z(Q)           6   I(Q)           7   I(Q)_unscaled
+2
+
+           Lattice parameter:    4.1939   4.1939   4.1939
+           Atoms:                Ba       Zr       O1       O2       O3       TOT
+           Atoms no.:                 1        2        3        4        5        6
+           Occupancy nominal:    0.2000   0.2000   0.2000   0.2000   0.2000   1.0000
+           Occupancy real 1:     0.1998   0.1995   0.2005   0.2000   0.2003   1.0000
+           Occupancy real 2:     0.2000   0.2001   0.2000   0.2000   0.2000   1.0000
+           Unit weights:     1.0000   1.0000   1.0000   1.0000   1.0000   5.0000
+           Mean rel_error:       0.0516   0.0516   0.0516   0.0516   0.0516   0.0103
+
+           Atom density [Å-3] and masks  0.677804E-01      1  1  1  1  1
+
+ MP_PDF>   Gaussian smooth FWHM in steps of 0.04Å (1 no smoothing, 4 - 20 useful)
+3
+           Applying Gaussian smoothing with FWHM=           3  steps of   3.99999991E-02 [A^]
+
+           Vertical scale c_min,c_max  -8.83776569       10.8000002
+ MP_PDF>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+-10 12
+ MP_PDF>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+           Postscript output written to: bzo200d_pdf_0001_23.ps
+           Text output written to: bzo200d_pdf_0001_23.txt
+ MP_PDF>   Choose output options (MODE is G(r), FILE output is ON, SIZE is XXL):
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Unit)
+                  5   edit atom MASKS
+                  6   create/modify max  4 PSEUDO_ATOMS
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external G(r) curve
+                  9   RESTART with updated weights, masks & pseudo_atoms
+
+                  10  select the PDF MODE, actual: G(r)
+                  0   EXIT
+4
+ MP_PDF>   Choose atom weights (1= unit, 2= neutron b_c, 3= Xray f(Q))
+2
+ MP_PDF>   Choose output options (MODE is G(r), FILE output is ON, SIZE is XXL):
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Neutron)
+                  5   edit atom MASKS
+                  6   create/modify max  4 PSEUDO_ATOMS
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external G(r) curve
+                  9   RESTART with updated weights, masks & pseudo_atoms
+
+                  10  select the PDF MODE, actual: G(r)
+                  0   EXIT
+10
+ MP_PDF>   Select the output MODE:            1   g(r)           2   G(r)           3   F(Q)           4   S(Q)           5   Z(Q)           6   I(Q)           7   I(Q)_unscaled
+3
+
+           Lattice parameter:    4.1939   4.1939   4.1939
+           Atoms:                Ba       Zr       O1       O2       O3       TOT
+           Atoms no.:                 1        2        3        4        5        6
+           Occupancy nominal:    0.2000   0.2000   0.2000   0.2000   0.2000   1.0000
+           Occupancy real 1:     0.1998   0.1995   0.2005   0.2000   0.2003   1.0000
+           Occupancy real 2:     0.2000   0.2001   0.2000   0.2000   0.2000   1.0000
+           Neutron weights:     0.5070   0.7160   0.5803   0.5803   0.5803   2.9639
+           Mean rel_error:       0.0516   0.0516   0.0516   0.0516   0.0516   0.0103
+
+           Atom density [Å-3] and masks  0.677804E-01      1  1  1  1  1
+
+           S(Q) q_step, q_range:   2.34587267E-02   78.5398178
+ MP_PDF>   Hann smooth FWHM in Q_steps (<=1. no smoothing)
+4
+
+           Vertical scale c_min,c_max  -1.20677066       5.09999990
+ MP_PDF>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+           Postscript output written to: bzo200d_pdf_0001_24.ps
+           Text output written to: bzo200d_pdf_0001_24.txt
+ MP_PDF>   Choose output options (MODE is F(Q), FILE output is ON, SIZE is XXL):
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Neutron)
+                  5   edit atom MASKS
+                  6   create/modify max  4 PSEUDO_ATOMS
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external F(Q) curve
+                  9   RESTART with updated weights, masks & pseudo_atoms
+
+                  10  select the PDF MODE, actual: F(Q)
+                  0   EXIT
+10
+ MP_PDF>   Select the output MODE:            1   g(r)           2   G(r)           3   F(Q)           4   S(Q)           5   Z(Q)           6   I(Q)           7   I(Q)_unscaled
+4
+
+           Lattice parameter:    4.1939   4.1939   4.1939
+           Atoms:                Ba       Zr       O1       O2       O3       TOT
+           Atoms no.:                 1        2        3        4        5        6
+           Occupancy nominal:    0.2000   0.2000   0.2000   0.2000   0.2000   1.0000
+           Occupancy real 1:     0.1998   0.1995   0.2005   0.2000   0.2003   1.0000
+           Occupancy real 2:     0.2000   0.2001   0.2000   0.2000   0.2000   1.0000
+           Neutron weights:     0.5070   0.7160   0.5803   0.5803   0.5803   2.9639
+           Mean rel_error:       0.0516   0.0516   0.0516   0.0516   0.0516   0.0103
+
+           Atom density [Å-3] and masks  0.677804E-01      1  1  1  1  1
+
+           S(Q) q_step, q_range:   2.34587267E-02   78.5398178
+ MP_PDF>   Hann smooth FWHM in Q_steps (<=1. no smoothing)
+4
+
+           Vertical scale c_min,c_max -0.206836209       6.09999990
+ MP_PDF>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+           Postscript output written to: bzo200d_pdf_0001_25.ps
+           Text output written to: bzo200d_pdf_0001_25.txt
+ MP_PDF>   Choose output options (MODE is S(Q), FILE output is ON, SIZE is XXL):
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Neutron)
+                  5   edit atom MASKS
+                  6   create/modify max  4 PSEUDO_ATOMS
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external S(Q) curve
+                  9   RESTART with updated weights, masks & pseudo_atoms
+
+                  10  select the PDF MODE, actual: S(Q)
+                  0   EXIT
+10
+ MP_PDF>   Select the output MODE:            1   g(r)           2   G(r)           3   F(Q)           4   S(Q)           5   Z(Q)           6   I(Q)           7   I(Q)_unscaled
+6
+
+           Lattice parameter:    4.1939   4.1939   4.1939
+           Atoms:                Ba       Zr       O1       O2       O3       TOT
+           Atoms no.:                 1        2        3        4        5        6
+           Occupancy nominal:    0.2000   0.2000   0.2000   0.2000   0.2000   1.0000
+           Occupancy real 1:     0.1998   0.1995   0.2005   0.2000   0.2003   1.0000
+           Occupancy real 2:     0.2000   0.2001   0.2000   0.2000   0.2000   1.0000
+           Neutron weights:     0.5070   0.7160   0.5803   0.5803   0.5803   2.9639
+           Mean rel_error:       0.0516   0.0516   0.0516   0.0516   0.0516   0.0103
+
+           Atom density [Å-3] and masks  0.677804E-01      1  1  1  1  1
+
+           S(Q) q_step, q_range:   2.34587267E-02   78.5398178
+ MP_PDF>   Hann smooth FWHM in Q_steps (<=1. no smoothing)
+4
+
+           Vertical scale c_min,c_max -0.191360325       6.09999990
+ MP_PDF>   Adjust vertical scale (min, max) (0 0 EXIT, -1 -1 to adjust plot range)
+0 0
+           Postscript output written to: bzo200d_pdf_0001_26.ps
+           Text output written to: bzo200d_pdf_0001_26.txt
+ MP_PDF>   Choose output options (MODE is I(Q), FILE output is ON, SIZE is XXL):
+                  1   REPLOT the last graph
+                  2   select max  4 partial PDFs & replot
+                  3   adjust partials scales & replot
+                  4   modify atom WEIGHTS (Neutron)
+                  5   edit atom MASKS
+                  6   create/modify max  4 PSEUDO_ATOMS
+                  7   toggle FILE output OFF (mind the J_TXT switch in .PAR)
+                  8   import external I(Q) curve
+                  9   RESTART with updated weights, masks & pseudo_atoms
+
+                  10  select the PDF MODE, actual: I(Q)
+                  0   EXIT
+0
+2023-12-04 18:05:28 BZO>

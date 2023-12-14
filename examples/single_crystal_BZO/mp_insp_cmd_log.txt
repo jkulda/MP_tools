@@ -1,0 +1,105 @@
+2023-12-04 17:14:31 BZO> mp_insp6
+ *** Program MP_INSP 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_INSP>  Master filename:
+bzo200d
+ MP_INSP>  snapshot file number (0 for no number):
+1
+           Reading ./data/bzo200d_n0001.dat
+
+           Code & version, no. of header lines:   MP_TOOLS        1.56           4
+           Substance name:                        BZO200d
+           Data & simulation type, input method:DL_POLY         TIMESTEP        CELL
+           Time structure t_ms,t_step,t_dump:     3.99999990E-04   4.00009155E-02   64.0400009
+           Shells, trajectory type, boundary cnd:            0              2              3
+           Supercell & temperature:                      32          32          32   198.984192
+           Unit cell parameter(3), angle(3):      4.19393730       4.19393730       4.19393730            1.57079637       1.57079637       1.57079637
+
+             a_cell                                                  a_cell_inv
+              4.19393730       0.00000000       0.00000000           0.238439426       0.00000000       0.00000000
+              0.00000000       4.19393730      -0.00000000            0.00000000      0.238439426       0.00000000
+              0.00000000      -0.00000000       4.19393730            0.00000000       0.00000000      0.238439426
+
+           Atom numbers:                                  5       32768       32768       32768       32768       32768      163840
+           Atoms & occupancies:
+                              Ba    0.250000000      0.250000000      0.250000000       1.00000000
+                              Zr    0.750000000      0.750000000      0.750000000       1.00000000
+                              O1    0.750000000      0.750000000      0.250000000       1.00000000
+                              O2    0.250000000      0.750000000      0.750000000       1.00000000
+                              O3    0.750000000      0.250000000      0.750000000       1.00000000
+
+ MP_INSP>  jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+1 1 1 1
+           Atom, type, mass, charge    Ba             1   124.320000       5.61999989
+           Cell index                       1           1           1
+           Atom position              -15.7803669      -15.7500095      -15.7543278
+           Atom velocity                1.99678099      0.213972330      -2.74756885
+           Atom force                  -1.02114880      0.407788575      -2.31031704
+
+
+ MP_INSP>  jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+1 32 1 1
+           Atom, type, mass, charge    Ba             1   124.320000       5.61999989
+           Cell index                      32           1           1
+           Atom position               15.2222557      -15.7298203      -15.7529125
+           Atom velocity                1.08607757     -0.139055595     -0.732358634
+           Atom force                   1.86735153      -1.73599625       2.26769018
+
+
+ MP_INSP>  jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+5 32 32 32
+           Atom, type, mass, charge    O3             5   14.4994001      0.910000026
+           Cell index                      32          32          32
+           Atom position               15.7528038       15.2540970       15.7979584
+           Atom velocity                2.18012285      -4.00152779      -4.31359863
+           Atom force                   1826.40149       5584.18408      -657.471802
+
+
+ MP_INSP>  jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+0 0 0 0
+ MP_INSP>  snapshot file number (0 for no number):
+2
+           Reading ./data/bzo200d_n0002.dat
+
+           Code & version, no. of header lines:   MP_TOOLS        1.56           4
+           Substance name:                        BZO200d
+           Data & simulation type, input method:DL_POLY         TIMESTEP        CELL
+           Time structure t_ms,t_step,t_dump:     3.99999990E-04   4.00009155E-02   64.0800018
+           Shells, trajectory type, boundary cnd:            0              2              3
+           Supercell & temperature:                      32          32          32   199.586273
+           Unit cell parameter(3), angle(3):      4.19393730       4.19393730       4.19393730            1.57079637       1.57079637       1.57079637
+
+             a_cell                                                  a_cell_inv
+              4.19393730       0.00000000       0.00000000           0.238439426       0.00000000       0.00000000
+              0.00000000       4.19393730      -0.00000000            0.00000000      0.238439426       0.00000000
+              0.00000000      -0.00000000       4.19393730            0.00000000       0.00000000      0.238439426
+
+           Atom numbers:                                  5       32768       32768       32768       32768       32768      163840
+           Atoms & occupancies:
+                              Ba    0.250000000      0.250000000      0.250000000       1.00000000
+                              Zr    0.750000000      0.750000000      0.750000000       1.00000000
+                              O1    0.750000000      0.750000000      0.250000000       1.00000000
+                              O2    0.250000000      0.750000000      0.750000000       1.00000000
+                              O3    0.750000000      0.250000000      0.750000000       1.00000000
+
+ MP_INSP>  jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+2 1 1 1
+           Atom, type, mass, charge    Zr             2   82.1240005       5.16130018
+           Cell index                       1           1           1
+           Atom position              -15.2683792      -15.2416000      -15.2568169
+           Atom velocity                2.14087963      0.350010961     -0.741435528
+           Atom force                   3064.49414      -1928.29529       2947.55371
+
+
+ MP_INSP>  jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+2 32 1 1 1
+           Atom, type, mass, charge    Zr             2   82.1240005       5.16130018
+           Cell index                      32           1           1
+           Atom position               15.7256699      -15.2323284      -15.2570496
+           Atom velocity                2.25591254      -3.32256484      -1.87652206
+           Atom force                  -5402.82275       4458.82031      -1474.12659
+
+
+ MP_INSP>  jat, j_pos,j_row,j_layer (0 0 0 0 = new file number, 9 9 9 9 = END):
+9 9 9 9
+2023-12-04 17:34:44 BZO>

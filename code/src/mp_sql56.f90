@@ -55,8 +55,8 @@ program mp_sql55
   character(5)   :: pg_ext,c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
   character(10)	 :: prompt,space = '          '
   character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
-  character(40)  :: subst_name,file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(4),int_mode,mp_tool
-  character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in,smooth
+  character(40)  :: subst_name,file_title,file_master,time_stamp,x_title,y_title,masks,at_weight_scheme(4),int_mode,mp_tool
+  character(40)  :: file_dat,file_inp,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in,smooth
   character(256) :: line,plot_title1,plot_title2,plot_title,plot_header,scan_title,interp_title,data_path,cwd_path,rec_str
   character(l_rec):: header_record
 

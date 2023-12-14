@@ -122,8 +122,8 @@ program mp_pdf55
   character(10)	 :: prompt,space = '          '
   character(10)  :: at_weight_scheme(3),pg_out,pg_ext,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
   character(16)  :: sim_type_par,string16,filter_name
-  character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name,string,mp_tool
-  character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,masks,smooth
+  character(40)  :: subst_name,file_master,file_out,time_stamp,int_mode,x_file_name,string,mp_tool
+  character(60)  :: file_dat,file_inp,file_dat_t0,file_res,file_ps,file_log,masks,smooth
   character(256) :: cwd_path,plot_header,plot_title,line
   character(l_rec):: header_record
   
