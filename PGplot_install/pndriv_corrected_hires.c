@@ -347,6 +347,7 @@ static void fill_rectangle( DeviceData *dev, int x1, int y1, int x2, int y2, Col
   should be freed after the page has been written to file
 */
 static void start_plot(DeviceData *dev, int w, int h) {
+	dev->error = false;           /*added JK Dec-2023*/
   dev->w = w;
   dev->h = h;
   dev->npix = dev->w * dev->h;
@@ -642,10 +643,10 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	/* same as used in GIF drivers        
 		rbuf[0] = 85.0; 
 	  rbuf[1] = 85.0; */
-	//troubleshooting PM
-        char *aux_ppi=NULL;
+//troubleshooting PM
+  char *aux_ppi=NULL;
   
-        if (! (aux_ppi = getenv("PGPLOT_PNG_PPI")))
+  if (! (aux_ppi = getenv("PGPLOT_PNG_PPI")))
 	{
 	     rbuf[0] = 160.0;        /* modified by JK 2023: this matters! */
 	     rbuf[1] = 160.0;
