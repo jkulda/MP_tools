@@ -199,10 +199,6 @@ program mp_lbin55
   call up_case(pos_units)
   call down_case(rec_str)
 
-  print *,'j_mult,n_head_in1,n_head_in2,n_tot_in,n_atom,n_row,j_basis,j_centred,j_test,j_shrec'  
-  print *,j_mult,n_head_in1,n_head_in2,n_tot_in,n_atom,n_row,j_basis,j_centred,j_test,j_shrec  
-  print *,sim_type,dat_type
-
   if(ext=='ext'.or.ext=='EXT') ext=''
   if(ext/=''.and.index(ext,'.')==0) ext='.'//ext
   
@@ -223,54 +219,7 @@ program mp_lbin55
   if(dat_type=='GENERAL') then    !it is assumed that here the box is only defined at the very beginning of the simulations and is given at the start in the .PAR file
     a_cell = transpose(reshape(a_cell_par,(/3,3/)))
   endif 
-!       if(j_verb==1) then 
-!         do k=1,3 
-!           print *,'k,a_cell(k,:)',a_cell(k,:) 
-!         enddo 
-!       endif
-
-!     do j=1,3
-!       a_cell_half(j) = .5*sum(a_cell(:,j))
-!       if(j_centred==0) then
-!         at_pos_centre(j) = a_cell_half(j)   
-!       else
-!         at_pos_centre(j) = .0
-!       endif
-!       a_cell(j,:) = a_cell(j,:)/n_row(j)        !for n_row>1 a_cell becomes unit cell
-!       a_par(j) = norm2(a_cell(j,:))
-!     enddo 
-! 
-!     angle(1) = dot_product(a_cell(2,:),a_cell(3,:))/(a_par(2)*a_par(3))
-!     angle(2) = dot_product(a_cell(1,:),a_cell(3,:))/(a_par(1)*a_par(3))
-!     angle(3) = dot_product(a_cell(1,:),a_cell(2,:))/(a_par(1)*a_par(2))
-!     angle = acos(angle)
-! 
-!     if(j_verb==1) then
-!       print *,'angle_rad',angle
-!       print *,'angle_deg',angle*180./pi
-! 
-!       print *,'a_cell'
-!       do k=1,3
-!         print *,a_cell(k,:)
-!       enddo
-!     endif
-! 
-!     a_cell_1 = a_cell
-!     call gjinv(a_cell_1,3,3,a_cell_inv,3,ierr)
-!     if(ierr==1) then
-!       print *,'Singular cell vector matrix, check your HISTORY file!'
-!       stop
-!     endif
-! 
-!     if(j_verb==1) then
-!       print *,'a_cell_inv'
-!       do k=1,3
-!         print *,a_cell_inv(k,:)
-!       enddo
-!     endif
-!   endif
   
-   
   allocate(at_name_par(n_atom),at_label(n_atom),at_base_in(n_atom,3),at_base(n_atom,3))
   allocate(ind_l(n_atom),i_site(n_atom,n_atom),at_occup(n_atom))
   allocate(at_mass_in_c(n_atom),at_mass_in_s(n_atom))

@@ -1,0 +1,48 @@
+2023-12-04 15:00:43 Cu_lammps_JK> mp_lbin6
+ *** Program MP_LBIN 1.56 ** Copyright (C) Jiri Kulda (2023) ***
+
+ MP_LBIN>  Parameter file name (.par will be added)
+cu_c48
+ j_mult,n_head_in1,n_head_in2,n_tot_in,n_atom,n_row,j_basis,j_centred,j_test,j_shrec
+           1           0           0           0           4          48          48          48           1           0           1           0
+ TIMESTEP        LAMMPS
+ MP_LBIN>  Substance name (confirm, &append or replace): Cu_48
+,
+
+           Substance name: Cu_48
+           Sim_type, dat_type, input method: TIMESTEP        LAMMPS          CELL
+           Atom labels (chemical species)            1
+                      4 Cu             1           2           3           4
+           Atom types:
+                      1 Cu1    0.00000000       0.00000000       0.00000000
+                      2 Cu2   0.500000000      0.500000000       0.00000000
+                      3 Cu3   0.500000000       0.00000000      0.500000000
+                      4 Cu4    0.00000000      0.500000000      0.500000000
+ MP_LBIN>  Read snapshots number: min, max
+1 5
+ MP_LBIN>  Saved snapshot numbers start:
+121
+ MP_LBIN>  Master for MD input filename:
+cu_48
+ MP_LBIN>  Read input files number (0 0 0 no numbers): min,step,max
+6000 50 6200
+           The frequency scale will rely on T_MS=   2.00000009E-04
+           If strange, modify this value and restart the whole treatment.
+           Simulation type = TIMESTEP
+           Trajectory recording mode =           1
+           Trajectory time start, step [ps]:   1.20000005       1.00000007E-02
+           Simulation box:          48          48          48
+           Lattice parameter:   3.63269901       3.63252735       3.63288212
+           Angles:              1.57079637       1.57079637       1.57079637
+ MP_LBIN>  go ahead? (1/0)
+1
+           1st snapshot: total of      442368  atoms read in   4.30749607      sec
+           Real temperature: cores only    299.588806
+           Occupancies: nominal 		real
+                Cu1    1.00000000       1.00000000
+                Cu2    1.00000000       1.00000000
+                Cu3    1.00000000       1.00000000
+                Cu4    1.00000000       1.00000000
+           ./data/cu_c48_n0121.dat
+           Trajectory finished:            5  .dat files written in SYS time   22.2169991      sec
+2023-12-04 15:08:39 Cu_lammps_JK>
