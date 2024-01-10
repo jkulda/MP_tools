@@ -26,6 +26,7 @@ program mp_sql55
 ! *****           - uses spherical average of 3D NUFFT amplitudes/intensities
 ! ***** 
 ! ***** Ver 1.56  - optimised generation of diverse scattering functions
+! *****           - true 3D_NUFFT replaced by the corresponding sequence of 2D_NUFFT slices
 ! *****           
 ! ***** 
 ! ***** indexing convention: supercell(u,v,w) = at_ind(j,k,l) = supercell(j_pos,j_row,j_layer)
@@ -73,7 +74,9 @@ program mp_sql55
   real(8), allocatable :: xx(:,:)			
   real(8) ::     eps_fft
   integer(8) ::  n_tot,n_qq8(3),n_fft,n_mem
-  integer(8), allocatable :: nul_opt,n_sup(:)		!nul_opt (since unallocated) used to pass a null pointer to FINUFFT...
+  integer(8), allocatable :: n_sup(:)		
+!   integer(8), allocatable :: nul_opt		!nul_opt (since unallocated) used to pass a null pointer to FINUFFT...
+  integer(8), pointer :: nul_opt => null()		!nul_opt (since unallocated) used to pass a null pointer to FINUFFT...
   complex(8), allocatable :: cf(:),ampl_tot(:),ampl_tot_3d(:,:,:)												! this is equivalent to complex*16
 
   complex, allocatable :: om_phase(:),ampl_atom_3d(:,:,:,:),ampl_q(:)
@@ -136,7 +139,7 @@ program mp_sql55
   namelist /mp_pdf/ pdf_range,pdf_step,q_step,x_end,a_par_pdf,pdf_pix,pdf_pix_shift,j_rand,n_h,j_acc,j_mode,n_part_max,n_pseudo_max,n_cond,q_xff  
 !
 ! ********************* Initialization *******************************      
-  version_t = '1.56'
+  version_t = '1.561'
   prompt = 'MP_SQL>   '
   mp_tool = 'MP_SQL '//version_t
 
@@ -627,7 +630,6 @@ program mp_sql55
 
 ! *** Create the a_cell_inv matrix for older data (orthorhombic only)
 
-   print *,'n_head,n_row,product(n_row)',n_head,n_row,product(n_row)
   if(n_head<4) then                                 !generate a_cell_inv for orthogonal lattices (older data without a_cell)
     a_cell_inv = .0
     
@@ -967,32 +969,40 @@ program mp_sql55
     e2_r_norm = norm2(e2_r)
     e3_r_norm = norm2(e3_r)
 
-!       if(j_verb==1) then
-!         print *,'e1_r,2Pi*e1_r_norm',e1_r,twopi*e1_r_norm			!twopi*e1_r_norm is the length of e1_r in A-1 on the usual scale containing the 2Pi factor
-!         print *,'e2_r,2Pi*e2_r_norm',e2_r,twopi*e2_r_norm
-!         print *,'e3_r,2Pi*e3_r_norm',e3_r,twopi*e3_r_norm
-!       endif
+      if(j_verb==1) then
+        print *,'e1_r,2Pi*e1_r_norm',e1_r,twopi*e1_r_norm			!twopi*e1_r_norm is the length of e1_r in A-1 on the usual scale containing the 2Pi factor
+        print *,'e2_r,2Pi*e2_r_norm',e2_r,twopi*e2_r_norm
+        print *,'e3_r,2Pi*e3_r_norm',e3_r,twopi*e3_r_norm
+      endif
     
     e3v = vector_product(e1_r,e2_r)
     e2v = vector_product(e3_r,e1_r)
     e1v = vector_product(e2_r,e3_r)
      
 ! *** to get the BZ_NX etc. range is BZ_N divided by the height of the parallepiped in the corresponding direction        
-    bz_nx = bz_n/(twopi*dot_product(e1_r,e1v)/norm2(e1v))+.5			!+.5 is a safety margin to avoid rounding effects
-    bz_ny = bz_n/(twopi*dot_product(e2_r,e2v)/norm2(e2v))+.5
-    bz_nz = bz_n/(twopi*dot_product(e3_r,e3v)/norm2(e3v))+.5
+    bz_nx = bz_n/(dot_product(e1_r,e1v)/norm2(e1v))  !+.5			!+.5 is a safety margin to avoid rounding effects
+    bz_ny = bz_n/(dot_product(e2_r,e2v)/norm2(e2v))  !+.5
+    bz_nz = bz_n/(dot_product(e3_r,e3v)/norm2(e3v))  !+.5
     if(j_verb==1) print *,space, 'bz_n,bz_nx,bz_ny,bz_nz',bz_n,bz_nx,bz_ny,bz_nz
 
     d_q = twopi/(at_pos_max-at_pos_min)				!pseudo-cubic phase steps for NUFFT defined by the box size
     
     if(j_verb==1) print *,space, 'd_q,q_step,q_range',d_q,'   ',q_step,q_range
 
-    n_qq(1) = 2*anint((.5*twopi*bz_nx)/d_q(1))+1       
-    n_qq(2) = 2*anint((.5*twopi*bz_ny)/d_q(2))+1       
-    n_qq(3) = 2*anint((.5*twopi*bz_nz)/d_q(3))+1   
+    n_qq(1) = 2*nint((.5*bz_nx)/d_q(1))+1       
+    n_qq(2) = 2*nint((.5*bz_ny)/d_q(2))+1       
+    n_qq(3) = 2*nint((.5*bz_nz)/d_q(3))+1   
     i_centre = n_qq/2+1
     if(j_verb==1) print *,space, 'n_qq,i_centre',n_qq,'   ',i_centre
     print *	
+    
+! **** test the size of Q-grid to fit into the 4Gb limit
+!
+    if(product(n_qq)*n_atom>huge(n_qq(1))) then
+      t2 = product(real(n_qq))/(real(huge(n_qq(1))/real(n_atom)))
+      print *,space, 'Q-range too large by a factor:',t2**.3333333	
+      cycle bz_loop
+    endif
   
     n_mem = 1+8.*(n_atom+4.)*(product(real(n_qq))/1.e9)					! 16*product(n_qq) is the size of NUFFT output (NUFFT needs 2x that), n_atom*8*product(n_qq) is needed for partial amplitudes; 1Gb is the rest (input etc.)
     write(*,'(1x,a,"NOTE: NUFFT_3D requires about",i4," Gb memory, in case of problems quit other applications or reduce Q-range!")') space,n_mem
@@ -1056,6 +1066,7 @@ program mp_sql55
   
     print *,space, 'Doing FT ...'		
 
+    call cpu_time(t0)				
     call cpu_time(t1)				
     CALL SYSTEM_CLOCK (COUNT = sc_c1, COUNT_RATE = sc_r)				!, COUNT MAX = sc_m)
     sc_r = 1./sc_r
@@ -1064,43 +1075,54 @@ program mp_sql55
 
       if(input_method=='CELL') then
         at_pos_file(1:4,1:nsuper,1:n_atom) => at_pos_in(:,ifile)
+        at_pos_file_bulk(1:4,1:1) => at_pos_in(1:4,ifile)       !this is pro forma because of OMP
       else
+        at_pos_file(1:4,1:1,1:1) => at_pos_in(1:4,ifile)       !this is pro forma because of OMP
         at_pos_file_bulk(1:4,1:n_tot) => at_pos_in(:,ifile)
       endif				
-    
+ 
       do j = 1,n_atom
-        allocate(xx(n_sup(j),3),cf(n_sup(j)),ampl_tot(n_qq(1)*n_qq(2)*n_qq(3)))																	
         n_fft = n_sup(j)			!we need n_fft 64bit
-        cf = (1.,0.)
-        
-        if(input_method=='CELL') then
-          ii = 0
-          do i=1,nsuper
-            non_zero = (at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0)
-            if(non_zero) then
-              ii = ii+1				!avoiding "empty" positions
-              xx(ii,:) = at_pos_file(1:3,i,j)*d_q
-            endif
-          enddo              
-        else					!BULK
-          do i=1,n_sup(j)
-            xx(i,:) = at_pos_file_bulk(1:3,ind_at(j)+i)*d_q
-          enddo							
-        endif		!input_method
+        allocate(xx(n_sup(j),2),cf(n_sup(j)),ampl_tot(n_qq(1)*n_qq(2)))																	
 
-        call finufft3d1(n_fft,xx(:,1),xx(:,2),xx(:,3),cf,iflag,eps_fft,n_qq8(1),n_qq8(2),n_qq8(3),ampl_tot,nul_opt,ier)
+        do k = 1,n_qq8(3)    !cycle over horizontal layers
+          kk = k-(n_qq8(3)+1)/2  
+          if(input_method=='CELL') then
+            ii = 0
+            do i=1,nsuper
+              non_zero = (at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0)
+              if(non_zero) then
+                ii = ii+1				!avoiding "empty" positions
+                xx(ii,1:2) = at_pos_file(1:2,i,j)*d_q(1:2)
+                cf(ii) = cexp((0.,-1.)*kk*d_q(3)*at_pos_file(3,i,j))
+              endif
+            enddo              
+          else					!BULK
+            do i=1,n_sup(j)
+              xx(i,1:2) = at_pos_file_bulk(1:2,ind_at(j)+i)*d_q(1:2)
+              cf(i) = cexp((0.,-1.)*kk*d_q(3)*at_pos_file_bulk(3,ind_at(j)+i))
+            enddo							
+          endif		!input_method
 
-        ampl_atom_3d(:,:,:,j) = reshape(source=ampl_tot,shape=[n_qq8(1),n_qq8(2),n_qq8(3)])     !/sqrt(real(n_fft))												
+!         call finufft3d1(n_fft,xx(:,1),xx(:,2),xx(:,3),cf,iflag,eps_fft,n_qq8(1),n_qq8(2),n_qq8(3),ampl_tot,nul_opt,ier)
+          call finufft2d1(n_fft,xx(:,1),xx(:,2),cf,iflag,eps_fft,n_qq8(1),n_qq8(2),ampl_tot,nul_opt,ier)
+         
+         ampl_atom_3d(:,:,k,j) = reshape(source=ampl_tot,shape=[n_qq8(1),n_qq8(2)])     !/sqrt(real(n_fft))												
+        enddo  !k
+
         deallocate(xx,cf,ampl_tot)						
       enddo  !j (n_atom)
-
+ 
       call cpu_time(t2)
       CALL SYSTEM_CLOCK (COUNT = sc_c2)
       print *	
       print *,space, 'FINUFFT on',ifile,'snapshot CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
       print *					
    
-      if(j_acc==2) then																	!do MC integration
+      call cpu_time(t1)				
+    CALL SYSTEM_CLOCK (COUNT = sc_c1)		
+
+    if(j_acc==2) then																	!do MC integration
         print *,space, 'Doing MC integration ...'
         allocate(sq_hist_k(n_atom,n_atom,n_hist,n_h))
         sq_hist_k = 0
@@ -1109,7 +1131,7 @@ program mp_sql55
         ampl_atom_3d = ampl_atom_3d/sqrt(real(sum(n_sup)))
 
 !!!!CCC OMP continuation line must have a valid character in column 6  CCCCCCC
-!$omp parallel shared(ampl_atom_3d,sq_hist,q_norm,q_step,q_range,n_h,n_atom,n_qq,i_centre,n_int,j_rand,n_skip1,n_skip2)&
+!$omp parallel shared(sq_hist_k,ampl_atom_3d,q_norm,q_step,q_range,n_h,n_atom,n_qq,i_centre,n_int,j_rand,n_skip1,n_skip2)&
 !$omp& private(q_pos,q_pos_norm,d_ind,i_hist,idum,rand0,rand1,numbers,k,j,ii,jj,iii,jjj,kkk)
 !$omp do
 
@@ -1156,7 +1178,7 @@ program mp_sql55
           kkk = i_centre(3)+d_ind(3)
 
           if(q_norm(iii,jjj,kkk)<=q_range) then
-            i_hist = anint(q_norm(iii,jjj,kkk)/q_step)+1    !Q=0 is the 1st channel
+            i_hist = nint(q_norm(iii,jjj,kkk)/q_step)+1    !Q=0 is the 1st channel
             do ii=1,n_atom
               do jj = 1,n_atom
                 sq_hist_k(ii,jj,i_hist,k) = sq_hist_k(ii,jj,i_hist,k)+ampl_atom_3d(iii,jjj,kkk,ii)*conjg(ampl_atom_3d(iii,jjj,kkk,jj))
@@ -1185,7 +1207,7 @@ program mp_sql55
 
       ampl_atom_3d = ampl_atom_3d/sum(n_sup)
               
-!$omp parallel shared(n_qq,n_atom,q_norm,q_range,q_step,sq_hist,ampl_atom_3d) private(i_hist)
+!$omp parallel shared(n_qq,n_atom,q_norm,q_range,q_step,sq_hist_k,ampl_atom_3d) private(i_hist)
 !$omp do
         do i=1,n_qq(1)
           do j=1,n_qq(2)
@@ -1240,7 +1262,7 @@ program mp_sql55
   
     call cpu_time(t2)
     CALL SYSTEM_CLOCK (COUNT = sc_c2)
-    if(j_verb==1) print *,space, 'S(Q) histogram normalisations CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
+    print *,space, 'S(Q) histogram CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
     print *					
 
 
@@ -1293,8 +1315,8 @@ program mp_sql55
       endif
 
       if(j_verb==1) then
-        print *,space, 'at_weight',at_weight
-        print *,space, 'at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
+!         print *,space, 'at_weight',at_weight
+!         print *,space, 'at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
         print *,space, 'at_weight matrix'
         do ii=1,n_atom
             print *,space, ii,at_weight_matrix(ii,:) 
@@ -1323,19 +1345,6 @@ program mp_sql55
           enddo
         enddo
       endif
-
-
-
-      if(j_verb==1) then
-        print *,space, '2at_weight',at_weight
-         print *,space, '2at_weight_sq_av,at_weight_av_sq',at_weight_sq_av,at_weight_av_sq
-       print *,space, '2at_weight matrix'
-        do ii=1,n_atom
-            print *,space, ii,at_weight_matrix(ii,:) 
-        enddo      
-        print *
-      endif
-
 
 ! *** generate the smoothing profile (Gauss) and ...
 !
@@ -1635,7 +1644,7 @@ program mp_sql55
         read(*,*) x_start,x_end 
         if(x_start.lt.q_step) x_start = x(1)
         i_start = (x_start-x(1))/(x(2)-x(1)) + 1
-        i_end = anint((x_end-x(1))/(x(2)-x(1)))
+        i_end = nint((x_end-x(1))/(x(2)-x(1)))
         n_plot = i_end-i_start+1
       else
         c_min = c1
