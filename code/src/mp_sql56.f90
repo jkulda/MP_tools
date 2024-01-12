@@ -1,9 +1,9 @@
 
-program mp_sql55
+program mp_sql56
 
 ! *************************************************************************************
 ! *****
-! *****  %%%%%%%%%%%%%%%%   		 program MP_SQL 1.55   		 %%%%%%%%%%%%%%%%%%%%%%
+! *****  %%%%%%%%%%%%%%%%   		 program MP_SQL 1.56   		 %%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! *****   calculates and plots liquid scattering functions S(Q) from simulated data
 ! *****
@@ -139,7 +139,7 @@ program mp_sql55
   namelist /mp_pdf/ pdf_range,pdf_step,q_step,x_end,a_par_pdf,pdf_pix,pdf_pix_shift,j_rand,n_h,j_acc,j_mode,n_part_max,n_pseudo_max,n_cond,q_xff  
 !
 ! ********************* Initialization *******************************      
-  version_t = '1.561'
+  version_t = '1.56'
   prompt = 'MP_SQL>   '
   mp_tool = 'MP_SQL '//version_t
 
@@ -1104,7 +1104,6 @@ program mp_sql55
             enddo							
           endif		!input_method
 
-!         call finufft3d1(n_fft,xx(:,1),xx(:,2),xx(:,3),cf,iflag,eps_fft,n_qq8(1),n_qq8(2),n_qq8(3),ampl_tot,nul_opt,ier)
           call finufft2d1(n_fft,xx(:,1),xx(:,2),cf,iflag,eps_fft,n_qq8(1),n_qq8(2),ampl_tot,nul_opt,ier)
          
          ampl_atom_3d(:,:,k,j) = reshape(source=ampl_tot,shape=[n_qq8(1),n_qq8(2)])     !/sqrt(real(n_fft))												
@@ -2183,7 +2182,7 @@ program mp_sql55
     END IF
   END
 
-end program mp_sql55
+end program mp_sql56
 
 
 !! Copyright (C) 2004-2009: Leslie Greengard and June-Yub Lee 
