@@ -29,18 +29,25 @@
 
 */
 
-// This is a version reviewed by J. Kulda (ILL Grenoble) and P. Marton (FZU Prague) in December 2023
+// The present version has been reviewed and modified by J. Kulda (ILL Grenoble) 
+// and P. Marton (FZU Prague) in December 2023:
+//
 // The driver functionality hasn't changed but in addition to the "canonic" bug
-// setjmp(png_ptr->jmpbuf)  that should be   setjmp(png_jmpbuf(png_ptr)) (line ≈250)
+// setjmp(png_ptr->jmpbuf)  that should be setjmp(png_jmpbuf(png_ptr)) (line ≈250)
 // we have revisited the obsolete low resolution of the bitmap output, in fact:
-// - the DEFAULT_WIDTH and DEFAULT_HEIGHT does not seem relevant,  apparently internally 
-//   PGPLOT works with a maximum image size of 8"x8" and maximum 1280x1280 pixels
-// - thus the default resolution, originally at 85 ppi, has been increased to 160 ppi  
-// - the resolution can be further modified by setting a new environment variable PGPLOT_PNG_PPI,
-//   but above the value of 160 ppi it will result in only partial fills of the image field
-// - a new message on STDOUT warns when the PNG was not saved
+// - the DEFAULT_WIDTH and DEFAULT_HEIGHT variables do not appear relevant, PGPLOT seemingly  
+//   works with an image size of 8"x8" which it fills at some resolution, so the traditional
+//   default pitch of 85 ppi leads to an image of 680x680 
+// - we have increased this default value to 300 ppi; however, on smaller systems this may
+//   result in an only partially rendered image field - in such cases the resolution can
+//   be adapted by setting a lower value via a the environment variable PGPLOT_PNG_PPI
+// - also - on some systems - it may happen that the PNG file is generated, but not saved:
+//   a new message on STDOUT warns when the PNG was not saved, the remedy is to repeat the
+//   operation
 // - use STDERR redirection to STDOUT for more diagnostics: $> my_prog 2>&1
 // - error messages on STDERR are numbered for easier localisation in the code
+//
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -171,7 +178,7 @@ static void get_color_rep(DeviceData *dev, int index, ColorComponent *r, ColorCo
 static void write_image_file(DeviceData *dev) {
 
   int i;
-  char *filename;
+  char *filename=NULL;
   FILE *fp;
 
   png_structp    png_ptr;
@@ -644,12 +651,12 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 		rbuf[0] = 85.0; 
 	  rbuf[1] = 85.0; */
 //troubleshooting PM
-  char *aux_ppi=NULL;
+  {char *aux_ppi=NULL;
   
   if (! (aux_ppi = getenv("PGPLOT_PNG_PPI")))
 	{
-	     rbuf[0] = 160.0;        /* modified by JK 2023: this matters! */
-	     rbuf[1] = 160.0;
+	     rbuf[0] = 300.0;        /* modified by JK 2023: this matters! */
+	     rbuf[1] = 300.0;
 	}
 	else
 	{
@@ -658,6 +665,7 @@ void PNDRIV(int *opcode, float *rbuf, int *nbuf, char *chr, int *lchr, int *mode
 	}
 	rbuf[2] = 1.0;
 	*nbuf = 3;
+	}
 	break;
 //  case 3: 
 //	/* same as used in GIF drivers        
