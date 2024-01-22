@@ -1,9 +1,9 @@
 
-program mp_sqom55
+program mp_sqom56
 
 ! *************************************************************************************
 ! *****
-! *****  %%%%%%%%%%%%%%%%   		 program MP_SQOM 1.55   		 %%%%%%%%%%%%%%%%%%%%%%
+! *****  %%%%%%%%%%%%%%%%   		 program MP_SQOM 1.56   		 %%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! *****   calculates and plots scattering functions (S(Q), S(Q,w)) from simulated data
 ! *****
@@ -20,8 +20,6 @@ program mp_sqom55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**	See the GNU General Public License for more details.
 !**
-! *****  %%%%%%%%%%%%%%%%       program MP_SQOM 1.55      %%%%%%%%%%%%%%%%%%%%%%%%
-! ***** 
 ! ***** Ver 1.51  - originates from mp_sqom49.f of 2022-01-16 16:57 
 ! ***** 					- optimized algorithm using coherence profile integration w/o OMP 
 ! ***** 					- other parts parallelised via OMP without touching FINUFFT (OMP already in)
@@ -2428,7 +2426,7 @@ program mp_sqom55
       END IF
       END
 
-end program mp_sqom55
+end program mp_sqom56
 
 
 !! Copyright (C) 2004-2009: Leslie Greengard and June-Yub Lee 

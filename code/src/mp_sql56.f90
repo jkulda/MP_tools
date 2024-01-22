@@ -20,8 +20,6 @@ program mp_sql56
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**	See the GNU General Public License for more details.
 !**
-! *****  %%%%%%%%%%%%%%%%       program MP_SQL 1.55      %%%%%%%%%%%%%%%%%%%%%%%%
-! ***** 
 ! ***** Ver 1.55  - forked from MP_SQOM55 on 01/08/2023
 ! *****           - uses spherical average of 3D NUFFT amplitudes/intensities
 ! ***** 
@@ -948,7 +946,7 @@ program mp_sql56
   e3 = (/0,0,1/)
 
 
-! **** map loop (goes till the very end)
+! **** BZ_loop (goes till the very end)
 !
   bz_loop: do
 
@@ -1819,7 +1817,7 @@ program mp_sql56
       print *                 
       print *,prompt, 'Choose output options (MODE is ',trim(pdf_out(j_mode)),', FILE output is ',trim(ps_out(j_ps+1))       !,', SIZE is ',trim(size_out(j_out+1)),'):'
       print *,space, '       1   REPLOT the last graph'
-      write(*,'(10x,"        2   select max ",i2," partial PDFs & replot")') n_part_max
+      write(*,'(10x,"        2   select max ",i2," partials & replot")') n_part_max
       print *,space, '       3   adjust partials scales & replot '
       print *,space, '       4   modify atom WEIGHTS (',trim(at_weight_scheme(j_weight)) 
       print *,space, '       5   edit atom MASKS ',trim(masks(8:))

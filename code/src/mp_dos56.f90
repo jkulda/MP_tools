@@ -1,9 +1,9 @@
 
-program mp_dos55
+program mp_dos56
 			
 ! *************************************************************************************
 ! *****
-! *****  %%%%%%%%%%%%%%%%   		  program MP_DOS  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+! *****  %%%%%%%%%%%%%%%%   		  program MP_DOS  1.56   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! ***** vibrational density of states (DOS) from the velocity autocorrelation function
 ! *****
@@ -21,8 +21,6 @@ program mp_dos55
 !**	See the GNU General Public License for more details.
 !**
 !**
-! *****  %%%%%%%%%%%%%%%%        program MP_DOS 1.55        %%%%%%%%%%%%%%%%%%%%%%%%
-! ***** 
 ! ***** Ver. 1.50 - start of a new series (identical to 1.45)
 ! ***** 
 ! ***** Ver. 1.52 - all data arrays allocatable, no predefined array size limits
@@ -695,7 +693,7 @@ program mp_dos55
             
 ! **** Output the DOS to a text file (linear scale)			
     open (3,file=file_res)																		!open the output file
-    write(3,*) '*****    MP_DOS55: total and partial densities of vibrational states     *****'
+    write(3,*) '*****    ',trim(mp_tool),': total and partial densities of vibrational states     *****'
     write(3,*) 
     write(3,*) 'Input files:  ',trim(file_dat_t0),' to ',trim(file_dat)
     write(3,*) '  t0,t_step,n_row,n_atom:',t0,t_step,n_row,n_atom
@@ -779,7 +777,7 @@ program mp_dos55
   close(3)
   close(9)
             
-end program mp_dos55
+end program mp_dos56
 
 
 ! **** string conversion to all upper case

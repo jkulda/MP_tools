@@ -1,9 +1,9 @@
       
-program mp_lbin55
+program mp_lbin56
  
 ! ************************************************************************************* 
 ! ***** 
-! *****  %%%%%%%%%%%%%%%%   		  program MP_LBIN 1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%% 
+! *****  %%%%%%%%%%%%%%%%   		  program MP_LBIN 1.56   		 %%%%%%%%%%%%%%%%%%%%%%%%%% 
 ! ***** 
 ! *****   converts MD trajectory data (LAMMPS or equivalent) to the MP_TOOLS binary form 
 ! ***** 
@@ -21,7 +21,6 @@ program mp_lbin55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.   
 !**	See the GNU General Public License for more details. 
 !** 
-! ***** %%%%%%%%%%%%%%%%   			program MP_LBIN 1.55  				 %%%%%%%%%%%%%%%%%%%%%%%% 
 ! *****	Reads LAMMPS dump files and records binary data files (based on MB_LBINARY44.F) 
 ! ***** 
 ! ***** Ver. 1.44 - identifies atoms according to the fractional positions in the PAR file  
@@ -73,7 +72,7 @@ program mp_lbin55
   
   integer ::  at_no,at_ind_in(3),at_ind_base(3),i_dom,n_dom,i_dom_rec,n_at_cell
   integer ::  j_at,j_yes,j_shell,nskip,nfile_min,nfile_max,nfile_step,i_time(8),j_proc,j_mult,j_test
-  integer ::  ios,ierr,i,j,k,ii,jl,jat,jhead,j_step,j_label,n_label,n_site,j_eq,n_tstep0,n_tstep,n_items
+  integer ::  ios,ierr,i,j,k,ii,jj,jl,jat,jhead,j_step,j_label,n_label,n_site,j_eq,n_tstep0,n_tstep,n_items
   integer ::  inrec,jrec,nrec,i_rec,l_rec4,ifile,n_tot,n_tot_in,nsuper,nrow,nlayer,ind,ind_rec
   integer ::  sc_c1,sc_c2,sc_m,j_data,j_struct,j_verb,j_shrec,j_ext,j_time,j_basis,j_centred
   integer ::  ind_id,ind_type,ind_atom,ind_pos,ind_vel,ind_mass,ind_charge,ind_force,n_col
@@ -474,7 +473,7 @@ endif !'GENERAL'
         exit
       else
         print *,space,'Input data do not contain explicit TIME information!'
-        print *,prompt,'Type in T_MS [ps] (frequent value = .0002)'
+        print *,prompt,'Type in the microstep T_MS [ps] (frequent value = .0002)'
         read(*,*) t_ms
         t_dump0 = t_ms*n_tstep0
         exit
@@ -624,9 +623,6 @@ endif !'GENERAL'
 !  1 1 Na1_c 20.9 0.167166 0.254627 0.115284 3.148 -3.06563 0.629693  
 !  2 9 Na1_s 2.09 0.165161 0.250872 0.113053 2.9716 -2.99374 0.691807 
  
-!!    	read(1,*,iostat=ios) ii,jat,string				 
-!!    	read(1,*,iostat=ios) ii,jat,string2
-
   if(ind_atom/=0) then
     read(1,*)  data_line  
     string = 	data_line(ind_atom)
@@ -746,11 +742,9 @@ endif !'GENERAL'
 !			n_tot = n_tot_in 
 !		endif
 
-  if(j_shell.eq.1) n_tot = n_tot/2		!LAMMPS: shell model counts both cores and shells as atoms 
-
   allocate(at_name(n_tot),SOURCE='    ')
   allocate(e_kin(n_atom,3),at_occup_r(n_atom))
-  allocate(nsuper_r(n_atom),SOURCE=0) !atom number jat is the first of the four indices
+  allocate(nsuper_r(n_atom),SOURCE=0) 
   if(j_shell.eq.1)allocate(e_kin_s(n_atom,3),SOURCE=0.0)
   allocate(at_ind(4,n_tot),i_series(n_tot))
   i_series = (/ (i, i = 1, n_tot) /)
@@ -1028,37 +1022,40 @@ endif !'GENERAL'
         read(*,*)
          cycle read_loop
       endif
+
+        if(j_shell.eq.1) then
+          ii = max(index(string,'_c'),index(string,'_C'))  					!supposed core comes first
+          at_name_in = string(1:ii-1)
+        else
+          at_name_in = trim(string)
+        endif 
+
        
 ! *** read also the SHELL line if needed 
       if(at_list) then            !for at_list=.false. the shell-test has no sense, possibly list shells as atoms ....
         if(j_shell.eq.1) then     !this is based on testing the presence of '_c' and '_s' in subsequent lines; 
           read(1,*)  data_line   		
           if(ios.ne.0.and.i.lt.n_tot) then
-            print *,space, 'EOF or EOR at',ii,jat,string 
+            print *,space, 'EOF or EOR at',i,jat,string 
             stop
           endif
 
-          string2 = data_line(ind_atom)
           if(ind_mass/=0)read(data_line(ind_mass),*) at_mass_in2
           if(ind_charge/=0)read(data_line(ind_charge),*) at_charge_in2 
 !             read(data_line(ind_pos:ind_pos+2),*) at_pos_in2
           if(j_centred==0) at_pos_in2 = at_pos_in2-at_pos_centre
           if(ind_vel/=0)read(data_line(ind_vel:ind_vel+2),*) at_veloc_in2
           if(ind_force/=0)read(data_line(ind_force:ind_force+2),*) at_force_in2
-    
-          if(string2(1:j_eq-1)/=string(1:j_eq-1).or.jl-n_atom*n_eq/=jat) then
-            print *,space, 'inconsistent core/shell data',ii,jat,jl,string,string2
-            write(9,*) 'inconsistent core/shell data',ii,jat,jl,string,string2,  'STOP!'
+
+          string2 = data_line(ind_atom)
+          ii = max(index(string2,'_s'),index(string2,'_S'))  
+           
+          if(string2(1:ii-1)/=trim(at_name_in)) then
+            print *,space, 'inconsistent core/shell names',i,string,string2
+            write(9,*) 'inconsistent core/shell names',i,string,string2,  'STOP!'
             stop
           endif
-        endif 
-
-        if(j_shell.eq.1) then
-          ii = index(string,'_c')						!supposed core comes first
-          at_name_in = string(1:ii-1)
-        else
-          at_name_in = trim(string)
-        endif 
+        endif   !j_shell
 
         if(ind_type==0) then            ! for LAMMPS itself should never occur - TYPE is one of the default identifiers
           if(j_basis==0) then
@@ -1072,19 +1069,24 @@ endif !'GENERAL'
               print *,space, 'atom ',at_name_in,' not found in .PAR'
               stop
             endif
-          else
+          elseif(j_basis==1)  then
+!            jl = jl      !nothing to do
+          elseif(j_basis==2)  then
             do j=1,n_atom
               if (at_name_in.eq.at_name_par(j)) then    !look for type
                 jl=j			!atom label found
                 exit
               endif
             enddo
-            if(jl.ne.j) then			!after "normal" loop exit
+            if(jl/=j) then			!after "normal" loop exit
               print *,space, 'atom ',at_name_in,' not found in .PAR'
               stop
             endif
-         endif
-        endif
+          else 
+            print *,space, 'ERROR: wrong J_BASIS',j_basis
+            stop           
+          endif
+        endif  !ind_type
       else
         jl = at_ind(4,inrec)    ! nothing to do: at_inds are already defined, labels or types
       endif  !at_list
@@ -1157,7 +1159,11 @@ endif !'GENERAL'
             endif
           endif						
         endif
-         
+
+        if(jat<1.or.jat>n_atom) then
+          print *,space, 'Atom ID wrong:',jat,' not compatible with N_ATOM =',n_atom
+        endif
+        
 !! *** calculate cell indices ix,iy,iz from atomic positions shifted to cell origin
 
         at_ind_in = anint(at_pos_in-at_base_in(jat,:))+at_ind_base		!they will serve as pointers to the right order of atom records
@@ -1175,7 +1181,7 @@ endif !'GENERAL'
       
         jrec = nsuper*(jat-1)+nlayer*(at_ind_in(3)-1)+n_row(1)*(at_ind_in(2)-1)+at_ind_in(1)
 
-        if(jrec>n_tot.or.jat<1.or.jat>n_atom) then
+        if(jrec>n_tot_in) then
           print *,space, 'JREC wrong:',jrec,' > ',n_tot,' check n_tot_in, n_row and j_centred in the .PAR'
           print *,space, 'jrec,at_ind_in',jrec,at_ind_in
           print *,space, 'at_pos_in',at_pos_in,at_pos_in2
@@ -1265,8 +1271,11 @@ endif !'GENERAL'
       e_kin(j,:) = e_kin(j,:)/nsuper_r(j)
       if(j_shell.eq.1) e_kin_s(j,:) = e_kin_s(j,:)/nsuper_r(j)
     enddo	 
-!!					if(j_verb==1.and.i_traj==nt_min.and.ifile==nfile_min) then
-    if(j_verb==1.and.ifile==nfile_min) then
+
+    if(j_verb==1.and.ifile==nfile_max) print *
+    if(j_verb==1.and.ifile==nfile_max) print *,space, 'Last frame no.',ifile
+
+    if(j_verb==1.and.(ifile==nfile_min.or.ifile==nfile_max)) then
       print *
       print *,space, 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
       if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
@@ -1278,24 +1287,24 @@ endif !'GENERAL'
       temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B) !the true shell temperature
       if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
         temp = (temp_r_c+temp_r_s)*.5						!hi-T limit: independent C and S vibrations
-        if(ifile==nfile_min) print *,space, 'Hi-T limit: independent C and S vibrations'
+        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
       else
         temp = temp_r_c+temp_r_s	!low-T limit: strongly bound C and S vibrations
-        if(ifile==nfile_min) print *,space, 'Low-T limit: strongly bound C and S vibrations'
+        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Low-T limit: strongly bound C and S vibrations'
       endif        
-      if(ifile==nfile_min) print *,space, 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
-      if(ifile==nfile_min) write(9,*) 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
     else
       temp = temp_r_c
       temp_r_s = .0
-      if(ifile==nfile_min) print *,space, 'Real temperature: cores only ',temp
-      if(ifile==nfile_min) write(9,*) 'Real temperature: cores only ',temp
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: cores only ',temp
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: cores only ',temp
     endif
   else
     temp = temp_par
     if(n_traj==1) then
-      if(ifile==nfile_min) print *,space, 'Using nominal temperature [K] ',temp
-      if(ifile==nfile_min) write(9,*) 'Using nominal temperature [K] ',temp
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Using nominal temperature [K] ',temp
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Using nominal temperature [K] ',temp
     endif
   endif
   
@@ -1465,7 +1474,7 @@ endif !'GENERAL'
   write(9,*) 'Trajectory finished: ',ifile-nfile_min,' .dat files written in SYS time',(sc_c2-sc_c1)/sc_r,' sec'
 
   stop
-end program mp_lbin55
+end program mp_lbin56
 
 ! ********************************************************************************************************** 
 ! **** string conversion to all upper case 

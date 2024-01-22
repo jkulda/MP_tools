@@ -1,9 +1,9 @@
   
-program mp_dplot55
+program mp_dplot56
 
 ! *************************************************************************************
 ! *****
-! ***** %%%%%%%%%%%%%%%%         program MP_DPLOT  1.55        %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+! ***** %%%%%%%%%%%%%%%%         program MP_DPLOT  1.56        %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! *****   plots diverse real-space variables from simulated data files
 ! *****
@@ -20,9 +20,6 @@ program mp_dplot55
 !**  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**  See the GNU General Public License for more details.
 !**
-! ***** %%%%%%%%%%%%%%%%         program MP_DPLOT  1.55        %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-! *****
-! ***** 
 ! ***** Ver. 1.54 - NAMELIST I/O for .PAR files and .DAT headers implemented 
 ! *****           - PNG driver for PGPLOT included
 ! *****           
@@ -111,7 +108,7 @@ program mp_dplot55
 
 ! ********************* Initialization *******************************      
   version = '1.56'
-  prompt = 'MP_SQL>   '
+  prompt = 'MP_DPLOT> '
   mp_tool = 'MP_DPLOT '//version
 
   print *,'*** Program ',trim(mp_tool),' ** Copyright (C) Jiri Kulda (2023) ***'
@@ -1309,7 +1306,7 @@ program mp_dplot55
 888      CALL PGEND
   deallocate(displ_field,displ_norm,i_dom)
 
-end program mp_dplot55
+end program mp_dplot56
 
   
 ! **** string conversion to all upper case

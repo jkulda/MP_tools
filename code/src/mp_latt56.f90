@@ -1,9 +1,9 @@
       
-program mp_latt55
+program mp_latt56
 
 ! *************************************************************************************
 ! *****
-! *****  %%%%%%%%%%%%%%%%   		  program MP_LATT 1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+! *****  %%%%%%%%%%%%%%%%   		  program MP_LATT 1.56   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! *****   generates snapshot data file with random (or zero) atomic displacements  ****
 ! *****
@@ -20,8 +20,6 @@ program mp_latt55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**	See the GNU General Public License for more details.
 !**
-! *****   %%%%%%%%%%%%%%%%   			program MP_LATT 1.55  				 %%%%%%%%%%%%%%%%%%%%%%%%
-! *****
 ! *****		!!!! incompatible with the old MD 1.4 file format because of N_ROW(3) !!!!
 ! *****
 ! *****
@@ -390,7 +388,7 @@ program mp_latt55
   deallocate(at_pos,at_ind)
 
   stop
-end program mp_latt55
+end program mp_latt56
    
        
       !-----------------------------------------------------------------------

@@ -1,9 +1,9 @@
   
-program mp_tfilter55
+program mp_tfilter56
 
 ! *************************************************************************************
 ! *****
-! ***** %%%%%%%%%%%%%%%%   		  program MP_TFILTER  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+! ***** %%%%%%%%%%%%%%%%   		  program MP_TFILTER  1.56   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! *****   calculates the pair distribution functions (PDF) for simulated supercell data
 ! *****
@@ -20,9 +20,6 @@ program mp_tfilter55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**	See the GNU General Public License for more details.
 !**
-! ***** %%%%%%%%%%%%%%%%   		  program MP_TFILTER  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-! *****
-
 ! ***** Ver. 1.50	- start of new series (identical to mp_pdf 1.42) as MP_PDF
 ! ***** 
 ! ***** Ver. 1.51	- all data arrays allocatable, no predefined array size limits
@@ -456,7 +453,7 @@ program mp_tfilter55
   print *,'          ', 'Finished: ',file_dat_out
   print *,'          ', 'Total of',i_save,' files written'  
                     
-end program mp_tfilter55
+end program mp_tfilter56
 
   
 ! **********************************************************************************************************

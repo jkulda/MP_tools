@@ -20,7 +20,7 @@ program mp_insp55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**	See the GNU General Public License for more details.
 !**
-! ***** %%%%%%%%%%%%%%%%           program MP_INSP 1.55   					 %%%%%%%%%%%%%%%%%%%%%%%%
+! ***** %%%%%%%%%%%%%%%%           program MP_INSP 1.56   					 %%%%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! ***** Ver. 1.1 - original version
 ! ***** Ver. 1.2  
@@ -292,7 +292,7 @@ program mp_insp55
     enddo file_loop
 
     stop
-  end program mp_insp55
+  end program mp_insp56
     
 ! **** string conversion to all upper case
 !     

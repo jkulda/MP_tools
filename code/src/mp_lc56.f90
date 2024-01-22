@@ -1,9 +1,9 @@
   
-program mp_lc55
+program mp_lc56
 
 ! *************************************************************************************
 ! *****
-! ***** %%%%%%%%%%%%%%%%   		  program MP_LC  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+! ***** %%%%%%%%%%%%%%%%   		  program MP_LC  1.56   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! *****               produces a linear combination of snapshots 
 ! *****
@@ -20,9 +20,6 @@ program mp_lc55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**	See the GNU General Public License for more details.
 !**
-! ***** %%%%%%%%%%%%%%%%   		  program MP_LC  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-! *****
-
 ! ***** Ver. 1.50	- start of new series (identical to mp_pdf 1.42) as MP_PDF
 ! ***** 
 ! ***** Ver. 1.51	- all data arrays allocatable, no predefined array size limits
@@ -362,7 +359,7 @@ program mp_lc55
   print *,space, 'Finished: ',file_dat_out
   print *,space, 'Total of',nfile,' files written'  
                     
-end program mp_lc55
+end program mp_lc56
    
 ! **********************************************************************************************************
 ! **** string conversion to all upper case

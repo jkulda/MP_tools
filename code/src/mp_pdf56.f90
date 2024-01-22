@@ -1,9 +1,9 @@
   
-program mp_pdf55
+program mp_pdf56
 
 ! *************************************************************************************
 ! *****
-! ***** %%%%%%%%%%%%%%%%   		  program MP_PDF  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+! ***** %%%%%%%%%%%%%%%%   		  program MP_PDF  1.56   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ! *****
 ! *****   calculates the pair distribution functions (PDF) for simulated supercell data
 ! *****
@@ -20,8 +20,6 @@ program mp_pdf55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 !**	See the GNU General Public License for more details.
 !**
-! ***** %%%%%%%%%%%%%%%%   		  program MP_PDF  1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-! *****
 ! ***** Ver. 1.1 The correlation is asymmetric: n_int random cell against the complete supercell
 ! ***** Ver. 1.2 the whole supercell is read into memory once for ever
 ! ***** Ver. 1.21 the correlation is symmetric n_int random cells against n_int random cells
@@ -2080,7 +2078,7 @@ program mp_pdf55
   flush(9)
   close(9)
               
-end program mp_pdf55
+end program mp_pdf56
       
 ! **** minimal random number generator (Numerical Recipees))
 !           

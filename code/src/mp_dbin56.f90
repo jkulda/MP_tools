@@ -1,9 +1,9 @@
       
-program mp_dbin55
+program mp_dbin56
  
 ! ************************************************************************************* 
 ! ***** 
-! *****  %%%%%%%%%%%%%%%%   		  program MP_BIN 1.55   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+! *****  %%%%%%%%%%%%%%%%   		  program MP_BIN 1.56   		 %%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 ! ***** 
 ! *****   converts MD trajectory data (DL_POLY or equivalent) to the MP_TOOLS binary form 
 ! ***** 
@@ -20,7 +20,7 @@ program mp_dbin55
 !**	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.   
 !**	See the GNU General Public License for more details. 
 !** 
-! *****   %%%%%%%%%%%%%%%%   			program MP_BIN 1.55  				 %%%%%%%%%%%%%%%%%%%%%%%% 
+! *****   %%%%%%%%%%%%%%%%   			program MP_BIN 1.56  				 %%%%%%%%%%%%%%%%%%%%%%%% 
 ! ***** 
 ! *****		!!!! incompatible with the old MD 1.4 file format because of N_ROW(3) !!!! 
 ! ***** 
@@ -1092,7 +1092,7 @@ program mp_dbin55
   write(9,*) 
 
   stop
-end program mp_dbin55
+end program mp_dbin56
 
 
 
