@@ -2077,7 +2077,9 @@ program mp_pdf56
 
   flush(9)
   close(9)
-              
+  CALL PGCLOS
+  CALL PGEND
+             
 end program mp_pdf56
       
 ! **** minimal random number generator (Numerical Recipees))
