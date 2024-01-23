@@ -660,12 +660,6 @@ endif !'GENERAL'
 ! *** produce informative values on A_PAR and ANGLES, for GENERAL data they will serve throughout ....
 ! *** calculate angles of unit cell and the inverse of a_cell                    
     do j=1,3
-      a_cell_half(j) = .5*sum(a_cell(:,j))
-      if(j_centred==0) then
-        at_pos_centre(j) = a_cell_half(j)   
-      else
-        at_pos_centre(j) = .0
-      endif
       a_cell(j,:) = a_cell(j,:)/n_row(j)        !for n_row>1 a_cell becomes unit cell
       a_par(j) = norm2(a_cell(j,:))
       if(nsuper==1) a_cell(j,:) = a_cell(j,:)/a_par(j)         !effective a_par=1 and Q will be in [A-1]
@@ -873,11 +867,6 @@ endif !'GENERAL'
 ! *** calculate angles of unit cell and the inverse of a_cell                    
       do j=1,3
         a_cell_half(j) = .5*sum(a_cell(:,j))
-        if(j_centred==0) then
-          at_pos_centre(j) = a_cell_half(j)   
-        else
-          at_pos_centre(j) = .0
-        endif
         a_cell(j,:) = a_cell(j,:)/n_row(j)        !for n_row>1 a_cell becomes unit cell
         a_par(j) = norm2(a_cell(j,:))
         if(nsuper==1) a_cell(j,:) = a_cell(j,:)/a_par(j)         !effective a_par=1 and Q will be in [A-1]
@@ -1000,13 +989,6 @@ endif !'GENERAL'
       endif
       at_pos_in = at_pos_in/a_scale								!apply a scaling to convert from exotic position units; normally a_scale = 1.
                  
-!  				if(pos_units=='ANGSTROM') then 
-!           if(j_centred==0) at_pos_in = at_pos_in-at_pos_centre 
-!  				 
-!  			  elseif(pos_units=='LATTICE') = 
-!  			  elseif(pos_units=='BOX') = 
-!  				endif
-
       if(ind_vel/=0)read(data_line(ind_vel:ind_vel+2),*,iostat=ios) at_veloc_in
       if(ios/=0)then
         print *,space, 'Data read problem: ios =',ios
@@ -1042,8 +1024,7 @@ endif !'GENERAL'
 
           if(ind_mass/=0)read(data_line(ind_mass),*) at_mass_in2
           if(ind_charge/=0)read(data_line(ind_charge),*) at_charge_in2 
-!             read(data_line(ind_pos:ind_pos+2),*) at_pos_in2
-          if(j_centred==0) at_pos_in2 = at_pos_in2-at_pos_centre
+          read(data_line(ind_pos:ind_pos+2),*) at_pos_in2
           if(ind_vel/=0)read(data_line(ind_vel:ind_vel+2),*) at_veloc_in2
           if(ind_force/=0)read(data_line(ind_force:ind_force+2),*) at_force_in2
 
