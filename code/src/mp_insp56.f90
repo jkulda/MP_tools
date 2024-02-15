@@ -1,5 +1,5 @@
    
-program mp_insp55
+program mp_insp56
 
 ! *************************************************************************************
 ! *****
@@ -173,7 +173,7 @@ program mp_insp55
       endif
                     
       print *,space, 'Substance name:                        ',subst_name
-      print *,space, 'Data & simulation type, input method:',dat_type,sim_type,input_method
+      print *,space, 'Data & simulation type, input method:  ',dat_type,sim_type,input_method
       print *,space, 'Time structure t_ms,t_step,t_dump:  ',t_ms,t_step,t_dump
       print *,space, 'Shells, trajectory type, boundary cnd: ',j_shell_out,'  ',n_traj,'  ',n_cond
       if(filter_fwhm/=0.) print *,space, 'Time filter name, fwhm:                ',trim(filter_name),filter_fwhm
@@ -181,14 +181,14 @@ program mp_insp55
       print *,space, 'Unit cell parameter(3), angle(3):   ',a_par,'    ',angle
       if(n_head==4) then
         print *,space 
-        print *,space, '  a_cell                                                  a_cell_inv'
+        print *,space, '  a_cell                                                 a_cell_inv'
         do k=1,3
-          print *,space, a_cell(k,:),'    ',a_cell_inv(k,:)
+          print *,space, '  ',a_cell(k,:),'    ',a_cell_inv(k,:)
         enddo
       endif
 
       print *,space 
-      print *,space, 'Atom numbers:                       ',n_atom,nsuper_r,n_tot
+      print *,space, 'Atom numbers:        ',n_atom,nsuper_r,n_tot
       print *,space, 'Atoms & occupancies: '
       do j=1,n_atom
         print *,space, '                   ',at_name_out(j),at_base(j,:),at_occup_r(j)
@@ -264,23 +264,23 @@ program mp_insp55
         endif
 
         jj = 4*(jpos_in-1)
-        print *,space, 'Atom, type, mass, charge    ',at_name_out(jat),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)   !at_ind(jj+4)=0 for unoccupied
+        print *,space, 'Atom type, mass, charge    ',at_name_out(jat),at_ind(jj+4),at_veloc_c(jj+4),at_pos_c(jj+4)   !at_ind(jj+4)=0 for unoccupied
         if(input_method=='CELL'.or.input_method=='FAST')	then
-          print *,space, 'Cell index            ',at_ind(jj+1:jj+3)
+          print *,space, 'Cell index           ',at_ind(jj+1:jj+3)
         else
-          print *,space, 'Atom index            ',at_ind(jj+1)					
+          print *,space, 'Atom index           ',at_ind(jj+1)					
         endif
         
-        print *,space, 'Atom position            ',at_pos_c(jj+1:jj+3)
+        print *,space, 'Atom position           ',at_pos_c(jj+1:jj+3)
         if(index(sim_type,'static')==0.and.index(sim_type,'Static')==0.and.index(sim_type,'STATIC')==0) then
-          if(n_traj>=1) print *,space, 'Atom velocity             ',at_veloc_c(jj+1:jj+3)
-          if(n_traj==2) print *,space, 'Atom force                ',at_force_c(jj+1:jj+3)
+          if(n_traj>=1) print *,space, 'Atom velocity           ',at_veloc_c(jj+1:jj+3)
+          if(n_traj==2) print *,space, 'Atom force              ',at_force_c(jj+1:jj+3)
           print *,space
           if(j_shell_out==1) then
-            print *,space, trim(at_name_out(jat))//'_s',at_veloc_s(jj+4),at_pos_s(jj+4)
-            print *,space, 'Shell position                ',at_pos_s(jj+1:jj+3)
-            if(n_traj>=1) print *,space, 'Shell velocity                ',at_veloc_s(jj+1:jj+3)
-            if(n_traj==2) print *,space, 'Shell force               ',at_force_s(jj+1:jj+3)
+            print *,space, 'Shell type, mass, charge   ',trim(at_name_out(jat))//'_s',at_ind(jj+4),at_veloc_s(jj+4),at_pos_s(jj+4)
+            print *,space, 'Shell position          ',at_pos_s(jj+1:jj+3)
+            if(n_traj>=1) print *,space, 'Shell velocity          ',at_veloc_s(jj+1:jj+3)
+            if(n_traj==2) print *,space, 'Shell force             ',at_force_s(jj+1:jj+3)
           endif
         endif				
         print *,space         
