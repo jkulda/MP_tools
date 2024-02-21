@@ -119,13 +119,14 @@ program mp_dbin56
   real :: at_mass_in,at_mass_in2,at_charge_in,at_charge_in2,at_displ_in,sc_r
   real ::	at_pos_in(3),at_pos_in2(3),at_veloc_in(3),at_veloc_in2(3),at_force_in(3),at_force_in2(3),at_base_shift(3)
   real ::	dummy,at_pos2(3),at_pos3(3),at_veloc2(3),a_cell(3,3),a_cell_1(3,3),a_cell_inv(3,3),a_cell_par(3),a_cell_half(3),at_pos_centre(3)
-  real :: t1,t2,filter_fwhm,t_step,zero,at_zero(3),pos_inp(3),temp_par,eps_x,temp_r_s,temp_r_c
+  real :: t1,t2,filter_fwhm,t_step,zero,at_zero(3),pos_inp(3)
+  real :: temp_par,temp_r_c,temp_r_s,temp_r_cg,temp_cs,eps_x
 
   character(4),allocatable :: at_name(:),at_label(:)
   integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:)
   integer,allocatable,target :: i_series(:),at_ind_out(:)
   integer,pointer ::  jr(:)
-  real,allocatable ::  sum_pos(:,:,:),ord(:),e_kin(:,:),e_kin_s(:,:),at_base_in(:,:),at_base(:,:),at_occup(:)
+  real,allocatable ::  sum_pos(:,:,:),ord(:),e_kin(:,:),e_kin_s(:,:),e_kin_cg(:,:),at_base_in(:,:),at_base(:,:),at_occup(:)
 
 ! **** the following variables MUST have the following 32bit sizes or multiples because of alignement in the binary output file 
 !
@@ -139,7 +140,7 @@ program mp_dbin56
   integer(4)     :: n_row(3),n_atom,n_eq,j_shell_out,n_traj,n_cond,idum,n_rec,n_head,n_head_in1,n_head_in2
   real(4)        :: rec_zero(l_rec),t_ms,t_dump,a_par(3),angle(3),temp
 
-  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,&
+  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
@@ -200,6 +201,7 @@ program mp_dbin56
   n_tot_in = 0
   t_ms = .0
   temp_par = .0
+  temp_cs = .0
   at_base_shift = .0
   filter_name = 'nn'
   filter_fwhm = .0
@@ -524,6 +526,7 @@ program mp_dbin56
   allocate(e_kin(n_atom,3),at_occup_r(n_atom))
   allocate(nsuper_r(n_atom),SOURCE=0) !atom number jat is the first of the four indices
   if(j_shell.eq.1)allocate(e_kin_s(n_atom,3),SOURCE=0.0)
+  if(j_shell.eq.1)allocate(e_kin_cg(n_atom,3),SOURCE=0.0)
   allocate(i_series(n_tot))
   i_series = (/ (i, i = 1, n_tot) /)
 
@@ -671,7 +674,8 @@ program mp_dbin56
   
     e_kin = .0
     if(j_shell.eq.1) e_kin_s = .0
-    
+    if(j_shell.eq.1) e_kin_cg = .0
+
     call cpu_time(t1)				
 
     read_loop: do  inrec=1,n_tot_in        !swallow the snapshot
@@ -853,7 +857,10 @@ program mp_dbin56
       if(n_traj>=1) then
         do k = 1,3
           e_kin(jat,k) = e_kin(jat,k) + at_mass_in*at_veloc_in(k)**2			!at_mass_c(i)=at_veloc_c(4,i)
-          if(j_shell==1) e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2
+          if(j_shell==1) then
+            e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2
+            e_kin_cg(jat,k) = e_kin_cg(jat,k) + (at_mass_in*at_veloc_in(k)+at_mass_in2*at_veloc_in2(k))**2/(at_mass_in+at_mass_in2)
+          endif
         enddo
       endif
     enddo read_loop
@@ -886,6 +893,7 @@ program mp_dbin56
       do j=1,n_atom
         e_kin(j,:) = e_kin(j,:)/(nsuper_r(j))
         if(j_shell.eq.1) e_kin_s(j,:) = e_kin_s(j,:)/(nsuper_r(j))
+        if(j_shell.eq.1) e_kin_cg(j,:) = e_kin_cg(j,:)/nsuper_r(j)
       enddo
 
       if(j_verb==1.and.i_traj==nt_min.and.ifile==nfile_min) then
@@ -895,31 +903,39 @@ program mp_dbin56
       endif
 
 ! *** get the true temperature
-      temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature
-
-      if(j_shell.eq.1) then
-        temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B) !the true temperature
-        if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
-          temp = (temp_r_c+temp_r_s)*.5						!hi-T limit: independent C and S vibrations
-          if(j_read.le.j_test) print *,space, 'Hi-T limit: independent C and S vibrations'
-        else
-          temp = temp_r_c+temp_r_s	!low-T limit: strongly bound C and S vibrations
-          if(j_read.le.j_test) print *,space, 'Low-T limit: strongly bound C and S vibrations'
-        endif        
-        if(j_read.le.j_test) print *,space, 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
-        if(j_read.le.j_test) write(9,*) 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
-      else
-        temp = temp_r_c
-        temp_r_s = .0
-        if(j_read.le.j_test) print *,space, 'Real temperature: cores only ',temp
-        if(j_read.le.j_test) write(9,*) 'Real temperature: cores only ',temp
-      endif
-    else
-      temp = temp_par
-      if(j_read.le.j_test) print *,space, 'Using nominal temperature [K] ',temp
-    endif
+    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature
+    temp = temp_r_c
+    
+    if(j_shell.eq.1) then
+      temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B) !the true shell temperature
+      temp_r_cg = sum(e_kin_cg(1:n_atom,:))/(n_atom*3*k_B) !the true LAMMPS temperature
       
-       
+      temp = temp_r_cg                      !temperature of the core-shell centre-of-mass
+      temp_cs = temp_r_c+temp_r_s-temp_r_cg !internal temperature of the core-shell pair
+      
+      if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
+        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
+      else
+        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Low-T limit: strongly bound C and S vibrations'
+      endif        
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: core, shell      ',temp_r_c,temp_r_s
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: core, shell      ',temp_r_c,temp_r_s
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
+    else
+      temp_r_s = .0
+      temp = temp_r_c
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: atoms/cores_only ',temp
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: atoms/cores_only ',temp
+    endif
+  else
+    temp = temp_par
+    if(n_traj==1) then
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Using nominal temperature [K] ',temp
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Using nominal temperature [K] ',temp
+    endif
+  endif
+  
 ! *** First snapshot in the series only 
 ! *** get the atom position occupation numbers and compare them with those from the .par file
                   !analyze in detail the 1st snapshot

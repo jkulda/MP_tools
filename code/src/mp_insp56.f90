@@ -79,10 +79,10 @@ program mp_insp56
     
     integer(4) :: j_name,n_head
 
-    real(4) :: a_par(3),angle(3),a_cell(3,3),a_cell_inv(3,3),t_ms,t_step,t_dump,filter_fwhm,temp
+    real(4) :: a_par(3),angle(3),a_cell(3,3),a_cell_inv(3,3),t_ms,t_step,t_dump,filter_fwhm,temp,temp_cs
 
-    namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,&
-  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
+  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
+ &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
     namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
     namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
    
@@ -104,6 +104,7 @@ program mp_insp56
     input_method = 'nn'
     t_ms = .0
     t_step = .0
+    temp_cs = .0
     filter_name = 'nn'
     filter_fwhm = .0
     
@@ -177,7 +178,11 @@ program mp_insp56
       print *,space, 'Time structure t_ms,t_step,t_dump:  ',t_ms,t_step,t_dump
       print *,space, 'Shells, trajectory type, boundary cnd: ',j_shell_out,'  ',n_traj,'  ',n_cond
       if(filter_fwhm/=0.) print *,space, 'Time filter name, fwhm:                ',trim(filter_name),filter_fwhm
-      print *,space, 'Supercell & temperature:            ',n_row,temp
+      if(j_shell_out==1) then
+        print *,space, 'Supercell & temperature CG, CS:     ',n_row,temp,temp_cs
+      else
+        print *,space, 'Supercell & temperature:            ',n_row,temp
+      endif
       print *,space, 'Unit cell parameter(3), angle(3):   ',a_par,'    ',angle
       if(n_head==4) then
         print *,space 

@@ -150,9 +150,9 @@ program mp_pdf56
 
   character(16)  :: sim_type,dat_type,input_method,file_par,dat_source
   integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,idum,rand,mult,j_pgc
-  real(4)        :: rec_zero(l_rec),t_ms,t_step,t0,t1,a_par(3),angle(3),a_par_pdf(3),temp
+  real(4)        :: rec_zero(l_rec),t_ms,t_step,t0,t1,a_par(3),angle(3),a_par_pdf(3),temp,temp_cs
 
-  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,&
+  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
