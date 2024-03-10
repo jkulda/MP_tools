@@ -79,7 +79,8 @@ program mp_dbin56
 ! *****  Ver. 1.55 - bug fixes 
 ! ***** 
 ! *****  Ver. 1.56 - handles triclinic unit cell geometry
-! ***** 
+! *****            - for core-shell model records the centre-of-mass positions&velocities for J_SHREC=0
+! *****
 ! ***** reads ASCII text output from MD simmulations (trajectory file) 
 ! ***** writes binary direct-access files for each snapshot 
 ! ***** depending on settings both CORE and SHELL records are read and recorded 
@@ -199,6 +200,7 @@ program mp_dbin56
   i_dom = 0
   n_cond = 2               !orthorhombic periodic bound_cond by default
   n_tot_in = 0
+  j_shrec = 0
   t_ms = .0
   temp_par = .0
   temp_cs = .0
@@ -209,7 +211,12 @@ program mp_dbin56
    
 ! *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
   print *,prompt, 'Parameter file name (.par will be added)'
-  read(*,*) file_par
+  do
+    read(*,*) string
+    if(len(trim(string))<=16) exit
+    print *,space,'Name exceeds 16 character, modify & retype ...'
+  enddo
+  file_par = trim(string)
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
@@ -232,9 +239,21 @@ program mp_dbin56
   call up_case(input_method)
   call up_case(pos_units)
   
+  if(dat_type/='DL_POLY') then
+    print *,space, 'Data type in .PAR ', trim(pos_units),' not corresponding to DL_POLY, continue (1/0)?'
+    read(*,*) j_yes
+    if(j_yes==0) stop    
+  endif
+
   if(pos_units/='ANGSTROM') then
-    print *,space, 'Position units ', trim(pos_units),' not implemented with DL_POLY data type, ANGSTROM needed! '
+    print *,space, 'Position units ', trim(pos_units),' not implemented with DL_POLY data type, ANGSTROM needed!'
     stop
+  endif
+  
+  if(j_centred/=1) then
+    print *,space, 'Atom coordinates not centred (J_CENTRED/=1, unusual with DL_POLY data type), continue (1/0)?'
+    read(*,*) j_yes
+    if(j_yes==0) stop    
   endif
   
   if(ext=='ext'.or.ext=='EXT') ext=''
@@ -490,9 +509,9 @@ program mp_dbin56
   
   if(j_shell==1) then
     print *,space,'Core & shell data found'
-    if(j_shrec==0) print *,space,'Shell data NOT to be recorded (change this in .PAR)'
-    if(j_shrec==1) print *,space,'Shell data WILL be recorded'
-    if(j_shrec==1) write(9,*)'Shell data WILL be recorded'
+    if(j_shrec==0) print *,space,'Core-shell centre-of-mass data will be recorded (default, change in .PAR with caution)'
+    if(j_shrec==1) print *,space,'Core-shell data WILL be recorded individually'
+    if(j_shrec==1) write(9,*)'Core-shell data WILL be recorded individually'
   endif
   j_shell_out = j_shell*j_shrec
 
@@ -683,10 +702,11 @@ program mp_dbin56
 ! *** first read the CORE data  
 
       read(1,*,iostat=ios_t) at_name_in,at_no,at_mass_in,at_charge_in,at_displ_in
-        if(ios_t/=0) print *,space, 'Error on ASCII input IOS: ',ios_t 
 
       if(ios_t<0.or.at_name_in.eq.head) then 
         exit read_loop    !end of snapshot, end of file
+      elseif(ios_t>0) then
+        print *,space, 'Error on ASCII input IOS: ',ios_t
       endif
 
       read(1,*) at_pos_in
@@ -745,7 +765,7 @@ program mp_dbin56
 !
         at_pos_in = matmul(a_cell_inv,at_pos_in)    			! at_pos_in are in Eucleidian direct space coordinates, we need to get them into the lattice coordinates to be able to use periodic boundary contions for FT
                                                           ! for nsuper=1 nothing happens as a_cell and a_cell_inv are unit matrices
-        if(j_shell_out==1) at_pos_in2 = matmul(a_cell_inv,at_pos_in2)     
+        if(j_shell==1) at_pos_in2 = matmul(a_cell_inv,at_pos_in2)     
         
 ! *** index BULK data 
       if(input_method=='BULK') then         !jl identifes label (chem species), jat basis position in CELL
@@ -794,7 +814,7 @@ program mp_dbin56
 
         at_ind_in = anint(at_pos_in-at_base_in(jat,:))+at_ind_base  !they will serve as pointers to the right order of atom records
         at_pos_in = at_pos_in+at_base_shift			!now the supercell will be centred & basis origin in at_base_shift
-        if(j_shell_out.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
+        if(j_shell.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
 
         do k=1,3
           if(at_ind_in(k)==0) then
@@ -806,7 +826,7 @@ program mp_dbin56
    
         jrec = nsuper*(jat-1)+nlayer*(at_ind_in(3)-1)+n_row(1)*(at_ind_in(2)-1)+at_ind_in(1)
       
-        if(jrec>n_tot.or.jat<1.or.jat>n_atom) then
+        if(jrec<1.or.jrec>n_tot.or.jat<1.or.jat>n_atom) then
           print *,space, 'JREC wrong:',jrec,' > ',n_tot,' check n_tot_in, n_row and j_centred in the .PAR'
           print *,space, 'jrec,at_ind_in',jrec,at_ind_in
           print *,space, 'at_pos_in',at_pos_in,at_pos_in2
@@ -824,7 +844,7 @@ program mp_dbin56
         do k=1,3
           if(at_pos_in(k)<n_row(k)/2.) at_pos_in(k) = at_pos_in(k)+n_row(k)   
           if(at_pos_in(k)>=n_row(k)/2.) at_pos_in(k) = at_pos_in(k)-n_row(k)
-          if(j_shell_out==1) then
+          if(j_shell==1) then
               if(at_pos_in2(k)<n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)   
               if(at_pos_in2(k)>=n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
           endif
@@ -833,23 +853,38 @@ program mp_dbin56
 
 ! *** prepare the output data     ! at_pos_in for BULK with n_row=1 will be recorded in ANGSTROM units 
 !
-      at_pos_c(1:3,jrec) = at_pos_in     
-      at_pos_c(4,jrec) = at_charge_in	
 
-      if(n_traj>=1) then
-        at_veloc_c(1:3,jrec) = at_veloc_in
-        at_veloc_c(4,jrec) = at_mass_in	
-      endif						
-      if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
-
-      if(j_shell_out==1) then				!only if the shell data are going to be recorded
+      if(j_shell==0) then				    !no shells at all
+        at_pos_c(1:3,jrec) = at_pos_in
+        at_pos_c(4,jrec) = at_charge_in
+        if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = at_veloc_in
+          at_veloc_c(4,jrec) = at_mass_in	
+        endif						
+        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
+      elseif(j_shell==1.and.j_shell_out==0) then				!calculate core-shell centre of mass									 
+        at_pos_c(1:3,jrec) = (at_mass_in*at_pos_in+at_mass_in2*at_pos_in2)/(at_mass_in+at_mass_in2)
+        at_pos_c(4,jrec) = at_charge_in+at_charge_in2
+        if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = (at_mass_in*at_veloc_in+at_mass_in2*at_veloc_in2)/(at_mass_in+at_mass_in2)
+          at_veloc_c(4,jrec) = at_mass_in+at_mass_in2	
+        endif						
+        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in+at_force_in2
+      elseif(j_shell_out==1) then				!only if the shell data are going to be recorded
+        at_pos_c(1:3,jrec) = at_pos_in
+        at_pos_c(4,jrec) = at_charge_in
         at_pos_s(1:3,jrec) = at_pos_in2
         at_pos_s(4,jrec) = at_charge_in2							
         if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = at_veloc_in
+          at_veloc_c(4,jrec) = at_mass_in	
           at_veloc_s(1:3,jrec) = at_veloc_in2
           at_veloc_s(4,jrec) = at_mass_in2							
         endif
         if(n_traj==2) at_force_s(1:3,jrec) = at_force_in2
+      else
+        print *,space,'ERR: j_shell_out out of range 0..1 '
+        stop
       endif
 
 ! *** accumulate the occupation number and the kinetic energy to refine the real temperature
@@ -858,7 +893,7 @@ program mp_dbin56
         do k = 1,3
           e_kin(jat,k) = e_kin(jat,k) + at_mass_in*at_veloc_in(k)**2			!at_mass_c(i)=at_veloc_c(4,i)
           if(j_shell==1) then
-            e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2
+            e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2        !we drop the 1/2 factor everywhere as we will do later with k_B
             e_kin_cg(jat,k) = e_kin_cg(jat,k) + (at_mass_in*at_veloc_in(k)+at_mass_in2*at_veloc_in2(k))**2/(at_mass_in+at_mass_in2)
           endif
         enddo
@@ -898,12 +933,12 @@ program mp_dbin56
 
       if(j_verb==1.and.i_traj==nt_min.and.ifile==nfile_min) then
         print *
-        print *,space, 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
-        if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
+        print *,space, 'Cores E_kin(jat,:)',(.5*e_kin(jat,:),jat=1,n_atom)
+        if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(.5*e_kin_s(jat,:),jat=1,n_atom)
       endif
 
 ! *** get the true temperature
-    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature
+    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature          !we drop the 1/2 factor with k_B as we did before with m*v**2
     temp = temp_r_c
     
     if(j_shell.eq.1) then

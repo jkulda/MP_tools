@@ -809,7 +809,7 @@ program mp_sqom56
     endif
 
     if(nsuper>1) then
-      bz_ny = (bz_n*(e1p_norm/(e2p_norm*sqrt(1.-cos_ep_angle**2))))            !adapt the BZ numbers to differences in a_par(j) !DO BY A_CELL
+      bz_ny = max(bz_n,bz_n*(e1p_norm/(e2p_norm*sqrt(1.-cos_ep_angle**2))))            !adapt the BZ numbers to differences in a_par(j) !DO BY A_CELL
       if(abs(cos_ep_angle)>.0) then
         bz_nx = bz_n+bz_ny*abs(cos_ep_angle)
       else
@@ -819,14 +819,13 @@ program mp_sqom56
       n_qy = twopi*bz_ny/tpe2			    
     else
       bz_nx = bz_n
-      bz_nY = bz_n
+      bz_ny = bz_n
       n_qx = bz_nx/tpe1			          !here the bz_n unit is 1 Å-1 corresponding to 1 rad FT phase
       n_qy = bz_ny/tpe2			    
     endif
 
     if(j_verb==1) print *,space, 'bz_nx,bz_ny',bz_nx,bz_ny
-    if(j_verb==1) print *,space, '1Q-pixels X,Y: ', n_qx,n_qy
-
+ 
     if(2*(n_qx/2)/=n_qx) n_qx = n_qx+1
     if(2*(n_qy/2)/=n_qy) n_qy = n_qy+1          
     n_qx8 = n_qx
@@ -1344,18 +1343,20 @@ program mp_sqom56
       q2_x = dot_product(e1,q2+(i_plot-n_plot/2-1)*dq_p)/e1_norm
       q2_y = dot_product(e2,q2+(i_plot-n_plot/2-1)*dq_p)/e2_norm
       if(q1_x.lt.qx_min.or.q1_x.gt.qx_max.or.q1_y.lt.qy_min.or.q1_y.gt.qy_max)then
+        print *,space, 'Map range: qx_min,qx_max,qy_min,qy_max:',qx_min,qx_max,qy_min,qy_max
         print *,space, 'Q1 out of the map range:',q1_x,q1_y
         cycle
       endif
       if(q2_x.lt.qx_min.or.q2_x.gt.qx_max.or.q2_y.lt.qy_min.or.q2_y.gt.qy_max)then
+        print *,space, 'Map range: qx_min,qx_max,qy_min,qy_max:',qx_min,qx_max,qy_min,qy_max
         print *,space, 'Q2 out of the map range:',q2_x,q2_y
         cycle
       endif
             
-      n_q1x = abs(q1_x-qx_min)*dot_product(e1,n_row)+1			!find indices of the first and last Q_points of the dispersion plot
-      n_q2x = abs(q2_x-qx_min)*dot_product(e1,n_row)+1
-      n_q1y = abs(q1_y-qy_min)*dot_product(e2,n_row)+1
-      n_q2y = abs(q2_y-qy_min)*dot_product(e2,n_row)+1
+      n_q1x = nint(abs(q1_x-qx_min)*dot_product(e1,n_row))+1			!find indices of the first and last Q_points of the dispersion plot
+      n_q2x = nint(abs(q2_x-qx_min)*dot_product(e1,n_row))+1
+      n_q1y = nint(abs(q1_y-qy_min)*dot_product(e2,n_row))+1
+      n_q2y = nint(abs(q2_y-qy_min)*dot_product(e2,n_row))+1
 
       if(abs(n_q2x-n_q1x).ge.abs(n_q2y-n_q1y))then
         n_qdisp = abs(n_q2x-n_q1x)
@@ -1684,7 +1685,6 @@ program mp_sqom56
     qx_ming = dot_product(e1,q_center)/e1_norm-.5*bz_n        !DO BY A_CELL  E_NORM READJUTS Q_RANGE (100 VERS 110)
     qx_maxg = dot_product(e1,q_center)/e1_norm+.5*bz_n
 
-
     if(j_disp==0) then
       tr_shift_x = .5
       tr_shift_y = .5
@@ -1701,8 +1701,8 @@ program mp_sqom56
       TR(4) = qy_min-tr_shift_y*TR(6)
 
     elseif(j_disp==1)then
+      tr_shift_x = .5
       if(n_qxg==2*(n_qxg/2)) tr_shift_x = 1.
-
       TR(2) = (q_max-q_min)/(n_qxg)
       TR(1) = q_min-tr_shift_x*TR(2)
       TR(3) = 0.0
@@ -1814,6 +1814,7 @@ program mp_sqom56
 ! *** print footer with program version & date_and_time
       x_plot = qx_min+.75*(qx_max-qx_min)
       y_plot = qy_min-.1*(qy_max-qy_min)
+      if(j_disp==1) y_plot = f_min-.1*(f_max-f_min)
       CALL PGSCI (1)  !white needs to be reset after PGLAB
       CALL PGSTBG(0)																				 !erase graphics under text
       CALL PGSLW(2)			!operates in steps of 5
@@ -1849,7 +1850,7 @@ program mp_sqom56
     c_max = c_max_save
     
 ! **** make an optional hardcopy and .txt output
-    if (j_ps.eq.1.and.j_plot>0) then				!j_ps; don't make hardcopy upon 1st pass	
+    if (j_ps.eq.1.and.abs(j_plot)>0) then				!j_ps; don't make hardcopy upon 1st pass	
       jfile = 1
       do						!look for existing .txt files to continue numbering
         if(t_single)then
@@ -2069,6 +2070,7 @@ program mp_sqom56
 ! *** print footer with program version & date_and_time
       x_plot = qx_min+.75*(qx_max-qx_min)
       y_plot = qy_min-.1*(qy_max-qy_min)
+      if(j_disp==1) y_plot = f_min-.1*(f_max-f_min)
       CALL PGSCI (1)  !white needs to be reset after PGLAB
       CALL PGSTBG(0)																				 !erase graphics under text
       CALL PGSLW(2)			!operates in steps of 5

@@ -160,6 +160,7 @@ program mp_lbin56
   i_dom = 0
   n_cond = 2               !orthorhombic periodic bound_cond by default
   n_tot_in = 0
+  j_shrec = 0
   at_list = .true.
   t_ms = .0
   t_step = .0
@@ -175,7 +176,12 @@ program mp_lbin56
   
 ! *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
   print *,prompt, 'Parameter file name (.par will be added)'
-  read(*,*) file_par
+  do
+    read(*,*) string
+    if(len(trim(string))<=16) exit
+    print *,space,'Name exceeds 16 character, modify & retype ...'
+  enddo
+  file_par = trim(string)
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
@@ -302,8 +308,8 @@ program mp_lbin56
   n_items = 0
   file_master = '' 
 ! ***********************************
-! n_row_par 32 32 32 & bounds:   standard box  cell & bulk periodic         !bounds may follow on N_ROW line in .PAR
-! n_row_par  1  1  1 & bounds:   standard box  bulk aperiodic              
+! n_row_par 32 32 32 & bounds:   standard box  cell & bulk periodic        ? !bounds may follow on N_ROW line in .PAR
+! n_row_par  1  1  1 & bounds:   standard box  bulk aperiodic              ?
 ! n_row_par 32 32 32 & no_bounds: standard box  cell & bulk periodic    r.l.u.
 ! n_row_par  1  1  1 & no_bounds: min_max box  bulk aperiodic          r.l.u. 
 ! **********************************
@@ -638,9 +644,9 @@ endif !'GENERAL'
   
   if(j_shell==1) then
     print *,space,'Core & shell data found'
-    if(j_shrec==0) print *,space,'Shell data NOT to be recorded (change this in .PAR)'
-    if(j_shrec==1) print *,space,'Shell data WILL be recorded'
-    if(j_shrec==1) write(9,*)'Shell data WILL be recorded'
+    if(j_shrec==0) print *,space,'Core-shell centre-of-mass data will be recorded (default, change in .PAR with caution)'
+    if(j_shrec==1) print *,space,'Core-shell data WILL be recorded individually'
+    if(j_shrec==1) write(9,*)'Core-shell data WILL be recorded individually'
   endif
   j_shell_out = j_shell*j_shrec
 
@@ -1086,7 +1092,7 @@ endif !'GENERAL'
         endif
         at_pos_in = at_pos_in-at_pos_centre
         at_pos_in = matmul(a_cell_inv,at_pos_in)
-        if(j_shell_out==1) then                     !shells only with LAMMPS which is ANGSTROM
+        if(j_shell==1) then                     !shells only with LAMMPS which is ANGSTROM
           if(j_centred==0) at_pos_in2 = at_pos_in2-at_pos_centre
           at_pos_in2 = matmul(a_cell_inv,at_pos_in2)
         endif       				
@@ -1153,7 +1159,7 @@ endif !'GENERAL'
 
         at_ind_in = anint(at_pos_in-at_base_in(jat,:))+at_ind_base		!they will serve as pointers to the right order of atom records
         at_pos_in = at_pos_in+at_base_shift			!now the supercell will be centred & basis positions origin at 0
-        if(j_shell_out.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
+        if(j_shell.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
 
         do k=1,3
           if(at_ind_in(k)==0) then
@@ -1184,7 +1190,7 @@ endif !'GENERAL'
         do k=1,3
           if(at_pos_in(k)<-n_row(k)/2.) at_pos_in(k) = at_pos_in(k)+n_row(k)   
           if(at_pos_in(k)>=n_row(k)/2.) at_pos_in(k) = at_pos_in(k)-n_row(k)
-          if(j_shell_out==1) then
+          if(j_shell==1) then
               if(at_pos_in2(k)<-n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)   
               if(at_pos_in2(k)>=n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
           endif
@@ -1194,27 +1200,41 @@ endif !'GENERAL'
 ! *** prepare the output data 
 !	
       if(nsuper==1.and.pos_units=='BOX') then
-        at_pos_in = at_pos_in*a_par      !bring at_pos_in from the (-.5,.5) range back to the  box range 
-        if(j_shell_out==1) at_pos_in2 = at_pos_in2*a_par
+        at_pos_in = at_pos_in*a_par      !bring at_pos_in from the (-.5,.5) range back to the ? box range 
+        if(j_shell==1) at_pos_in2 = at_pos_in2*a_par
       endif														 
 
-      at_pos_c(1:3,jrec) = at_pos_in
-      at_pos_c(4,jrec) = at_charge_in															 
-
-      if(n_traj>=1) then
-        at_veloc_c(1:3,jrec) = at_veloc_in
-        at_veloc_c(4,jrec) = at_mass_in	
-      endif						
-      if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
-
-      if(j_shell_out==1) then				!only if the shell data are going to be recorded
+      if(j_shell==0) then				    !no shells at all
+        at_pos_c(1:3,jrec) = at_pos_in
+        at_pos_c(4,jrec) = at_charge_in
+        if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = at_veloc_in
+          at_veloc_c(4,jrec) = at_mass_in	
+        endif						
+        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
+      elseif(j_shell==1.and.j_shell_out==0) then				!calculate core-shell centre of mass									 
+        at_pos_c(1:3,jrec) = (at_mass_in*at_pos_in+at_mass_in2*at_pos_in2)/(at_mass_in+at_mass_in2)
+        at_pos_c(4,jrec) = at_charge_in+at_charge_in2
+        if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = (at_mass_in*at_veloc_in+at_mass_in2*at_veloc_in2)/(at_mass_in+at_mass_in2)
+          at_veloc_c(4,jrec) = at_mass_in+at_mass_in2	
+        endif						
+        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in+at_force_in2
+      elseif(j_shell_out==1) then				!only if the shell data are going to be recorded
+        at_pos_c(1:3,jrec) = at_pos_in
+        at_pos_c(4,jrec) = at_charge_in
         at_pos_s(1:3,jrec) = at_pos_in2
         at_pos_s(4,jrec) = at_charge_in2							
         if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = at_veloc_in
+          at_veloc_c(4,jrec) = at_mass_in	
           at_veloc_s(1:3,jrec) = at_veloc_in2
           at_veloc_s(4,jrec) = at_mass_in2							
         endif
         if(n_traj==2) at_force_s(1:3,jrec) = at_force_in2
+      else
+        print *,space,'ERR: j_shell_out out of range 0..1 '
+        stop
       endif
 
 ! *** accumulate the occupation number and the kinetic energy to refine the real temperature
@@ -1223,7 +1243,7 @@ endif !'GENERAL'
         do k = 1,3
           e_kin(jat,k) = e_kin(jat,k) + at_mass_in*at_veloc_in(k)**2			!at_mass_c(i)=at_veloc_c(4,i)
           if(j_shell==1) then 
-            e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2
+            e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2              !we drop the 1/2 factor everyhere as we will do later with k_B
             e_kin_cg(jat,k) = e_kin_cg(jat,k) + (at_mass_in*at_veloc_in(k)+at_mass_in2*at_veloc_in2(k))**2/(at_mass_in+at_mass_in2)
           endif
         enddo
@@ -1266,12 +1286,12 @@ endif !'GENERAL'
 
     if(j_verb==1.and.(ifile==nfile_min.or.ifile==nfile_max)) then
       print *
-      print *,space, 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
-      if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
+      print *,space, 'Cores E_kin(jat,:)',(.5*e_kin(jat,:),jat=1,n_atom)
+      if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(.5*e_kin_s(jat,:),jat=1,n_atom)
     endif
 
 ! *** get the true temperature
-    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature
+    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature           !we drop the 1/2 factor with k_B as we did before with m*v**2
     temp = temp_r_c
     
     if(j_shell.eq.1) then
