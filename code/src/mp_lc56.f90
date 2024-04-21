@@ -82,7 +82,7 @@ program mp_lc56
   namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
 !!      namelist /data_header_2/at_name_out,at_base,at_occup_r,at_base,nsuper_r           !allocatables
- 
+!!      namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
 !!      namelist /mp_gen/ j_verb,j_proc       
 !!      namelist /mp_out/ j_weight,j_xray,j_logsc,j_txt,j_grid,pg_out       
 !!      										!general rule: namelists of tools should only contain their local parameters
@@ -244,7 +244,7 @@ program mp_lc56
         print *,space, 'WARNING: the input data were not produced by the CELL input method,'
         print *,space, 'the algorithm as such may work, BUT as there is no guaranteed relationship'
         print *,space, 'between the data position in the .BIN file and the position of the related ,'
-        print *,space, 'atom in the simulation box, the results when combining several snapshots'
+        print *,space, 'atom in the simulation box, the results of combining several snapshots'
         print *,space, 'may become COMPLETELY IMPREVISIBLE!'
         print *
         print *,prompt, 'Do you wish to continue anyways, at YOUR risks & perils? (1/0)'

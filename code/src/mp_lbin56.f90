@@ -80,7 +80,7 @@ program mp_lbin56
 
   real :: at_mass_in,at_mass_in2,at_charge_in,at_charge_in2,item_value(4),sc_r
   real ::	at_pos_in(3),at_pos_in2(3),at_veloc_in(3),at_veloc_in2(3),at_force_in(3),at_force_in2(3),at_base_shift(3),a_scale
-  real ::	at_pos_centre(3),a_cell(3,3),a_cell_1(3,3),a_cell_inv(3,3),a_cell_par(9),a_cell_lo(3),a_cell_hi(3),a_cell_half(3),cell_par,atp,b_coh
+  real ::	at_pos_centre(3),a_cell(3,3),a_cell_1(3,3),a_cell_inv(3,3),a_cell_par(9),a_cell_lo(3),a_cell_hi(3),a_cell_half(3),cell_par,arg,b_coh
   real :: t_dump0,t0,t1,t2,dt,t_step,pos_inp(3),xy(3)
   real :: temp_par,temp_r_c,temp_r_s,temp_r_cg,temp_cs,eps_x
   
@@ -96,7 +96,7 @@ program mp_lbin56
   character(4),allocatable :: at_name_par(:),at_name_out(:)
   integer(4),allocatable   :: at_ind(:,:),nsuper_r(:)
 
-  real(4),allocatable ::	at_pos_c(:,:),at_veloc_c(:,:),at_force_c(:,:),at_occup_r(:)
+  real(4),allocatable ::	at_pos_c(:,:),at_veloc_c(:,:),at_force_c(:,:),at_occup_r(:),d_cs(:),d_cs_max(:)
   real(4),allocatable ::	at_pos_s(:,:),at_veloc_s(:,:),at_force_s(:,:)
 
   character(16)  :: sim_type,input_method,dat_type,dat_origin,dat_source,file_par,filter_name,pos_units
@@ -744,7 +744,7 @@ endif !'GENERAL'
 !		endif
 
   allocate(at_name(n_tot),SOURCE='    ')
-  allocate(e_kin(n_atom,3),at_occup_r(n_atom))
+  allocate(e_kin(n_atom,3),at_occup_r(n_atom),d_cs(n_atom),d_cs_max(n_atom))
   allocate(nsuper_r(n_atom),SOURCE=0) 
   if(j_shell.eq.1)allocate(e_kin_s(n_atom,3),SOURCE=0.0)
   if(j_shell.eq.1)allocate(e_kin_cg(n_atom,3),SOURCE=0.0)
@@ -940,6 +940,8 @@ endif !'GENERAL'
     e_kin = .0
     if(j_shell.eq.1) e_kin_s = .0
     if(j_shell.eq.1) e_kin_cg = .0
+    if(j_shell.eq.1) d_cs = .0
+    if(j_shell.eq.1) d_cs_max = .0
 
 ! ***** now read the data
     read_loop: do i=1,n_tot
@@ -1247,6 +1249,9 @@ endif !'GENERAL'
             e_kin_cg(jat,k) = e_kin_cg(jat,k) + (at_mass_in*at_veloc_in(k)+at_mass_in2*at_veloc_in2(k))**2/(at_mass_in+at_mass_in2)
           endif
         enddo
+        arg = sqrt(dot_product((at_pos_in-at_pos_in2)*a_par,(at_pos_in-at_pos_in2)*a_par))
+        if(arg>d_cs_max(jat)) d_cs_max(jat) = arg
+        d_cs(jat) = d_cs(jat)+arg
       endif !input method
     enddo read_loop
 
@@ -1279,6 +1284,7 @@ endif !'GENERAL'
       e_kin(j,:) = e_kin(j,:)/nsuper_r(j)
       if(j_shell.eq.1) e_kin_s(j,:) = e_kin_s(j,:)/nsuper_r(j)
       if(j_shell.eq.1) e_kin_cg(j,:) = e_kin_cg(j,:)/nsuper_r(j)
+      if(j_shell.eq.1) d_cs(j) = d_cs(j)/nsuper_r(j)
     enddo	 
 
     if(j_verb==1.and.ifile==nfile_max) print *
@@ -1310,6 +1316,10 @@ endif !'GENERAL'
       if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: core, shell      ',temp_r_c,temp_r_s
       if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
       if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Average CS shift                   ',d_cs
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Average CS shift                   ',d_cs
+      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Maximum CS shift                   ',d_cs_max
+      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Maximum CS shift                   ',d_cs_max
     else
       temp_r_s = .0
       temp = temp_r_c
@@ -1479,7 +1489,7 @@ endif !'GENERAL'
   
   enddo trajectory_loop 
 
-  deallocate(at_name,at_ind,e_kin,at_occup_r,nsuper_r,i_series)
+  deallocate(at_name,at_ind,e_kin,at_occup_r,d_cs,nsuper_r,i_series)
   if(j_shell.eq.1) deallocate(e_kin_s)
 
   deallocate(at_name_par,at_label,at_base_in,at_base,ind_l,i_site,at_occup,at_mass_in_c,at_mass_in_s)

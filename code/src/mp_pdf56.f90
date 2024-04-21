@@ -118,9 +118,9 @@ program mp_pdf56
   
   character(4)   :: version,head,atom,ps_out(2),size_out(2)
   character(10)	 :: prompt,space = '          '
-  character(10)  :: at_weight_scheme(3),pg_out,pg_ext,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
+  character(10)  :: at_weight_scheme(3),pg_out,pg_ext,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile,shells(2)
   character(16)  :: sim_type_par,string16,filter_name
-  character(40)  :: subst_name,file_master,file_out,time_stamp,int_mode,x_file_name,string,mp_tool
+  character(40)  :: subst_name,file_master,file_out,time_stamp,int_mode,x_file_name,string,mp_tool,string_in
   character(60)  :: file_dat,file_inp,file_dat_t0,file_res,file_ps,file_log,masks,smooth
   character(256) :: cwd_path,plot_header,plot_title,line
   character(l_rec):: header_record
@@ -149,7 +149,7 @@ program mp_pdf56
   real(4),allocatable ::	at_pos_in(:),at_occup_r(:),at_occup_1(:),at_occup_2(:),at_occup_k1(:,:),at_occup_k2(:,:),r_min(:,:),part_scale(:),at_scf(:)
 
   character(16)  :: sim_type,dat_type,input_method,file_par,dat_source
-  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,idum,rand,mult,j_pgc
+  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell,j_shell_out,n_traj,n_cond,n_rec,idum,rand,mult,j_pgc
   real(4)        :: rec_zero(l_rec),t_ms,t_step,t0,t1,a_par(3),angle(3),a_par_pdf(3),temp,temp_cs
 
   namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
@@ -157,7 +157,8 @@ program mp_pdf56
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
  
-  namelist /mp_gen/ j_verb,j_proc       
+  namelist /mp_gen/ j_verb,j_proc
+  namelist /mp_in/  j_shell       
   namelist /mp_out/ j_weight,j_logsc,j_ps,j_txt,p_size,j_grid,pg_out,j_out,j_pgc       
                       !general rule: namelists of tools should only contain their local parameters
                       !what is of global interest they should pass into data_header
@@ -266,6 +267,8 @@ program mp_pdf56
   x_label = (/'r [A]  ','r [A]  ','Q [A-1]','Q [A-1]','Q [A-1]','Q [A-1]','Q [A-1]'/)
   ps_out = (/'OFF ','ON  '/)			!PGPLOT
   size_out = (/'S   ','XXL '/)		!PGPLOT
+  shells(1) = ''
+  shells(2) = 'SHELLS'
   j_out = 1
   j_ext = 0
   
@@ -383,7 +386,6 @@ program mp_pdf56
   j_proc = 0
   read(4,nml=mp_gen)
 
-  
   j_txt = 0               !defaults for &mp_out
   j_out = 0
   j_weight = 1
@@ -419,9 +421,23 @@ program mp_pdf56
   n_part_ext = 0
   j_rand = 1
   q_xff = .0
+
+  j_shell = 0
+  rewind(4)
+  read(4,nml=mp_in,iostat=ios)
+  if(ios/=0) j_shell = 0
+  if(j_shell==1) then
+    if(j_shell_out==1) then
+      print *,space,'Using SHELL input!'
+    else
+      print *,space,'SHELL data input not available, using CORES as usual!' 
+      j_shell = 0
+    endif   
+  endif
+
   rewind(4)
   read(4,nml=mp_pdf)
-  
+   
   allocate(ind_pseudo(n_atom,n_atom+n_pseudo_max+1),at_name_pseudo(n_atom+n_pseudo_max+1))       !1st pseudo is TOT by default
   ind_pseudo = 0
   at_name_pseudo = ''
@@ -594,6 +610,18 @@ program mp_pdf56
     print *,space, 'check atom name spelling and the neutron_xs.txt table; use unit weights'
   enddo xff_loop
   close(4)
+
+  string_in = subst_name
+  print *,prompt, 'Substance name (confirm, &append or replace): ', string_in
+  read(*,*) string_in
+  string_in = trim(adjustl(string_in))
+  if(string_in/=subst_name) then
+    if(string_in(1:1)=='&') then
+      subst_name = trim(subst_name)//string_in(2:)
+    else
+      subst_name = string_in
+    endif
+  endif
 
 
 ! *** write overview of atom data
@@ -833,12 +861,22 @@ program mp_pdf56
     i_rec = i_rec+1
     read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
   
-    do j=1,n_rec-1
+    if(j_shell==0) then
+      do j=1,n_rec-1
+        i_rec = i_rec+1       !read the CORES
+        read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec)			
+      enddo	
       i_rec = i_rec+1
-      read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec)			
-    enddo	
-    i_rec = i_rec+1
-    read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot)				
+      read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot)
+    else
+      i_rec = i_rec+(n_traj+1)*n_rec          !read the SHELLS 
+      do j=1,n_rec-1
+        i_rec = i_rec+1
+        read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec)			
+      enddo	
+      i_rec = i_rec+1
+      read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot)
+    endif				
     close(1)
      print *,space, 'Read finished'
 
@@ -1582,13 +1620,10 @@ program mp_pdf56
     print *,space, 'Vertical scale c_min,c_max',c_min,c_max
     
     write(plot_header,'(a,"    ",a," weights  ")') trim(file_dat_t0),trim(at_weight_scheme(j_weight))
-    plot_header = trim(subst_name)//'  '//trim(pdf_out(j_mode))//'  '//trim(plot_header)//trim(masks)//'  '//trim(smooth)
+    plot_header = trim(subst_name)//' '//trim(shells(j_shell+1))//'  '//trim(pdf_out(j_mode))//'  '//trim(plot_header)//trim(masks)//'  '//trim(smooth)
 
     scale_loop: do
 
-  call date_and_time(c_date,c_time,c_zone,i_time)
-  write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
-       
       CALL PGSLCT(j_xserv)
       CALL PGSCI (1)  !white
       CALL PGSCH(1.)
@@ -1644,6 +1679,9 @@ program mp_pdf56
         CALL PGTEXT (x_plot,y_plot,plot_title)
       enddo
 
+! *** print footer with program version & date_and_time
+      call date_and_time(c_date,c_time,c_zone,i_time)
+      write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
       x_plot = x_start+.8*(x_end-x_start)
       y_plot = c_min-.1*(c_max-c_min)
       CALL PGSCI (1)  !white needs to be reset after PGLAB
@@ -1738,7 +1776,7 @@ program mp_pdf56
 !         CALL PGBOX (XOPT, XTICK, NXSUB, YOPT, YTICK, NYSUB)
 !       endif
 
-      plot_header = trim(subst_name)//'  '//file_ps//'  '//trim(at_weight_scheme(j_weight))//' weights  '//trim(masks)//'  '//trim(smooth)	
+      plot_header = trim(subst_name)//' '//trim(shells(j_shell+1))//'  '//trim(file_ps)//'  '//trim(at_weight_scheme(j_weight))//' weights  '//trim(masks)//'  '//trim(smooth)	
 
       CALL PGSCI (1)  !white
       CALL PGSCH(1.)

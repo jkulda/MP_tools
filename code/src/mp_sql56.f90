@@ -53,9 +53,9 @@ program mp_sql56
   character(4)   :: atom,ps_out(2),version_t,head
   character(5)   :: pg_ext,c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
   character(10)	 :: prompt,space = '          '
-  character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
+  character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile,shells(2)
   character(40)  :: subst_name,file_title,file_master,time_stamp,x_title,y_title,masks,at_weight_scheme(4),int_mode,mp_tool
-  character(40)  :: file_dat,file_inp,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in,smooth
+  character(40)  :: file_dat,file_inp,file_dat_t0,file_res,file_ps,file_log,x_file_name,string_in,smooth
   character(256) :: line,plot_title1,plot_title2,plot_title,plot_header,scan_title,interp_title,data_path,cwd_path,rec_str
   character(l_rec):: header_record
 
@@ -115,8 +115,8 @@ program mp_sql56
   real(4), pointer :: at_pos_file_bulk(:,:)
 
   character(16)  :: sim_type,dat_type,input_method,file_par,dat_source,string16,filter_name
-  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_pgc
-  real(4)        :: rec_zero(l_rec),filter_fwhm,t_ms,t0,t1,a_par_pdf(3),a_par(3),angle(3),temp,temp_cs
+  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_pgc
+  real(4)        :: rec_zero(l_rec),filter_fwhm,t_ms,t0,t1,a_par_pdf(3),a_par(3),angle(3),temp
 
 ! *** PGPLOT stuff
   integer :: PGOPEN,NC,plot_unit
@@ -125,12 +125,13 @@ program mp_sql56
   REAL XTICK, YTICK
   INTEGER NXSUB, NYSUB,j_xserv					
 
-  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
+  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,&
  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
  
   namelist /mp_gen/ j_verb,j_proc       
+  namelist /mp_in/  j_shell       
   namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out,j_ps,j_out,j_pgc        
                       !general rule: namelists of tools should only contain their localisation parameters
                       !what is data-related should pass into data_header
@@ -172,6 +173,8 @@ program mp_sql56
   y_label(7) = 'I(Q) [unscaled]'
   x_label = (/'r [A]  ','r [A]  ','Q [A-1]','Q [A-1]','Q [A-1]','Q [A-1]','Q [A-1]'/)
   ps_out = (/'OFF ','ON  '/)			!PGPLOT
+  shells(1) = ''
+  shells(2) = 'SHELLS'
   plot_unit = 0
   p_size = 7.	                  !PGPLOT - screen plot size
   j_pgc = 6 										!PGPLOT - JK printer-friendly rainbow for colormaps (no black)
@@ -314,6 +317,19 @@ program mp_sql56
     endif
   rewind(4)
 
+  j_shell = 0
+  rewind(4)
+  read(4,nml=mp_in,iostat=ios)
+  if(ios/=0) j_shell = 0
+  if(j_shell==1) then
+    if(j_shell_out==1) then
+      print *,space,'Using SHELL input!'
+    else
+      print *,space,'SHELL data input not available, using CORES as usual!' 
+      j_shell = 0
+    endif   
+  endif
+
   read(4,nml=mp_out,iostat=ios)
     if(ios/=0) then
       print *,space, 'Error reading NML = mp_out from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
@@ -328,9 +344,7 @@ program mp_sql56
     pg_ext = '.ps'
   endif
 
-
   rewind(4)
-!   read(4,nml=mp_sql,iostat=ios)
   read(4,nml=mp_pdf,iostat=ios)
   if(ios/=0) then
     print *,space, 'Error',ios ,'reading NML = mp_pdf from ', trim(file_inp),', check that you have MP_TOOLS at least ',version
@@ -340,7 +354,7 @@ program mp_sql56
     print *,space, 'Modes J_MODE=1..2 not available with MP_SQL, setting J_MODE=6 for I(Q)'
     j_mode = 6
   endif
-  
+
 !!  allocate(ind_pseudo(n_atom,n_atom+n_pseudo_max+1),at_name_pseudo(n_pseudo_max+1),c_pseudo(n_pseudo_max+1),c_pseudo_mean(n_pseudo_max+1),m_pseudo(n_pseudo_max+1))       !1st pseudo is TOT by default
 !!  ind_pseudo = 0
 !!  at_name_pseudo = ''
@@ -913,12 +927,22 @@ program mp_sql56
     i_rec = i_rec+1
     if(jfile==nfile_min) read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot)			
 
-    do j=1,n_rec-1
+    if(j_shell==0) then
+      do j=1,n_rec-1
+        i_rec = i_rec+1       !read the CORES
+        read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,ifile)			
+      enddo	
       i_rec = i_rec+1
-      read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,ifile)			
-    enddo	
-    i_rec = i_rec+1
-    read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,ifile)					
+      read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,ifile)
+    else
+      i_rec = i_rec+(n_traj+1)*n_rec          !read the SHELLS 
+      do j=1,n_rec-1
+        i_rec = i_rec+1
+        read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,ifile)			
+      enddo	
+      i_rec = i_rec+1
+      read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,ifile)
+    endif				
     close(1)
   enddo file_loop
 
@@ -1555,12 +1579,12 @@ program mp_sql56
     print *,space, 'Vertical scale c_min,c_max',c_min,c_max
     
     if (j_mode==5)then
-      write(plot_header,'(a,"    ",a)') trim(file_dat_t0),trim(at_weight_scheme(1))         !implicit unit weights for Z(Q)
+      write(plot_header,'(a," ",a,"    ",a)') trim(file_dat_t0),shells(j_shell+1),trim(at_weight_scheme(1))         !implicit unit weights for Z(Q)
     else    
-      write(plot_header,'(a,"    ",a)') trim(file_dat_t0),trim(at_weight_scheme(j_weight))
+      write(plot_header,'(a," ",a,"    ",a)') trim(file_dat_t0),shells(j_shell+1),trim(at_weight_scheme(j_weight))
     endif
     
-    plot_header = trim(subst_name)//'  '//trim(pdf_out(j_mode))//'  '//trim(plot_header)//trim(masks)      //'  '//trim(smooth)
+!    plot_header = trim(subst_name)//'  '//trim(pdf_out(j_mode))//'  '//trim(plot_header)//trim(masks)      //'  '//trim(smooth)
 
     scale_loop: do
        
@@ -1589,8 +1613,8 @@ program mp_sql56
           CALL PGSTBG(0)																				 !erase graphics under text
           CALL PGSLW(5)			!operates in steps of 5
           y_plot = y_plot-.04*(c_max-c_min)
-          write(plot_title,'(a,a,i1.1," x",2f7.3)') trim(pdf_out(j_mode)),'_ext',j,ext_scale(j),ext_dy(j)
-          CALL PGTEXT (x_plot,y_plot,plot_title)
+!          write(plot_title,'(a,a,i1.1," x",2f7.3)') trim(pdf_out(j_mode)),'_ext',j,ext_scale(j),ext_dy(j)
+!          CALL PGTEXT (x_plot,y_plot,plot_title)
         enddo
       endif
 
@@ -1699,7 +1723,7 @@ program mp_sql56
       CALL PGSCRN(0, 'white', IER)	!plot on white background
       CALL PGSCRN(1, 'black', IER)
 
-      plot_header = trim(subst_name)//'  '//file_ps//'  '//trim(at_weight_scheme(j_weight))//'  '//trim(masks)//'  '//trim(smooth)	
+      plot_header = trim(subst_name)//' '//shells(j_shell+1)//'  '//file_ps//'  '//trim(at_weight_scheme(j_weight))//'  '//trim(masks)//'  '//trim(smooth)	
 
       CALL PGSCI (1)  !white
       CALL PGSCH(1.)
@@ -1775,7 +1799,7 @@ program mp_sql56
         open (4,file=file_res)
 
     ! *** write the S(Q) file header
-        write(4,*) 'Substance:   ',trim(subst_name),'       ',trim(mp_tool)//' '//trim(time_stamp)
+        write(4,*) 'Substance:   ',trim(subst_name),'  ',shells(j_shell+1),'       ',trim(mp_tool)//' '//trim(time_stamp)
         write(4,*) 'Input files: ',trim(file_dat_t0),' to ',trim(file_dat),' step',nfile_step									   
         write(4,*) 'OMP processes  = ', proc_num_in									
         write(4,*) 'Supercell size:',n_row																				

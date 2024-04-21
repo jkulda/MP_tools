@@ -70,7 +70,7 @@ program mp_dos56
   character(4),allocatable   :: at_label(:),at_name_par(:)
   character(4)   :: version,head,atom
   character(10)	 :: prompt,space = '          '
-  character(10)  :: string,section,ax_label,pg_out,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
+  character(10)  :: string,section,ax_label,pg_out,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile,shells(2)
   character(16)  :: dat_source,string16,filter_name
   character(40)  :: subst_name,file_master,file_inp,time_stamp,x_title,y_title,at_weight_scheme(2),x_file_name
   character(40)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,string_in,mp_tool
@@ -82,7 +82,7 @@ program mp_dos56
   real, allocatable :: cs_plot(:,:),cs_out(:,:),wind(:),ff(:)		
   complex, allocatable :: cs3(:,:,:),cs_inp(:)
 
-  integer ::  j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,j_name,jm,j1m,j2m,j_bc
+  integer ::  j_head_in,ind_rec,hist_ind(3),m_dom1,m_dom2,j_verb,j_name,jm,j1m,j2m,j_bc,j_shell
   integer ::  i,ii,j,jj,k,l,ios,ier,iflag,j_at,i_rec,nrec,n_tot,j_t
   integer ::  nfile,nfile_min,nfile_max,nfile_step,ifile,jfile,n_site,j_dir,i_shift,i_time(8)
 
@@ -113,11 +113,11 @@ program mp_dos56
  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
  
-  namelist /mp_gen/ j_verb,j_proc       
+  namelist /mp_gen/ j_verb,j_proc      
   namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out,j_ps,j_out,j_pgc        
-  namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out,j_pgc       
                       !general rule: namelists of tools should only contain their local parameters
                       !what is of global interest they should pass into data_header
+  namelist /mp_in/  j_shell       
 
 ! **** PGPLOT stuff
   integer :: PGOPEN,j_xserv,C1,C2,NC
@@ -159,6 +159,8 @@ program mp_dos56
   j_xserv = 0
   filter_name = 'nn'
   filter_fwhm = .0
+  shells(1) = ''
+  shells(2) = 'SHELLS'
 
 ! *** Generate data file access
   print *,prompt, 'Data file_master & file numbers (min, max): '
@@ -256,6 +258,19 @@ program mp_dos56
   read(4,nml=mp_gen)
   rewind(4)
   read(4,nml=mp_out)
+  
+  j_shell = 0
+  rewind(4)
+  read(4,nml=mp_in,iostat=ios)
+  if(ios/=0) j_shell = 0
+  if(j_shell==1) then
+    if(j_shell_out==1) then
+      print *,space,'Using SHELL input!'
+    else
+      print *,space,'SHELL data input not available, using CORES as usual!' 
+      j_shell = 0
+    endif   
+  endif
 
 ! *** Read the atom positions       
   rewind(4)
@@ -300,6 +315,7 @@ program mp_dos56
     print *,space, 'b_coh for ',trim(at_label(j)),' not found,'
     print *,space, 'check your spelling and the neutron_xs.txt table; use unit weights'
   enddo atom_loop
+  close(4)
 
   do j=1,n_atom
     if(at_name_par(j)/=at_name_out(j)) then
@@ -419,14 +435,23 @@ program mp_dos56
     read(1,rec=i_rec) at_ind_in((n_rec-1)*l_rec+1:4*n_tot,ifile)			
     
     i_rec = i_rec+n_rec			!skip the at_pos records
-    
-    do j=1,n_rec-1
-      i_rec = i_rec+1
-      read(1,rec=i_rec) at_vel_in((j-1)*l_rec+1:j*l_rec,ifile)			
-    enddo	
-    i_rec = i_rec+1
-    read(1,rec=i_rec) at_vel_in((n_rec-1)*l_rec+1:4*n_tot,ifile)	
 
+    if(j_shell==0) then
+      do j=1,n_rec-1
+        i_rec = i_rec+1       !read the CORES
+        read(1,rec=i_rec) at_vel_in((j-1)*l_rec+1:j*l_rec,ifile)			
+      enddo	
+      i_rec = i_rec+1
+      read(1,rec=i_rec) at_vel_in((n_rec-1)*l_rec+1:4*n_tot,ifile)
+    else
+      i_rec = i_rec+(n_traj+1)*n_rec          !read the SHELLS 
+      do j=1,n_rec-1
+        i_rec = i_rec+1
+        read(1,rec=i_rec) at_vel_in((j-1)*l_rec+1:j*l_rec,ifile)			
+      enddo	
+      i_rec = i_rec+1
+      read(1,rec=i_rec) at_vel_in((n_rec-1)*l_rec+1:4*n_tot,ifile)
+    endif				
     close(1)
   enddo file_loop
 
@@ -596,7 +621,7 @@ program mp_dos56
     c_min = .0
     c_max = maxval(cs_out)
 
-    write(plot_title,'("Vibrational DOS:  ",a,"  T =",f6.1," [K]  ",a)') trim(subst_name),temp,trim(at_weight_scheme(j_weight))
+    write(plot_title,'("Vibrational DOS:  ",a," ",a,"  T =",f6.1," [K]  ",a)') trim(subst_name),trim(shells(j_shell+1)),temp,trim(at_weight_scheme(j_weight))
     print *,space, plot_title
     do
       CALL PGSCH(1.)					!set character height					
@@ -608,8 +633,8 @@ program mp_dos56
       CALL PGSCI (1)  !white
       CALL PGSLW(5)			!operates in steps of 5
       CALL PGLINE(n_freq_plot,ff,cs_out(1:n_freq_plot,n_atom+1))  !plots the total DOS
-      write(plot_title_2,'(a)') trim(subst_name)
-      x_plot = f_min+.85*(f_max-f_min)
+      write(plot_title_2,'(a," ",a)') trim(subst_name),trim(shells(j_shell+1))
+      x_plot = f_min+.62*(f_max-f_min)
       y_plot = .9*c_max
       CALL PGSTBG(0)																				 !erase graphics under text
       CALL PGTEXT (x_plot,y_plot,plot_title_2)
@@ -695,6 +720,7 @@ program mp_dos56
     open (3,file=file_res)																		!open the output file
     write(3,*) '*****    ',trim(mp_tool),': total and partial densities of vibrational states     *****'
     write(3,*) 
+    if(j_shell==1) write(3,*) 'ATTENTION: the DOS corresponds to atom SHELLS!'
     write(3,*) 'Input files:  ',trim(file_dat_t0),' to ',trim(file_dat)
     write(3,*) '  t0,t_step,n_row,n_atom:',t0,t_step,n_row,n_atom
     write(3,*) '  temperature [K]',temp
@@ -705,7 +731,7 @@ program mp_dos56
     write(3,*) 
     write(3,'(" f [THz] ","   Total  ",20(a9))') (at_name_out(j),j=1,n_atom)
     do i=1,n_freq_plot
-      write(3,'(1x,f6.3,2x,f8.3,2x,1000(1x,f8.3))') ff(i),cs_out(i,n_atom+1),(cs_out(i,j),j=1,n_atom) 
+      write(3,'(1x,f6.3,2x,f9.5,2x,1000(1x,f9.5))') ff(i),cs_out(i,n_atom+1),(cs_out(i,j),j=1,n_atom) 
   enddo
   close(3)
 
@@ -735,8 +761,8 @@ program mp_dos56
     CALL PGSCI (1)  !white
     CALL PGSLW(5)			!operates in steps of 5
     CALL PGLINE(n_freq_plot,ff,cs_out(1:n_freq_plot,n_atom+1))  !plots the total DOS
-    write(plot_title_2,'("DOS_total ",a)') trim(subst_name)
-    x_plot = f_min+.75*(f_max-f_min)
+    write(plot_title_2,'("DOS_total ",a," ",a)') trim(subst_name),trim(shells(j_shell+1))
+    x_plot = f_min+.62*(f_max-f_min)
     y_plot = .9*c_max
     CALL PGSTBG(0)																				 !erase graphics under text
     CALL PGTEXT (x_plot,y_plot,plot_title_2)

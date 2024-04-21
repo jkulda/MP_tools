@@ -75,7 +75,7 @@ program mp_sqom56
   character(4)   :: atom,ps_out(2),version,head
   character(5)   :: pg_ext,c_dir(5)=(/'[00X]','[0X0]','[0XX]','[-XX]','[XXX]'/)
   character(10)	 :: prompt,space = '          '
-  character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile
+  character(10)  :: string,section,c_date,c_time,c_zone,mode,ext,pg_out,c_nfile_min,c_nfile,c_jfile,shells(2)
   character(40)  :: subst_name,file_title,file_master,file_inp,time_stamp,x_title,y_title,masks,at_weight_scheme(3)
   character(40)  :: x_label,y_label,file_dat,file_dat_t0,file_res,file_ps,file_log,x_file_name,wedge_label,string_in,mp_tool
   character(128) :: line,plot_title1,plot_title2,plot_title,scan_title,interp_title,data_path,cwd_path,rec_str
@@ -135,7 +135,7 @@ program mp_sqom56
   real(4), pointer :: at_pos_file_bulk(:,:)
 
   character(16)  :: sim_type,dat_type,input_method,file_par,dat_source,string16,filter_name
-  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_pgc
+  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_pgc
   real(4)        :: rec_zero(l_rec),filter_fwhm,t_ms,t0,t1,a_par(3),angle(3),temp,temp_cs
 
 ! *** PGPLOT stuff
@@ -151,6 +151,7 @@ program mp_sqom56
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
  
   namelist /mp_gen/ j_verb,j_proc       
+  namelist /mp_in/  j_shell       
   namelist /mp_out/ j_weight,j_logsc,j_txt,p_size,j_grid,pg_out,j_ps,j_out,j_pgc        
                       !general rule: namelists of tools should only contain their local parameters
                       !what is data-related should pass into data_header
@@ -196,6 +197,9 @@ program mp_sqom56
   at_weight_scheme(1) = 'Unit weights '
   at_weight_scheme(2) = 'Neutron weights'
   at_weight_scheme(3) = 'Xray weights'
+  shells(1) = ''
+  shells(2) = 'SHELLS'
+
   f_max = .0
   f_max_plot = .0
   j_coh = 1
@@ -363,10 +367,24 @@ program mp_sqom56
   write(9,*) 'Read the parameter file:  ',trim(file_inp)
 
   read(4,nml=mp_gen,iostat=ios)
-    if(ios/=0) then
-      print *,space, 'Error reading NML = mp_gen from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
-      stop
-    endif
+  if(ios/=0) then
+    print *,space, 'Error reading NML = mp_gen from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
+    stop
+  endif
+
+  j_shell = 0
+  rewind(4)
+  read(4,nml=mp_in,iostat=ios)
+  if(ios/=0) j_shell = 0
+  if(j_shell==1) then
+    if(j_shell_out==1) then
+      print *,space,'Using SHELL input!'
+    else
+      print *,space,'SHELL data input not available, using CORES as usual!' 
+      j_shell = 0
+    endif   
+  endif
+
   rewind(4)
   read(4,nml=mp_out,iostat=ios)
     if(ios/=0) then
@@ -383,10 +401,10 @@ program mp_sqom56
 
   rewind(4)
   read(4,nml=mp_sqom,iostat=ios)
-    if(ios/=0) then
-      print *,space, 'Error reading NML = mp_sqom from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
-      stop
-    endif
+  if(ios/=0) then
+    print *,space, 'Error reading NML = mp_sqom from ', trim(file_inp),', check that you have the latest version: MP_TOOLS ',version
+    stop
+  endif
 
   if(j_interp>0) then
     j_interp_x = 1
@@ -678,7 +696,6 @@ program mp_sqom56
       print *
     else
       n_freq_max = nfile-n_int+1					!for I(Q,t)
-!			  n_int = 1
       f_max_plot = n_freq_max*t_step
       freq_step = t_step
     endif
@@ -961,12 +978,22 @@ program mp_sqom56
           i_rec = i_rec+n_rec
         endif			
   
-        do j=1,n_rec-1
+        if(j_shell==0) then
+          do j=1,n_rec-1
+            i_rec = i_rec+1       !read the CORES
+            read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,1)			
+          enddo	
           i_rec = i_rec+1
-          read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,1)			
-        enddo	
-        i_rec = i_rec+1
-        read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,1)					
+          read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,1)
+        else
+          i_rec = i_rec+(n_traj+1)*n_rec          !read the SHELLS 
+          do j=1,n_rec-1
+            i_rec = i_rec+1
+            read(1,rec=i_rec) at_pos_in((j-1)*l_rec+1:j*l_rec,1)			
+          enddo	
+          i_rec = i_rec+1
+          read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot,1)
+        endif				
         close(1)
 
         if(input_method=='CELL') then
@@ -1544,22 +1571,21 @@ program mp_sqom56
       CALL PGSLCT(map_unit(i_plot))
     endif
 
-
     if(abs(j_plot)<=1) then  
       if(j_qsq==1) then
-        plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q)'
+        plot_title1 = trim(subst_name)//' '//trim(shells(j_shell+1))//' '//trim(masks)//' '//'S(Q)'
       else
-        plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q)/Q**2'
+        plot_title1 = trim(subst_name)//' '//trim(shells(j_shell+1))//' '//trim(masks)//' '//'S(Q)/Q**2'
       endif
     else
       if(j_sq==1) then
         if(j_qsq==1) then
-          plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q,ω)'
+          plot_title1 = trim(subst_name)//' '//trim(shells(j_shell+1))//' '//trim(masks)//' '//'S(Q,ω)'
         else
-          plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'S(Q,ω)/Q**2'
+          plot_title1 = trim(subst_name)//' '//trim(shells(j_shell+1))//' '//trim(masks)//' '//'S(Q,ω)/Q**2'
         endif
       else
-        plot_title1 = trim(subst_name)//' '//trim(masks)//'  '//'I(Q,t)'
+        plot_title1 = trim(subst_name)//' '//trim(shells(j_shell+1))//' '//trim(masks)//' '//'I(Q,t)'
       endif           
     endif
 
@@ -1639,10 +1665,10 @@ program mp_sqom56
     else      !for the moment no interpolation for the dispersion plots (being too grainy)
       n_qxg = n_qxp
       n_qyg = n_qyp
-        if(ubound(cs_pgplot,1)/=n_qxg.or.ubound(cs_pgplot,2)/=n_qyg) then
-          if(allocated(cs_pgplot)) deallocate(cs_pgplot)
-          allocate(cs_pgplot(n_qxg,n_qyg))
-        endif
+      if(ubound(cs_pgplot,1)/=n_qxg.or.ubound(cs_pgplot,2)/=n_qyg) then
+        if(allocated(cs_pgplot)) deallocate(cs_pgplot)
+        allocate(cs_pgplot(n_qxg,n_qyg))
+      endif
       cs_pgplot = cs_out
     endif
 
@@ -1696,7 +1722,7 @@ program mp_sqom56
       TR(1) = qx_min-tr_shift_x*TR(2)                       !orthogonal case
       TR(1) = TR(1)-.5*bz_ny*cos_ep_angle                       !compensates extension in non-orthogonal case
       TR(5) = 0.0
-      TR(6) = (bz_ny/n_qyg)      !*(e2p_norm/e1p_norm)
+      TR(6) = bz_ny/n_qyg      !*(e2p_norm/e1p_norm)
       TR(3) = cos_ep_angle*TR(6)
       TR(4) = qy_min-tr_shift_y*TR(6)
 
@@ -1762,7 +1788,7 @@ program mp_sqom56
         write(plot_title2,'("  Q_1 = [",3f6.2,"]","  Q_2 = [",3f6.2,"] ",a,1x,a)')& 
       &   q1_3d+(i_plot-n_plot/2-1)*dq_p,q2_3d+(i_plot-n_plot/2-1)*dq_p,trim(at_weight_scheme(j_weight)),trim(mode)
         CALL PGENV(q_min,q_max,f_min,f_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
-        CALL PGLAB(trim(x_label),y_label,' ')  !put the axis labels
+        CALL PGLAB(trim(x_label),trim(y_label),' ')  !put the axis labels
         CALL PGSCH(1.)					!set character height					
         CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
         CALL PGSCH(.6)					!set character height					
@@ -1812,13 +1838,15 @@ program mp_sqom56
       CALL PGWEDG('RI', 1., 3., c_min, c_max,trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 
 ! *** print footer with program version & date_and_time
+      call date_and_time(c_date,c_time,c_zone,i_time)
+      write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
       x_plot = qx_min+.75*(qx_max-qx_min)
       y_plot = qy_min-.1*(qy_max-qy_min)
       if(j_disp==1) y_plot = f_min-.1*(f_max-f_min)
       CALL PGSCI (1)  !white needs to be reset after PGLAB
       CALL PGSTBG(0)																				 !erase graphics under text
       CALL PGSLW(2)			!operates in steps of 5
-      CALL PGSCH(.6)
+      CALL PGSCH(.7)
       CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp))
   
       c_min_save = c_min
@@ -1932,7 +1960,7 @@ program mp_sqom56
         open (3,file=file_res)																		!open the output file
         write(3,*) '*****    ',trim(mp_tool),': total scattering cross-section     *****'
         write(3,*) 
-        write(3,*) 'Substance:    ',subst_name
+        write(3,*) 'Substance:    ',trim(subst_name),' ',trim(shells(j_shell+1)) 
         write(3,*) 'Input files:  ','./data/',trim(file_dat)
         write(3,*) '  t0,t_step,n_row(3),n_atom:',t0,t_step,n_row,n_atom
         write(3,*) '  temperature [K]',temp
@@ -2263,8 +2291,9 @@ program mp_sqom56
       endif
   !!							if(j_ps==0) print *,'       8  toggle the ',trim(pg_out),'/TXT output ON (mind the TXT switch in PAR)'
   !!							if(j_ps==1) print *,'       8  toggle the ',trim(pg_out),'/TXT output OFF (mind the TXT switch in PAR)'
-      if(j_qsq==0) print *,space, '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
-      if(j_qsq==1) print *,space, '       9  toggle the S(Q) scaling to S(Q)/Q^2'
+!!       if(j_qsq==0) print *,space, '       9  toggle the S(Q)/Q^2 scaling to S(Q)'
+!!       if(j_qsq==1) print *,space, '       9  toggle the S(Q) scaling to S(Q)/Q^2'
+      print *,space, '       9  modify E_max for E(Q) maps'
       print *,space, '      10  options: change the time integration window width, weighting etc.'		!include here the straight FT option
       print *
       print *,space, '       0  EXIT'
@@ -2293,37 +2322,61 @@ program mp_sqom56
       exit bz_loop              !new FT(Q) is needed
     endif
 
-    if(j_plot==9) then
-      j_qsq = j_qsq+1
-      j_qsq = mod(j_qsq,2)
-      cycle              
-    endif
+!!    if(j_plot==9) then
+!!      j_qsq = j_qsq+1
+!!      j_qsq = mod(j_qsq,2)
+!!      cycle              
+!!    endif
 
-    if(j_plot==10) then
-      print *,space, 'Present values: '									
-      print *,space,'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
-      print *,space, j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
-      print *,prompt, 'Input new values(after j_weight, j_wind or j_fft change go on via 6):'
-      read(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
-      print *,space, 'New values: '									
-      print *,space,'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       f_max,         p_size,      j_fft:'
-      print *,space, j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,f_max,p_size,j_fft
-      if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd	
+    if(j_plot==9) then
+      if(j_sq==1) then
+        print *,space,'Type new E_max [THz]:'
+      else
+        print *,space,'Type new t_max [ps]:'
+      endif
+      read(*,*) f_max
       if(f_max>f_max_plot) then
-        print *,space, 'Setting f_max =',f_max_plot
+        if(j_sq==1) then
+          print *,space, 'Setting E_max =',f_max_plot
+        else
+          print *,space, 'Setting t_max =',f_max_plot
+        endif
         f_max = f_max_plot
       endif			
       if(j_sq==1) then
-        n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step
-        t_width = .5*n_int*t_step
-        f_width = 1./t_width
-        if (n_int/=1) freq_step = 1./((n_int-1)*t_step)
         n_freq_plot = f_max/freq_step+1
-        print *,space, 'Time-integration (BN window FWHM) [ps]',t_width
-        print *,space, 'Energy resolution [THz]',f_width
       else
         n_freq_plot = f_max/t_step+1
       endif
+      cycle
+    endif
+
+
+    if(j_plot==10) then
+      print *,space, 'Present values: '									
+      print *,space,'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       j_qsq,         p_size,      j_fft:'
+      print *,space, j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,j_qsq,p_size,j_fft
+      print *,prompt, 'Input new values(after j_weight, j_wind or j_fft change go on via 6):'
+      read(*,*) j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,j_qsq,p_size,j_fft
+      print *,space, 'New values: '									
+      print *,space,'   j_weight,     j_wind,    j_logsc,     j_grid,      j_interp,      nfile,      n_int,       j_qsq,         p_size,      j_fft:'
+      print *,space, j_weight,j_wind,j_logsc,j_grid,j_interp,nfile,n_int,j_qsq,p_size,j_fft
+      if(2*(n_int/2)==n_int) n_int = n_int+1				!make it odd	
+!!       if(f_max>f_max_plot) then
+!!         print *,space, 'Setting f_max =',f_max_plot
+!!         f_max = f_max_plot
+!!       endif			
+!!       if(j_sq==1) then
+!!         n_freq_max = (n_int-1)/2+1					!f_max_plot/freq_step			!also n_freq_max= .5*t_int/t_step
+!!         t_width = .5*n_int*t_step
+!!         f_width = 1./t_width
+!!         if (n_int/=1) freq_step = 1./((n_int-1)*t_step)
+!!         n_freq_plot = f_max/freq_step+1
+!!         print *,space, 'Time-integration (BN window FWHM) [ps]',t_width
+!!         print *,space, 'Energy resolution [THz]',f_width
+!!       else
+!!         n_freq_plot = f_max/t_step+1
+!!       endif
 
       if(j_interp>0) then
         j_interp_x = 1
