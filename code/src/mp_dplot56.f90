@@ -41,7 +41,7 @@ program mp_dplot56
 
   integer,parameter :: l_rec  =  1024        !record length in real(4)
   real,parameter    :: pi = 3.14159
-
+  real,parameter    :: e_C = 16.02176634       ! e/Å^2 to C/m^2
   character(4),allocatable  ::  at_name_par(:),at_label(:),file_ext
   character(10),allocatable ::  dom_ind(:)
 
@@ -49,7 +49,7 @@ program mp_dplot56
 
   real,allocatable :: displ_field(:,:,:,:,:,:),displ_field1(:,:,:,:,:,:),displ_norm(:,:,:,:,:),displ_norm_tot(:,:)
   real,allocatable :: vel_field(:,:,:,:,:,:),vel_norm(:,:,:,:,:),vel_field1(:,:,:,:,:,:),vel_norm1(:,:,:,:,:)
-  real,allocatable :: polar(:,:,:,:,:),polar_tot(:,:),pol_norm(:,:,:,:),pol_norm_tot(:)
+  real,allocatable :: polar(:,:,:,:,:),polar_tot(:,:),polar_tot_abs(:,:),pol_norm(:,:,:,:),pol_norm_tot(:),pol_norm_tot2(:)
   real,allocatable :: at_base(:,:),at_charge(:),at_charge1(:),displ_plot(:,:,:,:),displ_vect(:,:,:)
 
   real     ::  c_min,c_max,c_min_save,c_max_save,filter_fwhm,p_size,res(3),pol(3),res2,charge_mom_c(3),charge_mom_s(3),charge_mom_cell(3)
@@ -72,7 +72,7 @@ program mp_dplot56
   integer ::  i,j,k,m,i2,i3,ii,jj,at,i_rec,ind_rec,nrec,ncell,nrow,nlayer,nsuper,nfile,nfile_t0,nfile_min,nfile_max,jfile
   integer ::  j1,j2,j_plane,j_grid,j_logsc,j_ps,j_op,j_tot,j_txt,i_time(8),j_cycle,i_shift,j_adv,n_shift,j_shift,j_slice,j_sign,jt,jt0,jt_max
   integer ::  at_no,at_ind(3),at_ind2(3),d_ind(3),n_dom,j_base(3),n_plot,e1(3),e2(3),ev(3),e_slice(3),ind_c,ind_h(3),n_x,n_y
-  integer ::  jat,j_edit,j_mask,ifile,ifile0,jfil_step,jint,jint2,n_atom,n_corr,sc_c2,sc_c1,ier,ios
+  integer ::  jat,j_edit,j_mask,ifile,ifile0,jfil_step,jint,jint2,n_atom,n_corr,sc_c2,sc_c1,ier,ios,j_pol
   integer ::  j_weight,j_xray
   
 ! **** the following variables MUST have the following type(4) or multiples because of alignement in the binary output file
@@ -284,7 +284,7 @@ program mp_dplot56
   allocate(at_pos_ref(3,n_row(1),n_row(2),n_row(3),n_corr))
   allocate(vel_field(3,n_row(1),n_row(2),n_row(3),n_atom,nfile),vel_norm(n_row(1),n_row(2),n_row(3),n_atom,nfile))
   allocate(i_dom(n_row(1),n_row(2),n_row(3),n_atom,nfile),i_dom_p(n_row(1),n_row(2),n_row(3),nfile))
-  allocate(polar(3,n_row(1),n_row(2),n_row(3),nfile),pol_norm(n_row(1),n_row(2),n_row(3),nfile),polar_tot(3,nfile),pol_norm_tot(nfile))
+  allocate(polar(3,n_row(1),n_row(2),n_row(3),nfile),pol_norm(n_row(1),n_row(2),n_row(3),nfile),polar_tot(3,nfile),polar_tot_abs(3,nfile),pol_norm_tot(nfile),pol_norm_tot2(nfile))
   if(j_shell_out==1) then 
     allocate(at_pos1_in(4*n_tot),at_vel1_in(4*n_tot),displ_field1(3,n_row(1),n_row(2),n_row(3),n_atom,nfile),at_pos_ref1(3,n_row(1),n_row(2),n_row(3),n_corr))
     allocate(vel_field1(3,n_row(1),n_row(2),n_row(3),n_atom,nfile),vel_norm1(n_row(1),n_row(2),n_row(3),n_atom,nfile))
@@ -402,25 +402,35 @@ program mp_dplot56
     if(j_shell_out==1) then
       at_pos1_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_pos1_in(:)
       at_vel1_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_vel1_in(:)
-      vel_field1(:,:,:,:,:,jt) = at_vel1_file(1:3,:,:,:,:)
+      vel_field1(:,:,:,:,:,jt) = at_vel1_file(1:3,:,:,:,:)              
     endif
 
-!       print *,'n_atom,n_row',n_atom,n_row
-!
-!       do
-!         print *,'jat,i,j,k?'
-!         read(*,*) jat,i,j,k
-!         print *,'Core:', at_pos_file(:,i,j,k,jat)
-!         print *,'Shell:', at_pos1_file(:,i,j,k,jat)
-!       enddo
+    i3 = 0
+    do jat=1,n_atom     !correct shells torn away from cores and bring back down atoms shifted to top
+      do k=1,n_row(3)
+        do j=1,n_row(2)
+          do i=1,n_row(1)
+            if(at_pos_file(1,1,j,k,jat)>.0) at_pos_file(1,1,j,k,jat) = at_pos_file(1,1,j,k,jat)-n_row(1)
+            if(at_pos_file(2,i,1,k,jat)>.0) at_pos_file(2,i,1,k,jat) = at_pos_file(2,i,1,k,jat)-n_row(2)
+            if(at_pos_file(3,i,j,1,jat)>.0) at_pos_file(3,i,j,1,jat) = at_pos_file(3,i,j,1,jat)-n_row(3)
 
-! ***** calculate reference (symmetry) positions for all atoms
+            if(j_shell_out==1) then
+              if(at_pos1_file(1,1,j,k,jat)>.0) at_pos1_file(1,1,j,k,jat) = at_pos1_file(1,1,j,k,jat)-n_row(1)
+              if(at_pos1_file(2,i,1,k,jat)>.0) at_pos1_file(2,i,1,k,jat) = at_pos1_file(2,i,1,k,jat)-n_row(2)
+              if(at_pos1_file(3,i,j,1,jat)>.0) at_pos1_file(3,i,j,1,jat) = at_pos1_file(3,i,j,1,jat)-n_row(3)
+            endif
+          enddo
+        enddo
+      enddo
+    enddo
+
+! ***** calculate reference positions for NN distances
 ! only valid for ABO3 cubic/orthorhombic perovskites
 ! all lattice positions are defined by neighbouring oxygen atoms
 ! cycling through the three oxygens and shifting their indexes provides all the necessary input
 
    at_pos_ref = .0
-   
+
 ! *** the A-atom
    at_pos_ref(:,:,:,:,1) = at_pos_ref(:,:,:,:,1)+at_pos_file(1:3,:,:,:,j_ox)+at_pos_file(1:3,:,:,:,j_ox+1)+at_pos_file(1:3,:,:,:,j_ox+2)
    at_pos_ref(:,:,:,:,1) = at_pos_ref(:,:,:,:,1)+cshift(at_pos_file(1:3,:,:,:,j_ox),-1,2)+cshift(at_pos_file(1:3,:,:,:,j_ox),-1,3)+cshift(cshift(at_pos_file(1:3,:,:,:,j_ox),-1,2),-1,3)
@@ -429,7 +439,7 @@ program mp_dplot56
    at_pos_ref(1,1,:,:,1) = at_pos_ref(1,1,:,:,1)-4*n_row(1)
    at_pos_ref(2,:,1,:,1) = at_pos_ref(2,:,1,:,1)-4*n_row(2)
    at_pos_ref(3,:,:,1,1) = at_pos_ref(3,:,:,1,1)-4*n_row(3)
-  at_pos_ref(:,:,:,:,1) = at_pos_ref(:,:,:,:,1)/12.
+   at_pos_ref(:,:,:,:,1) = at_pos_ref(:,:,:,:,1)/12.
 
 ! *** the B-atom
    at_pos_ref(:,:,:,:,2) = at_pos_ref(:,:,:,:,2)+at_pos_file(1:3,:,:,:,j_ox)+at_pos_file(1:3,:,:,:,j_ox+1)+at_pos_file(1:3,:,:,:,j_ox+2)
@@ -480,7 +490,6 @@ program mp_dplot56
 !!   at_pos_ref(:,:,:,:,5) = at_pos_ref(:,:,:,:,5)/6.
 
 ! *** the A-atom from B-atoms (or vice-versa)
-! *** the O1 [.5 .5 0] atom
    at_pos_ref(:,:,:,:,6) = at_pos_ref(:,:,:,:,6)+at_pos_file(1:3,:,:,:,2)+cshift(at_pos_file(1:3,:,:,:,2),-1,2)+cshift(at_pos_file(1:3,:,:,:,2),-1,3)+cshift(cshift(at_pos_file(1:3,:,:,:,2),-1,2),-1,3)
    at_pos_ref(:,:,:,:,6) = at_pos_ref(:,:,:,:,6)+cshift(at_pos_file(1:3,:,:,:,2),-1,4)+cshift(cshift(at_pos_file(1:3,:,:,:,2),-1,2),-1,4)
    at_pos_ref(:,:,:,:,6) = at_pos_ref(:,:,:,:,6)+cshift(cshift(at_pos_file(1:3,:,:,:,2),-1,3),-1,4)+cshift(cshift(cshift(at_pos_file(1:3,:,:,:,2),-1,2),-1,3),-1,4)
@@ -489,21 +498,18 @@ program mp_dplot56
    at_pos_ref(3,:,:,1,6) = at_pos_ref(3,:,:,1,6)-4*n_row(3)
    at_pos_ref(:,:,:,:,6) = at_pos_ref(:,:,:,:,6)/8.
 
-
-
-
    if(j_shell_out==1) then
      at_pos_ref1 = .0
 
 ! *** the A-atom
-     at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+at_pos1_file(1:3,:,:,:,j_ox)+at_pos1_file(1:3,:,:,:,j_ox+1)+at_pos1_file(1:3,:,:,:,j_ox+2)
-     at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+cshift(at_pos1_file(1:3,:,:,:,j_ox),-1,2)+cshift(at_pos1_file(1:3,:,:,:,j_ox),-1,3)+cshift(cshift(at_pos1_file(1:3,:,:,:,j_ox),-1,2),-1,3)
-     at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+cshift(at_pos1_file(1:3,:,:,:,j_ox+1),-1,3)+cshift(at_pos1_file(1:3,:,:,:,j_ox+1),-1,4)+cshift(cshift(at_pos1_file(1:3,:,:,:,j_ox+1),-1,3),-1,4)
-     at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+cshift(at_pos1_file(1:3,:,:,:,j_ox+2),-1,2)+cshift(at_pos1_file(1:3,:,:,:,j_ox+2),-1,4)+cshift(cshift(at_pos1_file(1:3,:,:,:,j_ox+2),-1,2),-1,4)
-     at_pos_ref1(1,1,:,:,1) = at_pos_ref1(1,1,:,:,1)-4*n_row(1)
-     at_pos_ref1(2,:,1,:,1) = at_pos_ref1(2,:,1,:,1)-4*n_row(2)
-     at_pos_ref1(3,:,:,1,1) = at_pos_ref1(3,:,:,1,1)-4*n_row(3)
-     at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)/12.
+    at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+at_pos1_file(1:3,:,:,:,j_ox)+at_pos1_file(1:3,:,:,:,j_ox+1)+at_pos1_file(1:3,:,:,:,j_ox+2)
+    at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+cshift(at_pos1_file(1:3,:,:,:,j_ox),-1,2)+cshift(at_pos1_file(1:3,:,:,:,j_ox),-1,3)+cshift(cshift(at_pos1_file(1:3,:,:,:,j_ox),-1,2),-1,3)
+    at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+cshift(at_pos1_file(1:3,:,:,:,j_ox+1),-1,3)+cshift(at_pos1_file(1:3,:,:,:,j_ox+1),-1,4)+cshift(cshift(at_pos1_file(1:3,:,:,:,j_ox+1),-1,3),-1,4)
+    at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)+cshift(at_pos1_file(1:3,:,:,:,j_ox+2),-1,2)+cshift(at_pos1_file(1:3,:,:,:,j_ox+2),-1,4)+cshift(cshift(at_pos1_file(1:3,:,:,:,j_ox+2),-1,2),-1,4)
+    at_pos_ref1(1,1,:,:,1) = at_pos_ref1(1,1,:,:,1)-4*n_row(1)
+    at_pos_ref1(2,:,1,:,1) = at_pos_ref1(2,:,1,:,1)-4*n_row(2)
+    at_pos_ref1(3,:,:,1,1) = at_pos_ref1(3,:,:,1,1)-4*n_row(3)
+    at_pos_ref1(:,:,:,:,1) = at_pos_ref1(:,:,:,:,1)/12.
 
 ! *** the B-atom
      at_pos_ref1(:,:,:,:,2) = at_pos_ref1(:,:,:,:,2)+at_pos1_file(1:3,:,:,:,j_ox)+at_pos1_file(1:3,:,:,:,j_ox+1)+at_pos1_file(1:3,:,:,:,j_ox+2)
@@ -544,7 +550,6 @@ program mp_dplot56
      at_pos_ref1(:,:,:,:,5) = at_pos_ref1(:,:,:,:,5)/8.
 
 ! *** the A-atom from B-atoms (or vice-versa)
-! *** the O1 [.5 .5 0] atom
      at_pos_ref1(:,:,:,:,6) = at_pos_ref1(:,:,:,:,6)+at_pos1_file(1:3,:,:,:,2)+cshift(at_pos1_file(1:3,:,:,:,2),-1,2)+cshift(at_pos1_file(1:3,:,:,:,2),-1,3)+cshift(cshift(at_pos1_file(1:3,:,:,:,2),-1,2),-1,3)
      at_pos_ref1(:,:,:,:,6) = at_pos_ref1(:,:,:,:,6)+cshift(at_pos1_file(1:3,:,:,:,2),-1,4)+cshift(cshift(at_pos1_file(1:3,:,:,:,2),-1,2),-1,4)
      at_pos_ref1(:,:,:,:,6) = at_pos_ref1(:,:,:,:,6)+cshift(cshift(at_pos1_file(1:3,:,:,:,2),-1,3),-1,4)+cshift(cshift(cshift(at_pos1_file(1:3,:,:,:,2),-1,2),-1,3),-1,4)
@@ -552,123 +557,66 @@ program mp_dplot56
      at_pos_ref1(2,:,1,:,6) = at_pos_ref1(2,:,1,:,6)-4*n_row(2)
      at_pos_ref1(3,:,:,1,6) = at_pos_ref1(3,:,:,1,6)-4*n_row(3)
      at_pos_ref1(:,:,:,:,6) = at_pos_ref1(:,:,:,:,6)/8.
-
    endif
 
-!!   print *,'at_pos_ref(:,1,1,1,1)'
-!!!    do j=1,n_atom
-!!     print *,at_pos_ref(:,1,1,1,1)
-!!!    enddo
-!!! 
-!!!    print *,'at_pos_ref(:,n_row(1)/2,n_row(2)/2,n_row(3)/2,j)'
-!!!    do j=1,n_atom
-!!     print *,at_pos_ref(:,n_row(1)/2,n_row(2)/2,n_row(3)/2,1)
-!!!    enddo
-!!! 
-!!!    print *,'at_pos_ref(:,n_row(1),n_row(2),n_row(3),j)'
-!!!    do j=1,n_atom
-!!     print *,at_pos_ref(:,n_row(1),n_row(2),n_row(3),1)
-!!!    enddo
-!!
-!!   print *,'at_pos_ref(:,1,1,1,6)'
-!!!    do j=1,n_atom
-!!     print *,at_pos_ref(:,1,1,1,6)
-!!!    enddo
-!!! 
-!!!    print *,'at_pos_ref(:,n_row(1)/2,n_row(2)/2,n_row(3)/2,j)'
-!!!    do j=1,n_atom
-!!     print *,at_pos_ref(:,n_row(1)/2,n_row(2)/2,n_row(3)/2,6)
-!!!    enddo
-!!! 
-!!!    print *,'at_pos_ref(:,n_row(1),n_row(2),n_row(3),j)'
-!!!    do j=1,n_atom
-!!     print *,at_pos_ref(:,n_row(1),n_row(2),n_row(3),6)
-!!!    enddo
-
-
-! ***** calculate local displacement field etc.      
-!     do jat=1,n_atom
+! ***** calculate NN distances      
     do jat=1,n_corr
       do k=1,n_row(3)    
         do j=1,n_row(2)    
           do i=1,n_row(1)
             jj = 1 
             res2 = .0
-!             write(*,*)'at_pos_file(1:3,i,j,k,jat)-at_base(jat,:)',at_pos_file(1:3,i,j,k,jat),at_base(jat,:)
-!             res = at_pos_file(1:3,i,j,k,jat)-at_base(jat,:)
-!             write(*,*) 'res',res
-!             res = res-nint(res)
-!                write(*,*) 'res-nint(res)',res,nint(res)
-        if(jat<=n_atom) then
-          res = at_pos_file(1:3,i,j,k,jat)-at_pos_ref(1:3,i,j,k,jat)
-          displ_field(:,i,j,k,jat,jt) = res
-        else
-          res = at_pos_file(1:3,i,j,k,1)-at_pos_ref(1:3,i,j,k,jat)
-        endif
+            if(jat<=n_atom) then
+              res = at_pos_file(1:3,i,j,k,jat)-at_pos_ref(1:3,i,j,k,jat)
+              displ_field(:,i,j,k,jat,jt) = res
+              if(norm2(res)>1.) then
+                print *,'i,j,k,jat,,at_pos_file(1:3,i,j,k,jat),at_pos_ref(1:3,i,j,k,jat)',i,j,k,jat,at_pos_file(1:3,i,j,k,jat),at_pos_ref(1:3,i,j,k,jat)
+                read(*,*)
+              endif
+            else
+              res = at_pos_file(1:3,i,j,k,1)-at_pos_ref(1:3,i,j,k,jat)
+            endif
+
             ind_h = n_hist/2+1+nint(res/hist_step)
-              if(minval(ind_h)<1.or.maxval(ind_h)>n_hist) cycle
-!             write(*,*) 'i,j,k,res,ind_h,jat,jt',i,j,k,res,ind_h,jat,jt
-!             if(i*j*k==1000)write(*,*) at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,1,jt)
+            if(minval(ind_h)<1.or.maxval(ind_h)>n_hist) cycle
             at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,1,jt) = at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,1,jt)+1
-!             write(*,*) at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,1,jt)
-!              read(*,*)
-!             if(i*j*k==1000) write(*,*) 'sum at_pos_hist',i,j,k,sum(at_pos_hist(:,:,:,jat,1,1))
             res2 = dot_product(res,res)
             displ_norm(i,j,k,jat,jt) = sqrt(res2)   !displacement magnitude is calculated for CORES only
-!                 jj = jj+2**(3-ii)*(sign(1.0,res)+1.)/2.
-!
-!               if(n_dom==1) then
-!                 jj = maxloc((abs(res)),dim=1)
-!!					print *,'maxloc',i_dom
-!                 if(res(jj).gt.0.) jj = jj+3
-!               else if (n_dom==2) then
-!                 ii = minloc((abs(res)),dim=1)
-!!					print *,'minloc',ii
-!                 i2 = ii+1
-!                 if(i2.gt.3) i2 = i2-3
-!                 i3 = ii+2
-!                 if(i3.gt.3) i3= i3-3
-!                 jj = mod(ii,3)*4+(sign(1.,res(i2))+1)+(sign(1.,res(i3))+1)/2 +1
-!               else if (n_dom==3) then
-!                 jj = 1
-!                 do ii=1,3
-!                   jj = jj+2**(ii-1)*(sign(1.0,res(ii))+1.)/2.
-!                 enddo 
-!               endif
-!
-
-          if(jat<=n_atom) then
-            if(n_dom==1) then
-              jj = maxloc((abs(res)),dim=1)
-            else if (n_dom==2) then
-              ii = minloc((abs(res)),dim=1)
-              i2 = ii+1
-              if(i2.gt.3) i2 = i2-3
-              i3 = ii+2
-              if(i3.gt.3) i3= i3-3
-              jj = mod(ii,3)*2+abs(sign(1.,res(i2))+sign(1.,res(i3)))*.5+1
-            else if (n_dom==3) then
-              jj = 0
-              do ii=1,3
-                jj = jj+(2**(ii-1))*(sign(1.0,res(ii))+1.)*.5
-              enddo 
-              if(jj>=0.and.jj<=3) then
-                jj = 4-jj
-              else
-                jj = jj-3
+  
+            if(jat<=n_atom) then
+              if(n_dom==1) then
+                jj = maxloc((abs(res)),dim=1)
+              else if (n_dom==2) then
+                ii = minloc((abs(res)),dim=1)
+                i2 = ii+1
+                if(i2.gt.3) i2 = i2-3
+                i3 = ii+2
+                if(i3.gt.3) i3= i3-3
+                jj = mod(ii,3)*2+abs(sign(1.,res(i2))+sign(1.,res(i3)))*.5+1
+              else if (n_dom==3) then
+                jj = 0
+                do ii=1,3
+                  jj = jj+(2**(ii-1))*(sign(1.0,res(ii))+1.)*.5
+                enddo 
+                if(jj>=0.and.jj<=3) then
+                  jj = 4-jj
+                else
+                  jj = jj-3
+                endif
               endif
+              i_dom(i,j,k,jat,jt) = jj
             endif
-            i_dom(i,j,k,jat,jt) = jj
-          endif
             
 !               print *,'n_dom,res,jj,ii,i2,i3',n_dom,res,jj,ii,i2,i3
 !               read(*,*)
 
             if(j_shell_out==1) then
-!               res = at_pos1_file(1:3,i,j,k,jat)-at_base(jat,:)
-!               res = res-nint(res)
               if(jat<=n_atom) then
                 res = at_pos1_file(1:3,i,j,k,jat)-at_pos_ref1(1:3,i,j,k,jat)
+                if(norm2(res)>1.) then
+                  print *,'i,j,k,jat,,at_pos1_file(1:3,i,j,k,jat),at_pos_ref1(1:3,i,j,k,jat)',i,j,k,jat,at_pos1_file(1:3,i,j,k,jat),at_pos_ref1(1:3,i,j,k,jat)
+                  read(*,*)
+                endif
                 displ_field1(:,i,j,k,jat,jt) = res
               else
                 res = at_pos1_file(1:3,i,j,k,1)-at_pos_ref1(1:3,i,j,k,jat)
@@ -681,46 +629,6 @@ program mp_dplot56
         enddo   
       enddo   
     enddo 
-
-!              write(*,*)  'sum at_pos_hist',sum(at_pos_hist(:,:,:,:,1,1))      
-!              
-!     do 
-!       write(*,*) 'j,k?'
-!       read(*,*) j,k
-!       if(j==0)exit
-!              write(*,*)  '1at_pos_hist',at_pos_hist(:,j,k,1,1,1) 
-!     
-!   enddo     
-! 
-!              write(*,*)  'at_pos_hist',at_pos_hist(46:56,101,51,1,1,1)      
-! 
-!     do jat=1,n_atom
-!       displ_norm_tot(jat,jt) = sum(displ_norm(:,:,:,jat,jt))/nsuper
-!     enddo
-!       if(j_verb==1) print *,'jt,displ_norm_tot(:,jt)',jt,displ_norm_tot(:,jt)
-
-!         print *,'n_dom',n_dom
-!       do
-!         print *,'jat,i,j,k?'
-!         read(*,*) jat,i,j,k
-!         print *,'Core:', at_pos_file(:,i,j,k,jat)
-!         print *,'Core:', displ_field(:,i,j,k,jat,jt),i_dom(i,j,k,jat,jt)
-!         print *,'Shell:', at_pos1_file(:,i,j,k,jat)
-!         print *,'Shell:', displ_field1(:,i,j,k,jat,jt)
-!         if(jat==0) exit
-!       enddo
-!
-
-! ***********************
-
-!     print *,space,'Histogram layer sums'
-!     
-!     do i=1,n_hist
-!       print *,space,
-!     enddo
-
-
-
     
 ! ***  calculate nominal unit cell electric polarisation for regularly occupied lattice
     if(ifile==nfile_min.and.sum(at_occup_r)/n_atom==1.) then
@@ -755,52 +663,37 @@ program mp_dplot56
       print *
     endif 
 
-! ***  calculate electric polarisation of each unit cell
+! ***  calculate dynamic electric polarisation of each unit cell
     do k=1,n_row(3)    
       do j=1,n_row(2)    
         do i=1,n_row(1)
           charge_mom_c = 0.
           charge_mom_s = 0.
           do jat=1,n_atom                       
-!               charge_mom_c = charge_mom_c + at_charge(jat)*displ_field(:,i,j,k,jat,jt)          !core   
-!               if(j_shell_out==1) charge_mom_s = charge_mom_s + at_charge1(jat)*displ_field1(:,i,j,k,jat,jt)        !shell
-            charge_mom_c = charge_mom_c + at_pos_file(4,i,j,k,jat)*displ_field(:,i,j,k,jat,jt)          !core   !use true local charges
-            if(j_shell_out==1) charge_mom_s = charge_mom_s + at_pos1_file(4,i,j,k,jat)*displ_field1(:,i,j,k,jat,jt)        !shell
+              charge_mom_c = charge_mom_c + at_pos_file(4,i,j,k,jat)*(at_pos_file(1:3,i,j,k,jat)-at_pos_file(1:3,i,j,k,1))          !core   !use true local charges
+              if(j_shell_out==1) charge_mom_s = charge_mom_s + at_pos1_file(4,i,j,k,jat)*(at_pos1_file(1:3,i,j,k,jat)-at_pos_file(1:3,i,j,k,1))        !shell
           enddo
 
-!              polar(:,i,j,k,jt) = charge_mom_c+charge_mom_s-charge_mom_cell
           pol = charge_mom_c+charge_mom_s
           polar(:,i,j,k,jt) = pol
           pol_norm(i,j,k,jt) = norm2(pol)
-
 ! *** calculate the domain (quadrant) number for polar(ization)
           if(n_dom==1) then
             jj = maxloc((abs(pol)),dim=1)
-!					print *,'maxloc',i_dom
-!               if(pol(jj).gt.0.) jj = jj+3
           else if (n_dom==2) then
             ii = minloc((abs(pol)),dim=1)
-!					print *,'minloc',ii
             i2 = ii+1
             if(i2.gt.3) i2 = i2-3
             i3 = ii+2
             if(i3.gt.3) i3= i3-3
-!               jj = mod(ii,3)*4+(sign(1.,pol(i2))+1)+(sign(1.,pol(i3))+1)/2 +1
             jj = mod(ii,3)*2+(sign(1.,pol(i3))+1)/2
           else if (n_dom==3) then
             jj = 1
             do ii=1,3
-!                 jj = jj+2**(ii-1)*(sign(1.0,pol(ii))+1.)/2.
               jj = jj+2**(ii-1)*(sign(1.0,pol(ii))+1.)/2.-4
               if(jj<1) jj = 1-jj
             enddo 
           endif
-
-!             jj = 1
-!             do ii=1,3
-!                jj = jj+2**(3-ii)*(sign(1.0,pol(ii))+1.)/2.
-!!                jj = jj+2**(3-ii)*(sign(1.0,charge_mom_c(ii))+1.)/2.
-!             enddo  
           i_dom_p(i,j,k,jt) = jj        
         enddo
       enddo   
@@ -810,9 +703,23 @@ program mp_dplot56
     do i=1,3
       polar_tot(i,jt) = sum(polar(i,:,:,:,jt))
     enddo
-    polar_tot(:,jt) = polar_tot(:,jt)/nsuper
+    polar_tot(:,jt) = polar_tot(:,jt)*a_par*e_c/(nsuper*product(a_par))
     pol_norm_tot(jt) = norm2(polar_tot(:,jt))
-!       if(j_verb==1) print *,'jt,polar_tot(:,jt),pol_norm_tot(jt)',jt,polar_tot(:,jt),pol_norm_tot(jt)
+    
+    pol_norm_tot2(jt) = .0
+    do k=1,n_row(3)
+      do j=1,n_row(2)
+        do i=1,n_row(1)
+          pol_norm_tot2(jt) = pol_norm_tot2(jt)+norm2(polar(:,i,j,k,jt)*a_par)
+        enddo
+      enddo
+    enddo
+    pol_norm_tot2(jt) = pol_norm_tot2(jt)*e_c/(nsuper*product(a_par))
+    
+    print *,space,'Total polarisation vector [C/m^2]',jt,polar_tot(:,jt)
+    print *,space,'Total polarisation norm, sum_norm [C/m^2]',jt,pol_norm_tot(jt),pol_norm_tot2(jt)
+    print *
+   
   enddo file_loop
 
   jt_max = jt   ! jt_max = 1 means a single explicit JT while t_single means absence of JT numbers
