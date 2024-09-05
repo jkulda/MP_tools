@@ -118,7 +118,7 @@ program mp_pdf56
   
   character(4)   :: version,head,atom,ps_out(2),size_out(2)
   character(10)	 :: prompt,space = '          '
-  character(10)  :: at_weight_scheme(3),pg_out,pg_ext,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile,shells(2)
+  character(10)  :: at_weight_scheme(3),pg_out,pg_ext,section,c_date,c_time,c_zone,c_nfile_min,c_nfile,c_jfile
   character(16)  :: sim_type_par,string16,filter_name
   character(40)  :: subst_name,file_master,file_out,time_stamp,int_mode,x_file_name,string,mp_tool,string_in
   character(60)  :: file_dat,file_inp,file_dat_t0,file_res,file_ps,file_log,masks,smooth
@@ -157,12 +157,11 @@ program mp_pdf56
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
  
-  namelist /mp_gen/ j_verb,j_proc
-  namelist /mp_in/  j_shell       
+  namelist /mp_gen/ j_verb,j_proc       
   namelist /mp_out/ j_weight,j_logsc,j_ps,j_txt,p_size,j_grid,pg_out,j_out,j_pgc       
                       !general rule: namelists of tools should only contain their local parameters
                       !what is of global interest they should pass into data_header
-  namelist /mp_pdf/ pdf_range,pdf_step,q_step,x_end,a_par_pdf,pdf_pix,pdf_pix_shift,j_rand,n_h,j_acc,j_mode,n_part_max,n_pseudo_max,n_cond,q_xff    
+  namelist /mp_pdf/ j_shell,pdf_range,pdf_step,q_step,x_end,a_par_pdf,pdf_pix,pdf_pix_shift,j_rand,n_h,j_acc,j_mode,n_part_max,n_pseudo_max,n_cond,q_xff    
 			
 ! **** PGPLOT stuff
   INTEGER :: PGOPEN,j_xserv, NXSUB, NYSUB
@@ -267,8 +266,6 @@ program mp_pdf56
   x_label = (/'r [A]  ','r [A]  ','Q [A-1]','Q [A-1]','Q [A-1]','Q [A-1]','Q [A-1]'/)
   ps_out = (/'OFF ','ON  '/)			!PGPLOT
   size_out = (/'S   ','XXL '/)		!PGPLOT
-  shells(1) = ''
-  shells(2) = 'SHELLS'
   j_out = 1
   j_ext = 0
   
@@ -392,10 +389,11 @@ program mp_pdf56
   j_logsc = 0
   j_grid = 0
   j_ps = 0 
-  pg_out = 'ps'
+  pg_out = 'cps'
   p_size = 7.
   rewind(4)
   read(4,nml=mp_out)
+  if(pg_out=='vcps') pg_out = 'cps'  !PS has to be landscape!
   
   call down_case(pg_out) 
   if(index(pg_out,'png')/=0) then
@@ -415,18 +413,18 @@ program mp_pdf56
   x_end = 20.
   pdf_step = 0.02
   pdf_pix = .5
+  pdf_pix_shift = .0    !pdf_pix_shift specified in .PAR is offset of PDF overlay grid to lattice to get most atoms in centres of its cells
   a_par_pdf = 1.
   n_part_max = 4         !defaults for &mp_pdf
   n_pseudo_max = 0
   n_part_ext = 0
   j_rand = 1
   q_xff = .0
-
   j_shell = 0
   rewind(4)
-  read(4,nml=mp_in,iostat=ios)
-  if(ios/=0) j_shell = 0
-  if(j_shell==1) then
+  read(4,nml=mp_pdf)
+ 
+   if(j_shell==1) then
     if(j_shell_out==1) then
       print *,space,'Using SHELL input!'
     else
@@ -434,9 +432,6 @@ program mp_pdf56
       j_shell = 0
     endif   
   endif
-
-  rewind(4)
-  read(4,nml=mp_pdf)
    
   allocate(ind_pseudo(n_atom,n_atom+n_pseudo_max+1),at_name_pseudo(n_atom+n_pseudo_max+1))       !1st pseudo is TOT by default
   ind_pseudo = 0
@@ -952,7 +947,7 @@ program mp_pdf56
 
           do j=1,3                                                  !handle basis atoms displaced out of the nominal box
             if(d_ind(j)<=0.or.d_ind(j)>n_pdf_grid(j)) then
-              print *,prompt,'i,d_ind(:)',i,d_ind(:)
+              print *,prompt,'i,d_ind(:),at_pos_in',i,d_ind(:),at_pos_in(4*(i-1)+1:4*(i-1)+3)
               read(*,*)
             endif
           enddo
@@ -1620,10 +1615,13 @@ program mp_pdf56
     print *,space, 'Vertical scale c_min,c_max',c_min,c_max
     
     write(plot_header,'(a,"    ",a," weights  ")') trim(file_dat_t0),trim(at_weight_scheme(j_weight))
-    plot_header = trim(subst_name)//' '//trim(shells(j_shell+1))//'  '//trim(pdf_out(j_mode))//'  '//trim(plot_header)//trim(masks)//'  '//trim(smooth)
+    plot_header = trim(subst_name)//'  '//trim(pdf_out(j_mode))//'  '//trim(plot_header)//trim(masks)//'  '//trim(smooth)
 
     scale_loop: do
 
+  call date_and_time(c_date,c_time,c_zone,i_time)
+  write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
+       
       CALL PGSLCT(j_xserv)
       CALL PGSCI (1)  !white
       CALL PGSCH(1.)
@@ -1679,9 +1677,6 @@ program mp_pdf56
         CALL PGTEXT (x_plot,y_plot,plot_title)
       enddo
 
-! *** print footer with program version & date_and_time
-      call date_and_time(c_date,c_time,c_zone,i_time)
-      write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
       x_plot = x_start+.8*(x_end-x_start)
       y_plot = c_min-.1*(c_max-c_min)
       CALL PGSCI (1)  !white needs to be reset after PGLAB
@@ -1776,7 +1771,7 @@ program mp_pdf56
 !         CALL PGBOX (XOPT, XTICK, NXSUB, YOPT, YTICK, NYSUB)
 !       endif
 
-      plot_header = trim(subst_name)//' '//trim(shells(j_shell+1))//'  '//trim(file_ps)//'  '//trim(at_weight_scheme(j_weight))//' weights  '//trim(masks)//'  '//trim(smooth)	
+      plot_header = trim(subst_name)//'  '//file_ps//'  '//trim(at_weight_scheme(j_weight))//' weights  '//trim(masks)//'  '//trim(smooth)	
 
       CALL PGSCI (1)  !white
       CALL PGSCH(1.)

@@ -80,30 +80,30 @@ program mp_lbin56
 
   real :: at_mass_in,at_mass_in2,at_charge_in,at_charge_in2,item_value(4),sc_r
   real ::	at_pos_in(3),at_pos_in2(3),at_veloc_in(3),at_veloc_in2(3),at_force_in(3),at_force_in2(3),at_base_shift(3),a_scale
-  real ::	at_pos_centre(3),a_cell(3,3),a_cell_1(3,3),a_cell_inv(3,3),a_cell_par(9),a_cell_lo(3),a_cell_hi(3),a_cell_half(3),cell_par,arg,b_coh
+  real ::	at_pos_centre(3),a_cell(3,3),a_cell_1(3,3),a_cell_inv(3,3),a_cell_par(9),a_cell_lo(3),a_cell_hi(3),a_cell_half(3),cell_par,atp,b_coh
   real :: t_dump0,t0,t1,t2,dt,t_step,pos_inp(3),xy(3)
-  real :: temp_par,temp_r_c,temp_r_s,temp_r_cg,temp_cs,eps_x
+  real :: temp_par,temp_r_c,temp_r_s,eps_x
   
   character(4),allocatable :: at_name(:),at_label(:)
   character(16),allocatable :: data_line(:)
   integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:)
   integer,allocatable,target :: i_series(:),at_ind_out(:)
   integer,pointer ::  jr(:)
-  real,allocatable ::  e_kin(:,:),e_kin_s(:,:),e_kin_cg(:,:),at_base_in(:,:),at_base(:,:),at_occup(:),at_mass_in_c(:),at_mass_in_s(:)
+  real,allocatable ::  e_kin(:,:),e_kin_s(:,:),at_base_in(:,:),at_base(:,:),at_occup(:),at_mass_in_c(:),at_mass_in_s(:)
 
 ! **** the following variables MUST have the following 32bit sizes or multiples because of alignement in the binary output file 
 !
   character(4),allocatable :: at_name_par(:),at_name_out(:)
   integer(4),allocatable   :: at_ind(:,:),nsuper_r(:)
 
-  real(4),allocatable ::	at_pos_c(:,:),at_veloc_c(:,:),at_force_c(:,:),at_occup_r(:),d_cs(:),d_cs_max(:)
+  real(4),allocatable ::	at_pos_c(:,:),at_veloc_c(:,:),at_force_c(:,:),at_occup_r(:)
   real(4),allocatable ::	at_pos_s(:,:),at_veloc_s(:,:),at_force_s(:,:)
 
   character(16)  :: sim_type,input_method,dat_type,dat_origin,dat_source,file_par,filter_name,pos_units
   integer(4)     :: n_row(3),n_atom,n_eq,j_shell_out,n_traj,n_cond,idum,n_rec,n_head,n_head_in1,n_head_in2
   real(4)        :: rec_zero(l_rec),t_ms,t_dump,filter_fwhm,a_par(3),angle(3),temp
 
-  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
+  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,&
  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
@@ -160,14 +160,12 @@ program mp_lbin56
   i_dom = 0
   n_cond = 2               !orthorhombic periodic bound_cond by default
   n_tot_in = 0
-  j_shrec = 0
   at_list = .true.
   t_ms = .0
   t_step = .0
   t_dump = .0
   t_dump0 = .0
   temp_par = .0
-  temp_cs = .0
   at_base_shift = .0
   a_scale = 1.
   filter_name = ''
@@ -175,13 +173,8 @@ program mp_lbin56
   pos_units = 'ANGSTROM'
   
 ! *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
-  print *,prompt, 'Parameter file name (.par will be added)'
-  do
-    read(*,*) string
-    if(len(trim(string))<=16) exit
-    print *,space,'Name exceeds 16 character, modify & retype ...'
-  enddo
-  file_par = trim(string)
+  print *,prompt, 'Parameter file name (²16char, .par will be added)'
+  read(*,*) file_par
   file_inp = trim(file_par)//'.par'
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
@@ -308,8 +301,8 @@ program mp_lbin56
   n_items = 0
   file_master = '' 
 ! ***********************************
-! n_row_par 32 32 32 & bounds:   standard box  cell & bulk periodic        ? !bounds may follow on N_ROW line in .PAR
-! n_row_par  1  1  1 & bounds:   standard box  bulk aperiodic              ?
+! n_row_par 32 32 32 & bounds:   standard box  cell & bulk periodic         !bounds may follow on N_ROW line in .PAR
+! n_row_par  1  1  1 & bounds:   standard box  bulk aperiodic              
 ! n_row_par 32 32 32 & no_bounds: standard box  cell & bulk periodic    r.l.u.
 ! n_row_par  1  1  1 & no_bounds: min_max box  bulk aperiodic          r.l.u. 
 ! **********************************
@@ -642,11 +635,13 @@ endif !'GENERAL'
   
   close(1)
   
+  if(j_verb==1.and.j_shell==0) print *,space,'Shell data not found'
+  
   if(j_shell==1) then
     print *,space,'Core & shell data found'
-    if(j_shrec==0) print *,space,'Core-shell centre-of-mass data will be recorded (default, change in .PAR with caution)'
-    if(j_shrec==1) print *,space,'Core-shell data WILL be recorded individually'
-    if(j_shrec==1) write(9,*)'Core-shell data WILL be recorded individually'
+    if(j_shrec==0) print *,space,'Shell data NOT to be recorded (change this in .PAR)'
+    if(j_shrec==1) print *,space,'Shell data WILL be recorded'
+    if(j_shrec==1) write(9,*)'Shell data WILL be recorded'
   endif
   j_shell_out = j_shell*j_shrec
 
@@ -744,10 +739,9 @@ endif !'GENERAL'
 !		endif
 
   allocate(at_name(n_tot),SOURCE='    ')
-  allocate(e_kin(n_atom,3),at_occup_r(n_atom),d_cs(n_atom),d_cs_max(n_atom))
+  allocate(e_kin(n_atom,3),at_occup_r(n_atom))
   allocate(nsuper_r(n_atom),SOURCE=0) 
   if(j_shell.eq.1)allocate(e_kin_s(n_atom,3),SOURCE=0.0)
-  if(j_shell.eq.1)allocate(e_kin_cg(n_atom,3),SOURCE=0.0)
   allocate(at_ind(4,n_tot),i_series(n_tot))
   i_series = (/ (i, i = 1, n_tot) /)
 
@@ -939,9 +933,6 @@ endif !'GENERAL'
 
     e_kin = .0
     if(j_shell.eq.1) e_kin_s = .0
-    if(j_shell.eq.1) e_kin_cg = .0
-    if(j_shell.eq.1) d_cs = .0
-    if(j_shell.eq.1) d_cs_max = .0
 
 ! ***** now read the data
     read_loop: do i=1,n_tot
@@ -1035,7 +1026,6 @@ endif !'GENERAL'
 
           if(ind_mass/=0)read(data_line(ind_mass),*) at_mass_in2
           if(ind_charge/=0)read(data_line(ind_charge),*) at_charge_in2 
-
           read(data_line(ind_pos:ind_pos+2),*) at_pos_in2
           if(ind_vel/=0)read(data_line(ind_vel:ind_vel+2),*) at_veloc_in2
           if(ind_force/=0)read(data_line(ind_force:ind_force+2),*) at_force_in2
@@ -1094,7 +1084,7 @@ endif !'GENERAL'
         endif
         at_pos_in = at_pos_in-at_pos_centre
         at_pos_in = matmul(a_cell_inv,at_pos_in)
-        if(j_shell==1) then                     !shells only with LAMMPS which is ANGSTROM
+        if(j_shell_out==1) then                     !shells only with LAMMPS which is ANGSTROM
           if(j_centred==0) at_pos_in2 = at_pos_in2-at_pos_centre
           at_pos_in2 = matmul(a_cell_inv,at_pos_in2)
         endif       				
@@ -1161,7 +1151,7 @@ endif !'GENERAL'
 
         at_ind_in = anint(at_pos_in-at_base_in(jat,:))+at_ind_base		!they will serve as pointers to the right order of atom records
         at_pos_in = at_pos_in+at_base_shift			!now the supercell will be centred & basis positions origin at 0
-        if(j_shell.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
+        if(j_shell_out.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
 
         do k=1,3
           if(at_ind_in(k)==0) then
@@ -1188,55 +1178,43 @@ endif !'GENERAL'
 
 ! *** enforce atom positions within the box limits by periodic boundary conditions (in case non-periodic case these atoms have no weight due to the FT window) 
 !
-      if(nsuper/=1.or.(nsuper==1.and.pos_units=='BOX')) then
+!      if(nsuper/=1.or.(nsuper==1.and.pos_units=='BOX')) then
         do k=1,3
-          if(at_pos_in(k)<-n_row(k)/2.) at_pos_in(k) = at_pos_in(k)+n_row(k)   
-          if(at_pos_in(k)>=n_row(k)/2.) at_pos_in(k) = at_pos_in(k)-n_row(k)
-          if(j_shell==1) then
-              if(at_pos_in2(k)<-n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)   
-              if(at_pos_in2(k)>=n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+          if(n_row(k)>1.or.pos_units=='BOX') then
+            if(at_pos_in(k)<-n_row(k)/2.) at_pos_in(k) = at_pos_in(k)+n_row(k)   
+            if(at_pos_in(k)>=n_row(k)/2.) at_pos_in(k) = at_pos_in(k)-n_row(k)
+            if(j_shell_out==1) then
+                if(at_pos_in2(k)<-n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)   
+                if(at_pos_in2(k)>=n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+            endif
           endif
         enddo
-      endif
+ !     endif
 
 ! *** prepare the output data 
 !	
       if(nsuper==1.and.pos_units=='BOX') then
-        at_pos_in = at_pos_in*a_par      !bring at_pos_in from the (-.5,.5) range back to the ? box range 
-        if(j_shell==1) at_pos_in2 = at_pos_in2*a_par
+        at_pos_in = at_pos_in*a_par      !bring at_pos_in from the (-.5,.5) range back to the  box range 
+        if(j_shell_out==1) at_pos_in2 = at_pos_in2*a_par
       endif														 
 
-      if(j_shell==0) then				    !no shells at all
-        at_pos_c(1:3,jrec) = at_pos_in
-        at_pos_c(4,jrec) = at_charge_in
-        if(n_traj>=1) then
-          at_veloc_c(1:3,jrec) = at_veloc_in
-          at_veloc_c(4,jrec) = at_mass_in	
-        endif						
-        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
-      elseif(j_shell==1.and.j_shell_out==0) then				!calculate core-shell centre of mass									 
-        at_pos_c(1:3,jrec) = (at_mass_in*at_pos_in+at_mass_in2*at_pos_in2)/(at_mass_in+at_mass_in2)
-        at_pos_c(4,jrec) = at_charge_in+at_charge_in2
-        if(n_traj>=1) then
-          at_veloc_c(1:3,jrec) = (at_mass_in*at_veloc_in+at_mass_in2*at_veloc_in2)/(at_mass_in+at_mass_in2)
-          at_veloc_c(4,jrec) = at_mass_in+at_mass_in2	
-        endif						
-        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in+at_force_in2
-      elseif(j_shell_out==1) then				!only if the shell data are going to be recorded
-        at_pos_c(1:3,jrec) = at_pos_in
-        at_pos_c(4,jrec) = at_charge_in
+      at_pos_c(1:3,jrec) = at_pos_in
+      at_pos_c(4,jrec) = at_charge_in															 
+
+      if(n_traj>=1) then
+        at_veloc_c(1:3,jrec) = at_veloc_in
+        at_veloc_c(4,jrec) = at_mass_in	
+      endif						
+      if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
+
+      if(j_shell_out==1) then				!only if the shell data are going to be recorded
         at_pos_s(1:3,jrec) = at_pos_in2
         at_pos_s(4,jrec) = at_charge_in2							
         if(n_traj>=1) then
-          at_veloc_c(1:3,jrec) = at_veloc_in
-          at_veloc_c(4,jrec) = at_mass_in	
           at_veloc_s(1:3,jrec) = at_veloc_in2
           at_veloc_s(4,jrec) = at_mass_in2							
         endif
         if(n_traj==2) at_force_s(1:3,jrec) = at_force_in2
-      else
-        print *,space,'ERR: j_shell_out out of range 0..1 '
-        stop
       endif
 
 ! *** accumulate the occupation number and the kinetic energy to refine the real temperature
@@ -1244,14 +1222,8 @@ endif !'GENERAL'
       if(n_traj>=1) then
         do k = 1,3
           e_kin(jat,k) = e_kin(jat,k) + at_mass_in*at_veloc_in(k)**2			!at_mass_c(i)=at_veloc_c(4,i)
-          if(j_shell==1) then 
-            e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2              !we drop the 1/2 factor everyhere as we will do later with k_B
-            e_kin_cg(jat,k) = e_kin_cg(jat,k) + (at_mass_in*at_veloc_in(k)+at_mass_in2*at_veloc_in2(k))**2/(at_mass_in+at_mass_in2)
-          endif
+          if(j_shell==1) e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2
         enddo
-        arg = sqrt(dot_product((at_pos_in-at_pos_in2)*a_par,(at_pos_in-at_pos_in2)*a_par))
-        if(arg>d_cs_max(jat)) d_cs_max(jat) = arg
-        d_cs(jat) = d_cs(jat)+arg
       endif !input method
     enddo read_loop
 
@@ -1278,53 +1250,45 @@ endif !'GENERAL'
       print *,space, '1st snapshot: total of',jrec,' atoms read in',t2-t1,' sec'
     endif
                      
-! *** normalize the kinetic energy
+! *** normalize the kinetic energy and get the true temperature
   if(n_traj>=1) then
     do j=1,n_atom*n_eq
       e_kin(j,:) = e_kin(j,:)/nsuper_r(j)
       if(j_shell.eq.1) e_kin_s(j,:) = e_kin_s(j,:)/nsuper_r(j)
-      if(j_shell.eq.1) e_kin_cg(j,:) = e_kin_cg(j,:)/nsuper_r(j)
-      if(j_shell.eq.1) d_cs(j) = d_cs(j)/nsuper_r(j)
     enddo	 
 
-    if(j_verb==1.and.ifile==nfile_max) print *
-    if(j_verb==1.and.ifile==nfile_max) print *,space, 'Last frame no.',ifile
+    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature
 
-    if(j_verb==1.and.(ifile==nfile_min.or.ifile==nfile_max)) then
+!     if(j_verb==1.and.ifile==nfile_max) print *
+!     if(j_verb==1.and.ifile==nfile_max) print *,space, 'Last frame no.',ifile
+! 
+!     if(j_verb==1.and.(ifile==nfile_min.or.ifile==nfile_max)) then
+ 
+    if(j_verb==1) then
       print *
-      print *,space, 'Cores E_kin(jat,:)',(.5*e_kin(jat,:),jat=1,n_atom)
-      if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(.5*e_kin_s(jat,:),jat=1,n_atom)
+      print *,space, 'Last frame no.',ifile
+      print *
+      print *,space, 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
+      if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
     endif
 
-! *** get the true temperature
-    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature           !we drop the 1/2 factor with k_B as we did before with m*v**2
-    temp = temp_r_c
-    
     if(j_shell.eq.1) then
       temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B) !the true shell temperature
-      temp_r_cg = sum(e_kin_cg(1:n_atom,:))/(n_atom*3*k_B) !the true LAMMPS temperature
-      
-      temp = temp_r_cg                      !temperature of the core-shell centre-of-mass
-      temp_cs = temp_r_c+temp_r_s-temp_r_cg !internal temperature of the core-shell pair
-      
       if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
-        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
+        temp = (temp_r_c+temp_r_s)*.5						!hi-T limit: independent C and S vibrations
+!         if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
+        if(j_verb==1.or.(ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
       else
-        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Low-T limit: strongly bound C and S vibrations'
+        temp = temp_r_c+temp_r_s	!low-T limit: strongly bound C and S vibrations
+        if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Low-T limit: strongly bound C and S vibrations'
       endif        
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: core, shell      ',temp_r_c,temp_r_s
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: core, shell      ',temp_r_c,temp_r_s
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Average CS shift                   ',d_cs
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Average CS shift                   ',d_cs
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Maximum CS shift                   ',d_cs_max
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Maximum CS shift                   ',d_cs_max
+      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
+      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
     else
-      temp_r_s = .0
       temp = temp_r_c
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: atoms/cores_only ',temp
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: atoms/cores_only ',temp
+      temp_r_s = .0
+      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: cores only ',temp
+      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: cores only ',temp
     endif
   else
     temp = temp_par
@@ -1358,6 +1322,7 @@ endif !'GENERAL'
   endif 		!i_traj==nt_min.and.ifile==nfile_min
 
   t_dump = i_save*t_step
+
 
 ! *** define the record structure
   n_rec = (n_tot/l_rec4)														!for each position there are 4 components
@@ -1489,7 +1454,7 @@ endif !'GENERAL'
   
   enddo trajectory_loop 
 
-  deallocate(at_name,at_ind,e_kin,at_occup_r,d_cs,nsuper_r,i_series)
+  deallocate(at_name,at_ind,e_kin,at_occup_r,nsuper_r,i_series)
   if(j_shell.eq.1) deallocate(e_kin_s)
 
   deallocate(at_name_par,at_label,at_base_in,at_base,ind_l,i_site,at_occup,at_mass_in_c,at_mass_in_s)
@@ -1535,7 +1500,7 @@ subroutine down_case (string)
 end subroutine down_case	     
 
    
-  !-----------------------------------------------------------------------
+!-----------------------------------------------------------------------
 ! gjinv - Invert a matrix, Gauss-Jordan algorithm
 ! A is destroyed.
 !

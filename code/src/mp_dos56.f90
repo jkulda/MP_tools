@@ -455,9 +455,11 @@ program mp_dos56
     close(1)
   enddo file_loop
 
-    at_ind(1:4,1:n_tot,1:nfile) => at_ind_in				
-    at_vel_file(1:4,1:n_tot,1:nfile) => at_vel_in
+  at_ind(1:4,1:n_tot,1:nfile) => at_ind_in				
+  at_vel_file(1:4,1:n_tot,1:nfile) => at_vel_in
 
+  if(j_verb==1) print *,'ifile,vx_max,vy_max,vz_max',ifile,maxval(at_vel_file(1,1:n_tot,1:nfile)),&
+&                ifile,maxval(at_vel_file(2,1:n_tot,1:nfile)),ifile,maxval(at_vel_file(3,1:n_tot,1:nfile))
   
   if(ifile.ne.nfile) nfile = ifile
 
@@ -574,7 +576,7 @@ program mp_dos56
     endif
 
     at_weight = at_weight*at_mask
-    at_weight_sum = sum(at_occup_r(1:n_atom)*at_weight(1:n_atom)*nsuper_r(1:n_atom))*wind_sum**2			
+    at_weight_sum = sum(at_occup_r(1:n_atom)*at_weight(1:n_atom)*nsuper_r(1:n_atom))*wind_sum**2*(t_step/.01)		!normalise tp dump step .01ps = 50*.2fs
 !
 ! **** generate the plot data
 !	
@@ -761,14 +763,14 @@ program mp_dos56
     CALL PGSCI (1)  !white
     CALL PGSLW(5)			!operates in steps of 5
     CALL PGLINE(n_freq_plot,ff,cs_out(1:n_freq_plot,n_atom+1))  !plots the total DOS
-    write(plot_title_2,'("DOS_total ",a," ",a)') trim(subst_name),trim(shells(j_shell+1))
+    write(plot_title_2,'(a," ",a)') trim(subst_name),trim(shells(j_shell+1))
     x_plot = f_min+.62*(f_max-f_min)
     y_plot = .9*c_max
     CALL PGSTBG(0)																				 !erase graphics under text
     CALL PGTEXT (x_plot,y_plot,plot_title_2)
     CALL PGSLW(2)
     do j=1,n_atom
-      write(plot_title_2,'("DOS_part  ",a)') at_name_out(j)
+      write(plot_title_2,'(a)') at_name_out(j)
       y_plot = (.9-.06*j)*c_max
       CALL PGSCI (j+1)  !red-green-blue
       CALL PGLINE(n_freq_plot,ff,cs_out(1:n_freq_plot,j))  !plots the curve

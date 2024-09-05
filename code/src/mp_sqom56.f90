@@ -116,7 +116,7 @@ program mp_sqom56
   real :: at_displ,at_pos(3),at_veloc(3),at_pos_min(3),at_pos_max(3),at_pos_centre(3),a_cell_par(3),a_cell(3,3),a_cell_inv(3,3)
   real :: t2,t3,t4,t_sum,t_dump,t_step,t_step_in,t_tot,tt0,tt,f_width,t_width,temp_par
   real :: f_plot,ff_plot,f_max_plot,freq_step,f_min,ff_min,f_max,ff_max,f_map_min,f_map_max,f_map_step,f_phase
-  real :: arg,q1_x,q1_y,q2_x,q2_y,qx_min,qx_max,qy_min,qy_max,q_min,q_max,qx_ming,qx_maxg,qq_plot,dq(3),dq_p(3),q_step
+  real :: arg,q1_x,q1_y,q2_x,q2_y,qx_min,qx_max,qy_min,qy_max,q_min,q_max,qx_ming,qx_maxg,qy_ming,qy_maxg,qq_plot,dq(3),dq_p(3),q_step
   real :: tr_shift_x,tr_shift_y,d_x,d_y,q_x,q_y,cut_off,xs(2),ys(2),x_plot,y_plot
   real :: e1(3),e2(3),ev(3),e1_norm,e2_norm,ev_norm,e1p(3),e2p(3),evp(3),e1p_norm,e2p_norm,evp_norm,cos_ep_angle,tpq_center(3),tpe1,tpe2,tpev,tpe1_shift,tpe2_shift
   real :: q1(3),q2(3),q1_3d(3),q2_3d(3),q_v(3),q_vp(3),q_center(3),q_nx,q_ny,wtime
@@ -191,6 +191,7 @@ program mp_sqom56
   n_plot_max = 7
   p_size = 7.	                  !PGPLOT - screen plot size
   j_pgc = 6 										!PGPLOT - JK printer-friendly rainbow for colormaps (no black)
+  j_ps = 0
   eps_fft = 1.e-6						!finufft
   iflag = -1						!finufft			
   j_head_in = 0		! if header found will become 1
@@ -729,8 +730,12 @@ program mp_sqom56
 ! *** modify the active frame range
     do
       if(j_plot==-6)	then
-        if(input_method=='BULK') then           !!!??? nsuper==1  ????
-         do i=1,3
+        print *,'before: at_pos_min',at_pos_min
+        print *,'before: at_pos_max',at_pos_max
+      
+!        if(input_method=='BULK') then           !!!??? nsuper==1  ????
+        if(nsuper==1) then          
+          do i=1,3
             print *,prompt, xyz(i),' min, max',at_pos_min(i),at_pos_max(i),' new values: (,, = NO CHANGE)'
             read(*,*) at_pos_min(i),at_pos_max(i)
             if(at_pos_min(i)<-a_par(i)/2.) at_pos_min(i) = -a_par(i)/2.
@@ -750,6 +755,8 @@ program mp_sqom56
           enddo 
           at_pos_centre = ceiling(.5*(at_pos_max+at_pos_min))
         endif
+        print *,'after: at_pos_min',at_pos_min
+        print *,'after: at_pos_max',at_pos_max
       endif			
 
       j_plot = 0			!j_plot=0 back to ZERO: we start again with a total scattering map
@@ -843,8 +850,8 @@ program mp_sqom56
 
     if(j_verb==1) print *,space, 'bz_nx,bz_ny',bz_nx,bz_ny
  
-    if(2*(n_qx/2)/=n_qx) n_qx = n_qx+1
-    if(2*(n_qy/2)/=n_qy) n_qy = n_qy+1          
+    if(n_qx>1.and.(2*(n_qx/2)/=n_qx)) n_qx = n_qx+1
+    if(n_qy>1.and.(2*(n_qy/2)/=n_qy)) n_qy = n_qy+1          
     n_qx8 = n_qx
     n_qy8 = n_qy
     nsuper8 = nsuper
@@ -872,11 +879,22 @@ program mp_sqom56
       read(*,*) q_center
     endif
 
-    qx_min = dot_product(e1,q_center)/e1_norm-.5*bz_nx          !DO BY A_CELL
-    qx_max = dot_product(e1,q_center)/e1_norm+.5*bz_nx
-    qy_min = dot_product(e2,q_center)/e2_norm-.5*bz_ny
-    qy_max = dot_product(e2,q_center)/e2_norm+.5*bz_ny
     tpq_center = twopi_s*q_center
+
+    qx_min = dot_product(e1,q_center)/e1_norm          !DO BY A_CELL
+    qx_max = dot_product(e1,q_center)/e1_norm
+    qy_min = dot_product(e2,q_center)/e2_norm
+    qy_max = dot_product(e2,q_center)/e2_norm
+
+    if(n_qx>1) then
+      qx_min = qx_min-.5*bz_nx          !DO BY A_CELL
+      qx_max = qx_max+.5*bz_nx
+    endif
+
+    if(n_qy>1) then
+      qy_min = qy_min-.5*bz_ny          !DO BY A_CELL
+      qy_max = qy_max+.5*bz_ny
+    endif
 
     if(j_verb==1) print *,space, 'qx_min,qx_max,qy_min,qy_max',qx_min,qx_max,qy_min,qy_max
 
@@ -885,9 +903,10 @@ program mp_sqom56
       q_v = (dot_product(ev,q_center)/ev_norm)*ev					!here Q is in r.l.u.	for LATTICE and A-1 for single bulk																											
       do i=1,n_qx
         do j=1,n_qy
-          q1 = ((qx_min+(i-1)*(bz_nx/n_qx))*e1+q_v)
-          q2 = ((qy_min+(j-1)*(bz_ny/n_qy))*e2+q_v)
-          q_sq = dot_product(q1+q2,q1+q2)										!this Q_SQ is related to the pseudo cubic story of NUFFT
+          q1 = (qx_min+(i-1)*(bz_nx/n_qx))*e1
+          q2 = (qy_min+(j-1)*(bz_ny/n_qy))*e2
+          q_sq = dot_product(q1+q2,q1+q2)+dot_product(q_v,q_v)								!this Q_SQ is related to the pseudo cubic story of NUFFT
+!            if(i==n_qx/4)	print *,'1q1,q2',q1,q2,q_sq													! the form factor formula contains a*exp(-b*(q/(4*Pi))**2)
 
           if(q_sq>=1.e-8) then
             q2_norm(i,j) = 1./sqrt(q_sq)
@@ -895,15 +914,16 @@ program mp_sqom56
             q2_norm(i,j) = 1.
           endif
         enddo
-      enddo							
+      enddo	
           
       if(j_weight==3) then
-        q_vp = (dot_product(evp,q_center)/evp_norm)*evp				!here Q is in A-1																												
+        q_vp = (dot_product(evp,q_center)/evp_norm)*evp				!here Q is in A-1		
         do i=1,n_qx
           do j=1,n_qy
-            q1 = (qx_min+(i-1)*(bz_nx/n_qx))*(e1p)+q_vp
-            q2 = (qy_min+(j-1)*(bz_ny/n_qy))*(e2p)+q_vp
-            q_sq = .25*dot_product(q1+q2,q1+q2)																! the form factor formula contains a*exp(-b*(q/(4*Pi))**2)
+            q1 = (qx_min+(i-1)*(bz_nx/n_qx))*e1p
+            q2 = (qy_min+(j-1)*(bz_ny/n_qy))*e2p
+            q_sq = .25*(dot_product(q1+q2,q1+q2)+dot_product(q_vp,q_vp))	
+!            if(i==n_qx/4)	print *,'q1,q2',q1,q2,q_sq														! the form factor formula contains a*exp(-b*(q/(4*Pi))**2)
           
             do j_at=1,n_atom
               x_ffq(j_at,i,j) = x_ffpar(j_at,9)
@@ -914,6 +934,9 @@ program mp_sqom56
           enddo
         enddo
       endif
+
+!print *,'q2_norm',n_qx/4,q2_norm(n_qx/4,n_qy)
+!print *,'x_ffq',x_ffq(1,n_qx/4,n_qy)
 
 ! *** generate the Fourier time window table				
   if(n_int<=1) then
@@ -959,7 +982,7 @@ program mp_sqom56
           if(jj==0) stop
         endif
 
-        if(jfile==nfile_min.or.ifile==100*(ifile/100)) print *,space, file_dat
+        if(jfile==nfile_min.or.ifile==200*(ifile/200)) print *,space, file_dat
 
         ind_at(1) = 0
         do j = 2,n_atom
@@ -1034,21 +1057,19 @@ program mp_sqom56
           enddo
 
           elseif(j_plane==2) then     ! the (h h l) plane
-
-          do i=1,nsuper
-            if(at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0) then
-              k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,(n_row(1)+n_row(2))/2)+1
-              l = at_ind(3,i,j)
-              d_x = at_pos_file(1,i,j)-at_base(j,1)-at_ind(1,i,j)+n_row(1)/2+1
-              d_x = d_x+at_pos_file(2,i,j)-at_base(j,2)-at_ind(2,i,j)+n_row(2)/2+1
-              d_x = d_x/sqrt2
-              d_y = at_pos_file(3,i,j)-at_base(j,3)-at_ind(3,i,j)+n_row(3)/2+1
-              u_x(k,l) = u_x(k,l)+d_x   !staying in the plane
-              u_y(k,l) = u_y(k,l)+d_y
-            endif
-          enddo
-
-        endif		!j_plane				
+            do i=1,nsuper
+              if(at_pos_file(1,i,j)/=.0.or.at_pos_file(2,i,j)/=.0.or.at_pos_file(3,i,j)/=.0) then
+                k = modulo(at_ind(1,i,j)-1+at_ind(2,i,j)-1,(n_row(1)+n_row(2))/2)+1
+                l = at_ind(3,i,j)
+                d_x = at_pos_file(1,i,j)-at_base(j,1)-at_ind(1,i,j)+n_row(1)/2+1
+                d_x = d_x+at_pos_file(2,i,j)-at_base(j,2)-at_ind(2,i,j)+n_row(2)/2+1
+                d_x = d_x/sqrt2
+                d_y = at_pos_file(3,i,j)-at_base(j,3)-at_ind(3,i,j)+n_row(3)/2+1
+                u_x(k,l) = u_x(k,l)+d_x   !staying in the plane
+                u_y(k,l) = u_y(k,l)+d_y
+              endif
+            enddo
+          endif		!j_plane				
 
           u_qx = fft(u_x,inv=.false.)/(1.*n_row(1))     !in fact 1/sqrt(nrow**2)
           u_qy = fft(u_y,inv=.false.)/(1.*n_row(2))     !FT in 0th Bz possibly with a q_z component
@@ -1148,7 +1169,7 @@ program mp_sqom56
     call cpu_time(t2)
     CALL SYSTEM_CLOCK (COUNT = sc_c2)
     if(j_verb==1.and.nsuper==1) print *,space, 'Out-of-frame atoms total',n_out
-    print *,space, 'FINUFFT on',nfile,'snapshots CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
+    print *,space, 'FT on',nfile,'snapshots CPU_TIME',t2-t1,'  SYS_TIME',(sc_c2-sc_c1)*sc_r
     print *,space
       
 ! **** calculate the mean value over the whole trajectory, in fact the 0th component of timeFT = elastic scattering
@@ -1163,6 +1184,8 @@ program mp_sqom56
       enddo
     enddo
 
+!    print *,'sum cs_mean',abs(sum(cs_mean))
+    
 !!!!CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 !!! *** Frequency loop
 !!						print *,'Choose a plot option (PS/TXT file output is ',trim(ps_out(j_ps+1)),'):'
@@ -1327,7 +1350,7 @@ program mp_sqom56
             endif
           endif
         enddo
-        if(j_qsq/=1) cs(ifile,:,:) = cs(ifile,:,:)*q2_norm
+!         if(j_qsq/=1) cs(ifile,:,:) = cs(ifile,:,:)*q2_norm   !total scattering should not be scaled down by 1/Q^2
       enddo
 !$omp end do
 !$omp end parallel
@@ -1548,11 +1571,11 @@ program mp_sqom56
 
 ! *** normalise to the box volume and make a copy of CS_PLOT for .TXT output and linear plots			
     if(abs(j_plot)<=1.or.j_sq/=1) then
-      cs_plot = cs_plot/(nsuper*cell_volume)     !for total scattering and intermediate functions microscopic time scale doesn't enter the norm
+      cs_plot = cs_plot/sum(real(nsuper_r))**2     !for total scattering and intermediate functions microscopic time scale doesn't enter the norm
     else
-      cs_plot = cs_plot*t_step/(nsuper*cell_volume)    !for energy resolved (FT_based) spectra t_step [ps] to stay on the DAPS scale
+      cs_plot = cs_plot*t_step/sum(real(nsuper_r))**2    !for total scattering and intermediate functions microscopic time scale doesn't enter the norm
     endif
-
+    
     if(map_unit(i_plot)<=0)then    !open the PGPLOT window, 1,1 no of panes
       map_unit(i_plot) = PGOPEN('/xserv')   !open the PGPLOT window, 1,1 no of panes
       CALL PGQCIR(C1, C2)
@@ -1589,10 +1612,19 @@ program mp_sqom56
       endif           
     endif
 
-    if(j_oneph<=0)then
-      mode = 'NU_FFT'
-    else
+!     if(j_oneph<=0)then
+!       mode = 'NU_FFT'
+!     else
+!       mode = 'Single_ph'
+!     endif
+    
+    if(j_oneph==1)then
       mode = 'Single_ph'
+    elseif(j_oneph==0.and.j_fft==0) then
+      mode = 'Normal FT'
+    else
+      mode = 'NU_FFT'
+    
     endif
     
     if(j_disp==0) then
@@ -1710,10 +1742,14 @@ program mp_sqom56
 ! *** redefine qx_min,qx_max to correspond to the plotting area
     qx_ming = dot_product(e1,q_center)/e1_norm-.5*bz_n        !DO BY A_CELL  E_NORM READJUTS Q_RANGE (100 VERS 110)
     qx_maxg = dot_product(e1,q_center)/e1_norm+.5*bz_n
+    qy_ming = dot_product(e2,q_center)/e2_norm-.5*bz_n        !DO BY A_CELL  E_NORM READJUTS Q_RANGE (100 VERS 110)
+    qy_maxg = dot_product(e2,q_center)/e2_norm+.5*bz_n
 
     if(j_disp==0) then
       tr_shift_x = .5
       tr_shift_y = .5
+      if(n_qxg==1) tr_shift_x = 1.0
+      if(n_qyg==1) tr_shift_y = 1.0
       if(n_qxg==2*(n_qxg/2)) tr_shift_x = 1.
       if(n_qyg==2*(n_qyg/2)) tr_shift_y = 1.
       tr_shift_x = tr_shift_x+cos_ep_angle
@@ -1777,7 +1813,8 @@ program mp_sqom56
           write(y_title,'("[",i1,2i2,"]"," [r.l.u.]")')nint(e2)
         endif
 
-        CALL PGENV(qx_ming,qx_maxg,qy_min,qy_max,0,1-j_grid) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
+        
+        CALL PGENV(qx_ming,qx_maxg,qy_ming,qy_maxg,0,1-j_grid) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
         CALL PGLAB(trim(x_title),trim(y_title),' ')  					!put the axis labels
         CALL PGSCH(1.)					!set character height					
         CALL PGMTXT ('T', 3., .5, .5, trim(plot_title1))			!put plot title on 2 lines
@@ -1840,8 +1877,8 @@ program mp_sqom56
 ! *** print footer with program version & date_and_time
       call date_and_time(c_date,c_time,c_zone,i_time)
       write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
-      x_plot = qx_min+.75*(qx_max-qx_min)
-      y_plot = qy_min-.1*(qy_max-qy_min)
+      x_plot = qx_ming+.75*(qx_maxg-qx_ming)
+      y_plot = qy_ming-.1*(qy_maxg-qy_ming)
       if(j_disp==1) y_plot = f_min-.1*(f_max-f_min)
       CALL PGSCI (1)  !white needs to be reset after PGLAB
       CALL PGSTBG(0)																				 !erase graphics under text
@@ -2038,7 +2075,7 @@ program mp_sqom56
       CALL PGSLW(2)			!operates in steps of 5
    
       if(j_disp==0) then
-        CALL PGENV(qx_ming,qx_maxg,qy_min,qy_max,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
+        CALL PGENV(qx_ming,qx_maxg,qy_ming,qy_maxg,0,2) !PGENV(xmin,xmax,ymin,ymax,0,1) - draw the axes
         CALL PGLAB(trim(x_title),trim(y_title),' ')  !put the axis labels
         CALL PGSCH(.7)					!set character height					
         CALL PGMTXT ('T', 3., .5, .5, trim(plot_title))			!put plot title on 2 lines
@@ -2096,8 +2133,8 @@ program mp_sqom56
     CALL PGWEDG('RI', 1., 3., c_min, c_max,trim(wedge_label))           ! R is right (else L,T,B), I is PGIMAG (G is PGGRAY)
 
 ! *** print footer with program version & date_and_time
-      x_plot = qx_min+.75*(qx_max-qx_min)
-      y_plot = qy_min-.1*(qy_max-qy_min)
+      x_plot = qx_ming+.75*(qx_maxg-qx_ming)
+      y_plot = qy_ming-.1*(qy_maxg-qy_ming)
       if(j_disp==1) y_plot = f_min-.1*(f_max-f_min)
       CALL PGSCI (1)  !white needs to be reset after PGLAB
       CALL PGSTBG(0)																				 !erase graphics under text

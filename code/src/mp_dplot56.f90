@@ -56,11 +56,11 @@ program mp_dplot56
   real     ::  e1_norm(3),e2_norm(3),ev_norm(3),ed_norm(3),e1p(3),e2p(3),evp(3),e1p_norm,e2p_norm,evp_norm,ep_angle,x1,y1,x2,y2,x_plot,y_plot
   
   character(4)   :: c_int(2),c_fil(2),version,head,atom
-  character(10)	 :: prompt,space = '          '
+  character(10)	 :: prompt,space = '          ',cs_string(3)
   character(10)  :: pg_out,string,section,c_date,c_time,c_zone,c_jt,c_slice,c_mode,c_jfile,at_name,dom_name,polar_name
-  character(16)  :: sim_type_par,data_type,string16,wedge_label,filter_name,c_e1(3),c_e2(3),c_x,c_y
+  character(16)  :: sim_type_par,data_type,string16,wedge_label,filter_name,c_e1(3),c_e2(3),c_x,c_y,header_1
   character(40)  :: subst_name,file_master,file_inp,file_out,time_stamp,int_mode,x_file_name,mp_tool,z_str,ev_str
-  character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,line
+  character(60)  :: file_dat,file_dat_t0,file_res,file_ps,file_log,line,header_2
   character(128) :: cwd_path,plot_title
   character(l_rec):: header_record
   
@@ -72,7 +72,7 @@ program mp_dplot56
   integer ::  i,j,k,m,i2,i3,ii,jj,at,i_rec,ind_rec,nrec,ncell,nrow,nlayer,nsuper,nfile,nfile_t0,nfile_min,nfile_max,jfile
   integer ::  j1,j2,j_plane,j_grid,j_logsc,j_ps,j_op,j_tot,j_txt,i_time(8),j_cycle,i_shift,j_adv,n_shift,j_shift,j_slice,j_sign,jt,jt0,jt_max
   integer ::  at_no,at_ind(3),at_ind2(3),d_ind(3),n_dom,j_base(3),n_plot,e1(3),e2(3),ev(3),e_slice(3),ind_c,ind_h(3),n_x,n_y
-  integer ::  jat,j_edit,j_mask,ifile,ifile0,jfil_step,jint,jint2,n_atom,n_corr,sc_c2,sc_c1,ier,ios,j_pol
+  integer ::  jat,j_edit,j_mask,ifile,ifile0,jfil_step,jint,jint2,n_atom,n_corr,sc_c2,sc_c1,ier,ios,j_pol,j_cs
   integer ::  j_weight,j_xray
   
 ! **** the following variables MUST have the following type(4) or multiples because of alignement in the binary output file
@@ -84,7 +84,7 @@ program mp_dplot56
   real,pointer        :: at_pos_file(:,:,:,:,:),at_pos1_file(:,:,:,:,:),at_vel_file(:,:,:,:,:),at_vel1_file(:,:,:,:,:)
   
   character(16)  :: sim_type,dat_type,input_method,file_par,dat_source
-  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_out,j_pgc
+  integer(4)     :: n_row(3),n_at,n_eq,j_force,j_shell_out,n_traj,n_cond,n_rec,n_tot_in,idum,j_out,j_pgc,j_shell_plot
   real(4)        :: rec_zero(l_rec),t_ms,t0,t_dump,t_step,a_par(3),angle(3),a_cell(3,3),a_cell_inv(3,3),temp,temp_cs,hist_step(3)
 
   namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
@@ -140,6 +140,10 @@ program mp_dplot56
   print *,prompt, 'Data file_master & file numbers (min, max; 0 0 single file): '
   read(*,*) file_master,nfile_min,nfile_max
   nfile_step = 1
+  
+  print *,prompt, 'Display shells instead of cores? (1/0) '
+  read(*,*) j_shell_plot
+  
         
   t_single = nfile_min==0.and.nfile_max==0  
   j_pgc = 6       !PG_PLOT palette JK
@@ -149,6 +153,8 @@ program mp_dplot56
   j_ox = 3     !index of the 1st oxygen atom (assuming they are consecutive)
   polar_name = 'POLAR'
   n_corr = 6
+  j_cs = 1
+  cs_string = (/'cores ','shells','CSdist'/)
   mode_s = .false.
   mode_pix = .true.
   mode_pts = .false.
@@ -289,7 +295,7 @@ program mp_dplot56
     allocate(at_pos1_in(4*n_tot),at_vel1_in(4*n_tot),displ_field1(3,n_row(1),n_row(2),n_row(3),n_atom,nfile),at_pos_ref1(3,n_row(1),n_row(2),n_row(3),n_corr))
     allocate(vel_field1(3,n_row(1),n_row(2),n_row(3),n_atom,nfile),vel_norm1(n_row(1),n_row(2),n_row(3),n_atom,nfile))
   endif
-  allocate (at_pos_hist(n_hist,n_hist,n_hist,n_corr,j_shell_out+1,nfile))
+  allocate (at_pos_hist(n_hist,n_hist,n_hist,n_corr,1+2*j_shell_out,nfile))
 
   print *,prompt, 'Displacement domain type (0 = NONE, 1=[100], 2=[110], 3= 111])?'
   read(*,*) n_dom		!displacement domain type (1=[100], 2=[110], 3= 111])
@@ -395,14 +401,29 @@ program mp_dplot56
     
     close(1)
 
-    at_pos_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_pos_in(:)
-    at_vel_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_vel_in(:)
+    if(j_shell_plot==0)then
+      at_pos_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_pos_in(:)
+      at_vel_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_vel_in(:)
+      header_1 = 'cores'
+    else
+      at_pos_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_pos1_in(:)
+      at_vel_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_vel1_in(:)
+      header_1 = 'shells'
+    endif
+
+
     vel_field(:,:,:,:,:,jt) = at_vel_file(1:3,:,:,:,:)
+    do jj = 1,n_atom
+      vel_norm(:,:,:,jj,jt) = sqrt(at_vel_file(1,:,:,:,jj)**2+at_vel_file(2,:,:,:,jj)**2+at_vel_file(3,:,:,:,jj)**2)
+    enddo
 
     if(j_shell_out==1) then
       at_pos1_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_pos1_in(:)
       at_vel1_file(1:4,1:n_row(1),1:n_row(2),1:n_row(3),1:n_atom) => at_vel1_in(:)
       vel_field1(:,:,:,:,:,jt) = at_vel1_file(1:3,:,:,:,:)              
+      do jj = 1,n_atom
+        vel_norm1(:,:,:,jj,jt) = sqrt(at_vel1_file(1,:,:,:,jj)**2+at_vel1_file(2,:,:,:,jj)**2+at_vel1_file(3,:,:,:,jj)**2)
+      enddo
     endif
 
     i3 = 0
@@ -570,11 +591,11 @@ program mp_dplot56
               res = at_pos_file(1:3,i,j,k,jat)-at_pos_ref(1:3,i,j,k,jat)
               displ_field(:,i,j,k,jat,jt) = res
               if(norm2(res)>1.) then
-                print *,'i,j,k,jat,,at_pos_file(1:3,i,j,k,jat),at_pos_ref(1:3,i,j,k,jat)',i,j,k,jat,at_pos_file(1:3,i,j,k,jat),at_pos_ref(1:3,i,j,k,jat)
+                print *,'i,j,k,jat,at_pos_file(1:3,i,j,k,jat),at_pos_ref(1:3,i,j,k,jat)',i,j,k,jat,at_pos_file(1:3,i,j,k,jat),at_pos_ref(1:3,i,j,k,jat)
                 read(*,*)
               endif
             else
-              res = at_pos_file(1:3,i,j,k,1)-at_pos_ref(1:3,i,j,k,jat)
+              res = at_pos_file(1:3,i,j,k,1)-at_pos_ref(1:3,i,j,k,jat)      ! "1"   ???????
             endif
 
             ind_h = n_hist/2+1+nint(res/hist_step)
@@ -614,20 +635,24 @@ program mp_dplot56
               if(jat<=n_atom) then
                 res = at_pos1_file(1:3,i,j,k,jat)-at_pos_ref1(1:3,i,j,k,jat)
                 if(norm2(res)>1.) then
-                  print *,'i,j,k,jat,,at_pos1_file(1:3,i,j,k,jat),at_pos_ref1(1:3,i,j,k,jat)',i,j,k,jat,at_pos1_file(1:3,i,j,k,jat),at_pos_ref1(1:3,i,j,k,jat)
+                  print *,'i,j,k,jat,at_pos1_file(1:3,i,j,k,jat),at_pos_ref1(1:3,i,j,k,jat)',i,j,k,jat,at_pos1_file(1:3,i,j,k,jat),at_pos_ref1(1:3,i,j,k,jat)
                   read(*,*)
                 endif
                 displ_field1(:,i,j,k,jat,jt) = res
               else
-                res = at_pos1_file(1:3,i,j,k,1)-at_pos_ref1(1:3,i,j,k,jat)
+                res = at_pos1_file(1:3,i,j,k,1)-at_pos_ref1(1:3,i,j,k,jat)     ! "1"   ???????
               endif
               ind_h = n_hist/2+1+nint(res/hist_step)
-              if(minval(ind_h)<1.or.maxval(ind_h)>n_hist) cycle
-              at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,2,jt) = at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,2,jt)+1
+              if(minval(ind_h)>=1.and.maxval(ind_h)<=n_hist) at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,2,jt) = at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,2,jt)+1
+
+              if(jat<=n_atom) res = at_pos1_file(1:3,i,j,k,jat)-at_pos_file(1:3,i,j,k,jat)     !CS_displacement
+              ind_h = n_hist/2+1+nint(res/hist_step)
+              if(minval(ind_h)>=1.and.maxval(ind_h)<=n_hist) at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,3,jt) = at_pos_hist(ind_h(1),ind_h(2),ind_h(3),jat,3,jt)+1
             endif                   
           enddo
         enddo   
-      enddo   
+      enddo
+      if(jat>n_atom) at_pos_hist(:,:,:,jat,3,jt) = 0
     enddo 
     
 ! ***  calculate nominal unit cell electric polarisation for regularly occupied lattice
@@ -716,10 +741,12 @@ program mp_dplot56
     enddo
     pol_norm_tot2(jt) = pol_norm_tot2(jt)*e_c/(nsuper*product(a_par))
     
-    print *,space,'Total polarisation vector [C/m^2]',jt,polar_tot(:,jt)
-    print *,space,'Total polarisation norm, sum_norm [C/m^2]',jt,pol_norm_tot(jt),pol_norm_tot2(jt)
-    print *
-   
+    if(j_verb==1) then
+      print *,space,'Total polarisation vector [C/m^2]',jt,polar_tot(:,jt)
+      print *,space,'Total polarisation norm, sum_norm [C/m^2]',jt,pol_norm_tot(jt),pol_norm_tot2(jt)
+      print *
+    endif
+    
   enddo file_loop
 
   jt_max = jt   ! jt_max = 1 means a single explicit JT while t_single means absence of JT numbers
@@ -807,10 +834,10 @@ program mp_dplot56
     print *,space, '         4 velocity in direction (value), scale (~1)'
     print *,space, '         5 polarisation in-plane (vector), scale (~5)  '
     print *,space, '         6 polarisation in direction (value), scale (~1) '
-    print *,space, '         7 displacement histogram, scale (~1) '
+    print *,space, '         7 displacement histogram, scale (= c_max) '
     print *,space, '         0 exit (0 0)'
     
-    if(j_verb==1) then
+!     if(j_verb==1) then
       print *
       print *,space, '         10 displacement domains, 1 '
       print *,space, '         11 atom mass, .01 '          
@@ -823,7 +850,7 @@ program mp_dplot56
       print *,space, '         18 polarisation component, scale (~5) '
       print *,space, '         19 polarisation domains, 1 '          
       print *,space, '         20 bond length, (~5) '          
-    endif
+!     endif
 
     fmin = 0.
     read(*,*) mode,scale
@@ -832,6 +859,12 @@ program mp_dplot56
       read(*,*) ed_norm
       ed_norm = ed_norm/norm2(ed_norm)
     endif                             
+
+    if(mode==7) then
+      print *,prompt, 'displacements: 1=cores, 2=shells, 3=CS_shift'
+      read(*,*) j_cs
+    endif                             
+
     if(mode==0) exit plot_loop
 
     j_cycle = 1
@@ -922,6 +955,7 @@ program mp_dplot56
     jat = 0             !display all atoms initially
     j_atom = 0
     mode_s = .false.
+    c_max_save = .0
 
     atom_loop: do
       if(mode==20) then
@@ -934,11 +968,15 @@ program mp_dplot56
         j_atom = 0
 
       else
-        print *,prompt, 'Atom number for domain reference (0=NONE, -1=POLARISATION, 99=END)'
+        print *,prompt, 'Atom number for domain & bond reference (0=NONE, -1=POLARISATION, 99=END)'
         read(*,*) j_atom
         if(j_atom==99) exit atom_loop
         if(j_atom<-1.or.j_atom>n_atom) then
           print *,space, 'wrong atom number(s), retype ...'
+          cycle atom_loop
+        endif
+        if(j_atom==0.and.mode==20) then
+          print *,space, 'Option 20: reference atom is obligatory, retype ...'
           cycle atom_loop
         endif
         if(j_atom==-1) then
@@ -1027,6 +1065,7 @@ program mp_dplot56
        
         select case(mode)             !scalar plots
           case(1)
+            header_2 = 'displacement'
             mode_vect = .true.
             do i=1,n_x         
               do j=1,n_y
@@ -1039,6 +1078,7 @@ program mp_dplot56
               enddo
             enddo
           case(2)         
+            header_2 = 'displ_along'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
@@ -1049,6 +1089,7 @@ program mp_dplot56
               enddo
             enddo
           case(3)
+            header_2 = 'velocity'
             mode_vect = .true.
             do i=1,n_x         
               do j=1,n_y
@@ -1059,6 +1100,7 @@ program mp_dplot56
               enddo
             enddo
           case(4)         
+            header_2 = 'vel_along'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
@@ -1068,6 +1110,7 @@ program mp_dplot56
               enddo
             enddo
           case(5)         
+            header_2 = 'polarisation'
             mode_vect = .true.
             jat = n_atom+1
             do i=1,n_x         
@@ -1077,6 +1120,7 @@ program mp_dplot56
               enddo
             enddo
           case(6)         
+            header_2 = 'pol_along'
             mode_pts = .true.
             jat = n_atom+1
             do i=1,n_x         
@@ -1085,15 +1129,17 @@ program mp_dplot56
               enddo
             enddo
           case(7) 
+            header_2 = 'displ_hist'
             mode_pix = .true.
-            c_max = .0
-            write(z_str,'(f7.3)') (k-(n_hist/2+1))*hist_step(3)
+            c_max = scale
+!             c_max = .0
+            write(z_str,'("z = ",f7.3)') (k-(n_hist/2+1))*hist_step(3)
             do i=1,n_x         
               do j=1,n_y
 !                 hist_plot(i,j,:) = at_pos_hist(ind(1,i,j),ind(2,i,j),ind(3,i,j),:,1,jt)
 !                 do jj=1,n_atom
                 do jj=1,n_corr
-                  displ_plot(1,i,j,jj) = sum(at_pos_hist(ind(1,i,j),ind(2,i,j),ind(3,i,j),jj,1,:))
+                  displ_plot(1,i,j,jj) = sum(at_pos_hist(ind(1,i,j),ind(2,i,j),ind(3,i,j),jj,j_cs,:))
                 enddo
               enddo
             enddo
@@ -1113,81 +1159,94 @@ program mp_dplot56
 !     endif
 ! 
           case(10)         
+            header_2 = 'displ_domains'
             mode_pix = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = i_dom(ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt)
+                displ_plot(1,i,j,1:n_atom) = i_dom(ind(1,i,j),ind(2,i,j),ind(3,i,j),1:n_atom,jt)
               enddo
             enddo
           case(11)         
+            header_2 = 'atom_mass'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = at_vel_file(4,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat)   !take masses from the last input frame
+                displ_plot(1,i,j,1:n_atom) = at_vel_file(4,ind(1,i,j),ind(2,i,j),ind(3,i,j),1:n_atom)   !take masses from the last input frame
               enddo
             enddo
           case(12)         
+            header_2 = 'atom_charget'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = at_pos_file(4,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat)   !take charges from the last input frame
+                displ_plot(1,i,j,1:n_atom) = at_pos_file(4,ind(1,i,j),ind(2,i,j),ind(3,i,j),1:n_atom)   !take charges from the last input frame
               enddo
             enddo
           case(13)                
+            header_2 = 'displ_magnitude'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = displ_norm(ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt)
+                displ_plot(1,i,j,1:n_atom) = displ_norm(ind(1,i,j),ind(2,i,j),ind(3,i,j),1:n_atom,jt)
               enddo
             enddo
           case(14)         
+            header_2 = 'displ_component'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = displ_field(ind_c,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt)
+                displ_plot(1,i,j,1:n_atom) = displ_field(ind_c,ind(1,i,j),ind(2,i,j),ind(3,i,j),1:n_atom,jt)
               enddo
             enddo
           case(15)                
+            header_2 = 'vel_magnitude'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = vel_norm(ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt)
+                displ_plot(1,i,j,1:n_atom) = vel_norm(ind(1,i,j),ind(2,i,j),ind(3,i,j),1:n_atom,jt)
               enddo
             enddo
           case(16)         
+            header_2 = 'vel_component'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = vel_field(ind_c,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt)
+                displ_plot(1,i,j,1:n_atom) = vel_field(ind_c,ind(1,i,j),ind(2,i,j),ind(3,i,j),1:n_atom,jt)
               enddo
             enddo
           case(17)         
+            header_2 = 'polar_magnitude'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = pol_norm(ind(1,i,j),ind(2,i,j),ind(3,i,j),jt)
+                displ_plot(1,i,j,n_atom+1) = pol_norm(ind(1,i,j),ind(2,i,j),ind(3,i,j),jt)
               enddo
             enddo
           case(18)         
+            header_2 = 'polar_component'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = polar(ind_c,ind(1,i,j),ind(2,i,j),ind(3,i,j),jt)
+                displ_plot(1,i,j,n_atom+1) = polar(ind_c,ind(1,i,j),ind(2,i,j),ind(3,i,j),jt)
               enddo
             enddo
           case(19)         
+            header_2 = 'polar_domains'
             mode_pix = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = i_dom_p(ind(1,i,j),ind(2,i,j),ind(3,i,j),jt)
+                displ_plot(1,i,j,j_atom) = i_dom_p(ind(1,i,j),ind(2,i,j),ind(3,i,j),jt)
               enddo
             enddo
           case(20)         
+            header_2 = 'bond_length'
             mode_pts = .true.
             do i=1,n_x         
               do j=1,n_y
-                displ_plot(1,i,j,jat) = norm2(displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jat,jt)-&
-              &      displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),j_atom,jt))
+                do jj=1,n_atom
+                  displ_plot(1,i,j,jj) = norm2(displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),jj,jt)-&
+                &      displ_field(1:3,ind(1,i,j),ind(2,i,j),ind(3,i,j),j_atom,jt))
+                enddo
               enddo
             enddo
         end select
@@ -1259,13 +1318,13 @@ program mp_dplot56
       endif
 
       if(jt<=9999) then
-        write(line,'("  frame = ",i4.4,"  layer = ",i2,"  mode = ",i2)') jt,j_slice,mode
+        write(line,'(" frame = ",i4.4," layer = ",i2," mode = ",i2)') jt,j_slice,mode
       else
-        write(line,'("  frame = *",i4.4,"  layer = ",i2,"  mode = ",i2)') mod(jt,10000),j_slice,mode
+        write(line,'(" frame = *",i4.4," layer = ",i2," mode = ",i2)') mod(jt,10000),j_slice,mode
       endif     
-      plot_title = trim(file_dat)//'  '//trim(at_name)//'/'//trim(dom_name)//line
+      plot_title = trim(file_dat)//'  '//trim(at_name)//'/'//trim(dom_name)//trim(line)
 
-
+      header_2 = trim(line)//' '//trim(header_2)
 
       map_unit(1) = PGOPEN('/xserv')   !open the PGPLOT window, 1,1 no of panes
       CALL PGASK(.FALSE.)     ! would not ask for <RET>
@@ -1301,11 +1360,12 @@ program mp_dplot56
       if(mode_pix) then       !here come pixel maps
         c_min = .0
         if(c_max_save==.0) then
-          c_max = maxval(displ_plot(1,1:n_x,1:n_y,:))
+!           c_max = maxval(displ_plot(1,1:n_x,1:n_y,:))
+          c_max = scale
         else
           c_max = c_max_save
         endif
-!         write(*,*) 'c_min,c_max',c_min,c_max
+ !        write(*,*) 'c_min,c_max',c_min,c_max
         print *,space,'Plot sum, j_slice, z',j_slice,'  ',trim(z_str),(sum(displ_plot(1,:,:,jj)),jj=1,n_corr)
 
         CALL PGQCIR(C1, C2)
@@ -1321,7 +1381,7 @@ program mp_dplot56
         CALL PGSCI (1)  !black(0 = white)
   
         if(mode_s) then
-          plot_title = trim(at_name_par(jat))//' ('//trim(ev_str)//')  z ='//trim(z_str)//' Å'		
+          plot_title = trim(at_name_par(jat))//' '//trim(cs_string(j_cs))//' ('//trim(ev_str)//')  '//trim(z_str)//' r.l.u.'		
           CALL PGENV(x1-.5*hist_step(1),x2+.5*hist_step(1),y1-.5*hist_step(2),y2+.5*hist_step(2),0,1) !draw the axes
           CALL PGSCH(1.2)					!set character height
           CALL PGLAB('X','Y',plot_title)  					!put the axis labels
@@ -1335,7 +1395,7 @@ program mp_dplot56
           y_plot = y2-.10*(y2-y1)
           CALL PGSCI (1)  !white needs to be reset after PGLAB
           CALL PGSCH(.7)
-          CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp)//'       '//trim(file_master))
+          CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp)//'  '//trim(file_master)//' '//trim(header_1)//'   '//trim(header_2))
           CALL PGSCH(1.)
         
           if(j_grid==1) then
@@ -1354,9 +1414,9 @@ program mp_dplot56
             CALL PGIMAG(displ_plot(1,1:n_x,1:n_y,jj),n_x,n_y,1,n_x,1,n_y,.0,c_max,TR)    
             CALL PGSCH(1.2)					!set character height
             if(jj<=n_atom) then
-              plot_title = trim(at_name_par(jj))//' ('//trim(ev_str)//')  z ='//trim(z_str)//' Å'		
+              plot_title = trim(at_name_par(jj))//' '//trim(cs_string(j_cs))//' ('//trim(ev_str)//')  '//trim(z_str)//' Å'		
             else
-              plot_title = trim(corr_name(jj-n_atom))//' ('//trim(ev_str)//')  z ='//trim(z_str)//' Å'		
+              plot_title = trim(corr_name(jj-n_atom))//' '//trim(cs_string(j_cs))//' ('//trim(ev_str)//')  '//trim(z_str)//' Å'		
             endif
             CALL PGTEXT(x1+.1*(x2-x1),y2-.1*(y2-y1),plot_title)
             CALL PGSCH(1.)					!set character height					
@@ -1369,7 +1429,7 @@ program mp_dplot56
               y_plot = y2+.05*(y2-y1)
               CALL PGSCI (1)  !white needs to be reset after PGLAB
               CALL PGSCH(1.4)
-              CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp)//'       '//trim(file_master))
+              CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp)//'  '//trim(file_master)//' '//trim(header_1)//'   '//trim(header_2))
               CALL PGSCH(1.)
             endif
           
@@ -1426,6 +1486,7 @@ program mp_dplot56
               if(mask(i_dom_out(i,j,jat))==0) cycle
 !               CALL PGSCI(20+i_dom_out(i,j,jat))
               CALL PGSCI(i_dom_out(i,j,jat))
+              if(n_dom==1) CALL PGSCI(24)
               if(displ_plot(1,i,j,jat)>=.0)then
                 CALL PGSFS (1)            !full circles
               else
@@ -1437,12 +1498,12 @@ program mp_dplot56
 
           call date_and_time(c_date,c_time,c_zone,i_time)
           write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
-          x_plot = x1+.75*(x2-x1)
+          x_plot = x1+.15*(x2-x1)
           y_plot = y1-.1*(y2-y1)
           CALL PGSCI (1)  !white needs to be reset after PGLAB
           CALL PGSLW (1)          ! *** write the domain legend
           CALL PGSCH(.5)
-          CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp))
+          CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp)//' '//trim(header_1)//'   '//trim(header_2))
           CALL PGSCH(1.)
 
         else
@@ -1479,6 +1540,7 @@ program mp_dplot56
                 if(mask(i_dom_out(i,j,jj))==0) cycle
  !                CALL PGSCI(20+i_dom_out(i,j,jj))
                 CALL PGSCI(i_dom_out(i,j,jj))
+                if(n_dom==1) CALL PGSCI(8)
                 if(displ_plot(1,i,j,jj)>=.0)then
                   CALL PGSFS (1)            !full circles
                 else
@@ -1490,12 +1552,12 @@ program mp_dplot56
             if(jj==1) then          ! *** print header with program version & date_and_time with the 1st pane
               call date_and_time(c_date,c_time,c_zone,i_time)
               write(time_stamp,'(a,"/",a,"/",a," ",a,":",a,":",a)') c_date(1:4),c_date(5:6),c_date(7:8),c_time(1:2),c_time(3:4),c_time(5:6)
-              x_plot = x1 +.7*(x2-x1)
+              x_plot = x1 +.15*(x2-x1)
               y_plot = y2+.12*(y2-y1)
               CALL PGSCI (1)  !white needs to be reset after PGLAB
               CALL PGSLW (1)          ! *** write the domain legend
               CALL PGSCH(.9)
-              CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp)//'       '//trim(file_master))
+              CALL PGTEXT (x_plot,y_plot,trim(mp_tool)//' '//trim(time_stamp)//'  '//trim(file_master)//' '//trim(header_1)//'   '//trim(header_2))
               CALL PGSCH(1.)
             endif
           enddo
@@ -1851,7 +1913,7 @@ program mp_dplot56
         else
           c_max = c_max_save
         endif
-!         write(*,*) 'c_min,c_max',c_min,c_max
+        write(*,*) 'c_min,c_max,c_max_save',c_min,c_max,c_max_save
         print *,space,'Plot sum, j_slice, z',j_slice,'  ',trim(z_str),(sum(displ_plot(1,:,:,jj)),jj=1,n_corr)
 
         CALL PGQCIR(C1, C2)
@@ -1867,7 +1929,7 @@ program mp_dplot56
         CALL PGSCI (1)  !black(0 = white)
   
         if(mode_s) then
-          plot_title = trim(at_name_par(jat))//' ('//trim(ev_str)//')  z ='//trim(z_str)//' Å'		
+          plot_title = trim(at_name_par(jat))//' '//trim(cs_string(j_cs))//' ('//trim(ev_str)//')  '//trim(z_str)//' r.l.u.'		
           CALL PGENV(x1-.5*hist_step(1),x2+.5*hist_step(1),y1-.5*hist_step(2),y2+.5*hist_step(2),0,1) !draw the axes
           CALL PGSCH(1.2)					!set character height
           CALL PGLAB('X','Y',plot_title)  					!put the axis labels
@@ -1900,9 +1962,9 @@ program mp_dplot56
             CALL PGIMAG(displ_plot(1,1:n_x,1:n_y,jj),n_x,n_y,1,n_x,1,n_y,.0,c_max,TR)    
             CALL PGSCH(1.2)					!set character height
             if(jj<=n_atom) then
-              plot_title = trim(at_name_par(jj))//' ('//trim(ev_str)//')  z ='//trim(z_str)//' Å'		
+              plot_title = trim(at_name_par(jj))//' '//trim(cs_string(j_cs))//' ('//trim(ev_str)//')  '//trim(z_str)//' Å'		
             else
-              plot_title = trim(corr_name(jj-n_atom))//' ('//trim(ev_str)//')  z ='//trim(z_str)//' Å'		
+              plot_title = trim(corr_name(jj-n_atom))//' '//trim(cs_string(j_cs))//' ('//trim(ev_str)//')  '//trim(z_str)//' Å'		
             endif
             CALL PGTEXT(x1+.1*(x2-x1),y2-.1*(y2-y1),plot_title)
             CALL PGSCH(1.)					!set character height					
@@ -1972,6 +2034,7 @@ program mp_dplot56
               if(mask(i_dom_out(i,j,jat))==0) cycle
 !               CALL PGSCI(20+i_dom_out(i,j,jat))
               CALL PGSCI(i_dom_out(i,j,jat))
+              if(n_dom==1) CALL PGSCI(4)
               if(displ_plot(1,i,j,jat)>=.0)then
                 CALL PGSFS (1)            !full circles
               else
@@ -2025,6 +2088,7 @@ program mp_dplot56
                 if(mask(i_dom_out(i,j,jj))==0) cycle
  !                CALL PGSCI(20+i_dom_out(i,j,jj))
                 CALL PGSCI(i_dom_out(i,j,jj))
+                if(n_dom==1) CALL PGSCI(4)
                 if(displ_plot(1,i,j,jj)>=.0)then
                   CALL PGSFS (1)            !full circles
                 else
@@ -2189,6 +2253,7 @@ program mp_dplot56
         j_slice=j_slice+j_shift
       else
         jt = jt+j_shift
+        print *,'jt=',jt
       endif                                  
       i_shift = i_shift+1
 
