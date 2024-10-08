@@ -80,16 +80,19 @@ program mp_lbin56
 
   real :: at_mass_in,at_mass_in2,at_charge_in,at_charge_in2,item_value(4),sc_r
   real ::	at_pos_in(3),at_pos_in2(3),at_veloc_in(3),at_veloc_in2(3),at_force_in(3),at_force_in2(3),at_base_shift(3),a_scale
+  real ::	box_centre(3),box_centre_ref(3),box_centre_diff(3),box_centre_c_tot(3),box_centre_s_tot(3)
   real ::	at_pos_centre(3),a_cell(3,3),a_cell_1(3,3),a_cell_inv(3,3),a_cell_par(9),a_cell_lo(3),a_cell_hi(3),a_cell_half(3),cell_par,atp,b_coh
+  real :: a_cell_min(3),a_cell_max(3)
   real :: t_dump0,t0,t1,t2,dt,t_step,pos_inp(3),xy(3)
   real :: temp_par,temp_r_c,temp_r_s,eps_x
   
   character(4),allocatable :: at_name(:),at_label(:)
   character(16),allocatable :: data_line(:)
-  integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:)
+  integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:),nsum_lo(:,:),nsum_hi(:,:)
   integer,allocatable,target :: i_series(:),at_ind_out(:)
   integer,pointer ::  jr(:)
   real,allocatable ::  e_kin(:,:),e_kin_s(:,:),at_base_in(:,:),at_base(:,:),at_occup(:),at_mass_in_c(:),at_mass_in_s(:)
+  real,allocatable ::  at_pos_lo(:,:),at_pos_hi(:,:),a_par_eff(:,:),box_centre_c(:,:),c_box_mass(:),box_centre_s(:,:),s_box_mass(:)
 
 ! **** the following variables MUST have the following 32bit sizes or multiples because of alignement in the binary output file 
 !
@@ -173,7 +176,7 @@ program mp_lbin56
   pos_units = 'ANGSTROM'
   
 ! *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
-  print *,prompt, 'Parameter file name (²16char, .par will be added)'
+  print *,prompt, 'Parameter file name (max 16char, .par will be added)'
   read(*,*) file_par
   file_inp = trim(file_par)//'.par'
 
@@ -740,6 +743,8 @@ endif !'GENERAL'
 
   allocate(at_name(n_tot),SOURCE='    ')
   allocate(e_kin(n_atom,3),at_occup_r(n_atom))
+  allocate(a_par_eff(3,n_atom),at_pos_lo(3,n_atom),at_pos_hi(3,n_atom),nsum_lo(3,n_atom),nsum_hi(3,n_atom))
+  allocate(box_centre_c(3,n_atom),box_centre_s(3,n_atom),c_box_mass(n_atom),s_box_mass(n_atom))
   allocate(nsuper_r(n_atom),SOURCE=0) 
   if(j_shell.eq.1)allocate(e_kin_s(n_atom,3),SOURCE=0.0)
   allocate(at_ind(4,n_tot),i_series(n_tot))
@@ -812,7 +817,12 @@ endif !'GENERAL'
       endif						
     endif
   
-    if(j_verb==1.or.i_traj==1) print *,space, 'Reading trajectory file(s):  ',trim(file_inp)
+    if(j_verb==1.or.i_traj==1) then
+      print *,space
+      print *,space
+      print *,space, 'Reading trajectory file(s):  ',trim(file_inp)
+      print *,space
+    endif
 
 !!				t1 = .0 
 !!				do  
@@ -846,7 +856,7 @@ endif !'GENERAL'
         print *,space, 'Inconsistent data files: BOUNDS not in place!' 
         stop           
       endif
-    
+
       a_cell = .0
       if(index(line,'XY')/=0) then       !the box is triclinic
         do k=1,3
@@ -865,14 +875,19 @@ endif !'GENERAL'
         enddo
       endif
       read(1,*)           !line     skip the header line with ATOMS       
+      
+      a_cell_min = 64.
+      a_cell_max = 64.
    
 ! *** calculate angles of unit cell and the inverse of a_cell                    
       do j=1,3
-        a_cell_half(j) = .5*sum(a_cell(:,j))
+!         a_cell_half(j) = .5*sum(a_cell(:,j))
         a_cell(j,:) = a_cell(j,:)/n_row(j)        !for n_row>1 a_cell becomes unit cell
         a_par(j) = norm2(a_cell(j,:))
         if(nsuper==1) a_cell(j,:) = a_cell(j,:)/a_par(j)         !effective a_par=1 and Q will be in [A-1]
       enddo 
+
+      a_cell_half = .5*(a_cell_lo+a_cell_hi)    !box_centre in original coordinates (ortho/tric) for shift compensation on input, before any other transformation
 
       angle(1) = dot_product(a_cell(2,:),a_cell(3,:))/(a_par(2)*a_par(3))
       angle(2) = dot_product(a_cell(1,:),a_cell(3,:))/(a_par(1)*a_par(3))
@@ -880,6 +895,8 @@ endif !'GENERAL'
       angle = acos(angle)
     
       if(j_verb==1) then
+        print *,space, 'a_cell_half',a_cell_half
+        print *,space, 'a_par',a_par
         print *,space, 'angle_rad',angle
         print *,space, 'angle_deg',angle*180./pi
       endif
@@ -904,6 +921,9 @@ endif !'GENERAL'
     endif      !LAMMPS
 	
 ! *** cycle over snapshots, each to be saved in a separate binary file 
+
+    call cpu_time(t1)
+
 
   frame_loop: do 				!we have to go through all the snapshots in the .TXT input
 
@@ -931,8 +951,17 @@ endif !'GENERAL'
       if(n_traj==2) allocate(at_force_s(4,n_tot),source=.0)
     endif
 
+    box_centre_c = .0
+    box_centre_s = .0
+    c_box_mass = .0    
+    s_box_mass = .0    
     e_kin = .0
     if(j_shell.eq.1) e_kin_s = .0
+    
+    nsum_lo = 0
+    nsum_hi = 0
+    at_pos_lo = .0
+    at_pos_hi = .0
 
 ! ***** now read the data
     read_loop: do i=1,n_tot
@@ -989,6 +1018,12 @@ endif !'GENERAL'
         read(*,*)
         cycle read_loop
       endif
+
+      do k=1,3
+        if(at_pos_in(k)<a_cell_min(k)) a_cell_min(k) = at_pos_in(k)
+        if(at_pos_in(k)>a_cell_max(k)) a_cell_max(k) = at_pos_in(k)
+      enddo
+
       at_pos_in = at_pos_in/a_scale								!apply a scaling to convert from exotic position units; normally a_scale = 1.
                  
       if(ind_vel/=0)read(data_line(ind_vel:ind_vel+2),*,iostat=ios) at_veloc_in
@@ -1082,6 +1117,7 @@ endif !'GENERAL'
         else
           at_pos_centre = .0
         endif
+
         at_pos_in = at_pos_in-at_pos_centre
         at_pos_in = matmul(a_cell_inv,at_pos_in)
         if(j_shell_out==1) then                     !shells only with LAMMPS which is ANGSTROM
@@ -1176,6 +1212,18 @@ endif !'GENERAL'
         at_ind(4,jrec) = jat					
       endif		!input_method CELL
 
+! *** accumulate position data to get box centre of mass
+     if(j_verb==1) then
+        box_centre_c(:,at_ind(4,jrec)) = box_centre_c(:,at_ind(4,jrec)) + at_mass_in*at_pos_in
+        c_box_mass(at_ind(4,jrec)) = c_box_mass(at_ind(4,jrec))+at_mass_in
+  
+        if(j_shell==1) then
+          box_centre_s(:,at_ind(4,jrec)) = box_centre_s(:,at_ind(4,jrec)) + at_mass_in2*at_pos_in2
+          s_box_mass(at_ind(4,jrec)) = s_box_mass(at_ind(4,jrec))+at_mass_in2
+        endif
+      endif
+      
+
 ! *** enforce atom positions within the box limits by periodic boundary conditions (in case non-periodic case these atoms have no weight due to the FT window) 
 !
 !      if(nsuper/=1.or.(nsuper==1.and.pos_units=='BOX')) then
@@ -1225,8 +1273,59 @@ endif !'GENERAL'
           if(j_shell==1) e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2
         enddo
       endif !input method
-    enddo read_loop
 
+! *** accumulate position data to get effective lattice parameter
+     if(j_verb==1) then
+       do k=1,3
+          if(at_ind(k,jrec)==2) then
+            at_pos_lo(k,at_ind(4,jrec)) = at_pos_lo(k,at_ind(4,jrec))+at_pos_in(k)
+            nsum_lo(k,at_ind(4,jrec)) = nsum_lo(k,at_ind(4,jrec))+1
+          endif 
+          if(at_ind(k,jrec)==n_row(k)-1) then
+            at_pos_hi(k,at_ind(4,jrec)) = at_pos_hi(k,at_ind(4,jrec))+at_pos_in(k)
+            nsum_hi(k,at_ind(4,jrec)) = nsum_hi(k,at_ind(4,jrec))+1
+          endif 
+        enddo
+      endif
+      
+    enddo read_loop
+    
+
+    if(j_verb==1) then
+
+! *** get effective lattice parameter
+      at_pos_lo = at_pos_lo/real(nsum_lo)
+      at_pos_hi = at_pos_hi/real(nsum_hi)
+      do k=1,3
+        a_par_eff(k,:) = (at_pos_hi((k),:)-at_pos_lo((k),:))/real(n_row(k)-3)
+      enddo
+    
+! *** get box centre-of-mass 
+      do k=1,3
+        box_centre(k) = (sum(box_centre_c(k,:))+sum(box_centre_s(k,:)))/(sum(c_box_mass)+sum(s_box_mass))
+        box_centre_c_tot(k) = sum(box_centre_c(k,:))/sum(c_box_mass)
+        box_centre_s_tot(k) = sum(box_centre_s(k,:))/sum(s_box_mass)
+        box_centre_c(k,:) = box_centre_c(k,:)/c_box_mass
+        box_centre_s(k,:) = box_centre_s(k,:)/s_box_mass
+      enddo
+      
+      if(ifile==nfile_min) then
+        box_centre_ref = box_centre
+        print *,space,'box_centre_ref',box_centre_ref
+      else
+        box_centre_diff = box_centre-box_centre_ref
+        if(j_verb==1.or.ifile<=nfile_min+5) print *,space,'box_centre_diff',box_centre_diff
+      endif
+   
+      print *,space,'box_centre_c_tot,box_centre_s_tot,diff_c-s_tot          ',box_centre_c_tot,'  ',box_centre_s_tot,'       ',box_centre_c_tot-box_centre_s_tot
+      print *,space,'j_at, a_par_eff(jat),box_centre_c(jat),box_centre_s(jat),diff_c-s(jat)'
+      do j=1,n_atom
+        print *,space,j,a_par_eff(:,j),box_centre_c(:,j),box_centre_s(:,j),'   ',box_centre_c(:,j)-box_centre_s(:,j)
+      enddo
+
+    endif
+
+    
 ! *** indexing for the output
     allocate(at_ind_out(n_tot),at_name_out(n_atom),ind_at(n_atom))
     if(input_method=='BULK') then
@@ -1259,14 +1358,7 @@ endif !'GENERAL'
 
     temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature
 
-!     if(j_verb==1.and.ifile==nfile_max) print *
-!     if(j_verb==1.and.ifile==nfile_max) print *,space, 'Last frame no.',ifile
-! 
-!     if(j_verb==1.and.(ifile==nfile_min.or.ifile==nfile_max)) then
- 
     if(j_verb==1) then
-      print *
-      print *,space, 'Last frame no.',ifile
       print *
       print *,space, 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
       if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
@@ -1297,6 +1389,7 @@ endif !'GENERAL'
       if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Using nominal temperature [K] ',temp
     endif
   endif
+  if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space
   
 ! *** First snapshot in the series only  
 ! *** get the atom position occupation numbers and compare them with those from the .par file
@@ -1345,7 +1438,7 @@ endif !'GENERAL'
 ! *** write the header record
   n_head = 4                        !number of header lines for including full cell info for non-orthogonal lattices
   write(string,*) n_head
-  if(j_verb==1.and.ifile==nfile_min) print *,space, 'n_head',n_head
+!   if(j_verb==1.and.ifile==nfile_min) print *,space, 'n_head',n_head
 
   header_record = dat_source//version//string//'   '//trim(time_stamp)
   i_rec = 1
