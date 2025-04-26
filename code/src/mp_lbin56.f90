@@ -57,7 +57,7 @@ program mp_lbin56
 ! ***** atom positions are converted to and recorded in reduced lattice coordinates (x)  
 ! ***** 
 
-  real,parameter    :: pi = 3.14159
+  real,parameter    :: pi = 3.14159265
   real, parameter   :: k_B = .831444 !DAPS/K Boltzmann's constant 0.08617333262145 meV/K   
   integer,parameter :: l_rec  =  1024		    !record length in real(4)
 
@@ -1405,8 +1405,7 @@ endif !'GENERAL'
         write(9,*)     'Temperature: atoms(CG), CS [K]',temp,temp_cs
       endif
     endif
-  endif
-  if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space
+    if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space
   
 ! *** First snapshot in the series only  
 ! *** get the atom position occupation numbers and compare them with those from the .par file
