@@ -84,14 +84,14 @@ program mp_lbin56
   real ::	at_pos_centre(3),a_cell(3,3),a_cell_1(3,3),a_cell_inv(3,3),a_cell_par(9),a_cell_lo(3),a_cell_hi(3),a_cell_half(3),cell_par,atp,b_coh
   real :: a_cell_min(3),a_cell_max(3)
   real :: t_dump0,t0,t1,t2,dt,t_step,pos_inp(3),xy(3)
-  real :: temp_par,temp_r_c,temp_r_s,eps_x
+  real :: temp_par,temp_r_c,temp_r_cg,temp_r_s,eps_x
   
   character(4),allocatable :: at_name(:),at_label(:)
   character(16),allocatable :: data_line(:)
   integer,allocatable ::  ind_l(:),i_site(:,:),ind_at(:),nsum_lo(:,:),nsum_hi(:,:)
   integer,allocatable,target :: i_series(:),at_ind_out(:)
   integer,pointer ::  jr(:)
-  real,allocatable ::  e_kin(:,:),e_kin_s(:,:),at_base_in(:,:),at_base(:,:),at_occup(:),at_mass_in_c(:),at_mass_in_s(:)
+  real,allocatable ::  e_kin(:,:),e_kin_s(:,:),e_kin_cg(:,:),at_base_in(:,:),at_base(:,:),at_occup(:),at_mass_in_c(:),at_mass_in_s(:)
   real,allocatable ::  at_pos_lo(:,:),at_pos_hi(:,:),a_par_eff(:,:),box_centre_c(:,:),c_box_mass(:),box_centre_s(:,:),s_box_mass(:)
 
 ! **** the following variables MUST have the following 32bit sizes or multiples because of alignement in the binary output file 
@@ -104,9 +104,9 @@ program mp_lbin56
 
   character(16)  :: sim_type,input_method,dat_type,dat_origin,dat_source,file_par,filter_name,pos_units
   integer(4)     :: n_row(3),n_atom,n_eq,j_shell_out,n_traj,n_cond,idum,n_rec,n_head,n_head_in1,n_head_in2
-  real(4)        :: rec_zero(l_rec),t_ms,t_dump,filter_fwhm,a_par(3),angle(3),temp
+  real(4)        :: rec_zero(l_rec),t_ms,t_dump,filter_fwhm,a_par(3),angle(3),temp,temp_cs
 
-  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,a_par,angle,&
+  namelist /data_header_1/sim_type,dat_type,input_method,file_par,subst_name,t_ms,t_step,t_dump,temp,temp_cs,a_par,angle,&
  &    n_row,n_atom,n_eq,n_traj,j_shell_out,n_cond,n_rec,n_tot,filter_name,filter_fwhm             !scalars & known dimensions
   namelist /data_header_2/at_name_out,at_base,at_occup_r,nsuper_r           !allocatables
   namelist /data_header_3/ a_cell,a_cell_inv                                !optional header containing non-orthogonal cell description
@@ -746,7 +746,7 @@ endif !'GENERAL'
   allocate(a_par_eff(3,n_atom),at_pos_lo(3,n_atom),at_pos_hi(3,n_atom),nsum_lo(3,n_atom),nsum_hi(3,n_atom))
   allocate(box_centre_c(3,n_atom),box_centre_s(3,n_atom),c_box_mass(n_atom),s_box_mass(n_atom))
   allocate(nsuper_r(n_atom),SOURCE=0) 
-  if(j_shell.eq.1)allocate(e_kin_s(n_atom,3),SOURCE=0.0)
+  if(j_shell.eq.1)allocate(e_kin_s(n_atom,3),e_kin_cg(n_atom,3))
   allocate(at_ind(4,n_tot),i_series(n_tot))
   i_series = (/ (i, i = 1, n_tot) /)
 
@@ -956,7 +956,10 @@ endif !'GENERAL'
     c_box_mass = .0    
     s_box_mass = .0    
     e_kin = .0
-    if(j_shell.eq.1) e_kin_s = .0
+    if(j_shell.eq.1) then
+      e_kin_s = .0
+      e_kin_cg = .0
+     endif
     
     nsum_lo = 0
     nsum_hi = 0
@@ -1270,9 +1273,12 @@ endif !'GENERAL'
       if(n_traj>=1) then
         do k = 1,3
           e_kin(jat,k) = e_kin(jat,k) + at_mass_in*at_veloc_in(k)**2			!at_mass_c(i)=at_veloc_c(4,i)
-          if(j_shell==1) e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2
+          if(j_shell==1) then
+            e_kin_s(jat,k) = e_kin_s(jat,k) + at_mass_in2*at_veloc_in2(k)**2        !we drop the 1/2 factor everywhere as we will do later with k_B
+            e_kin_cg(jat,k) = e_kin_cg(jat,k) + (at_mass_in*at_veloc_in(k)+at_mass_in2*at_veloc_in2(k))**2/(at_mass_in+at_mass_in2)
+          endif
         enddo
-      endif !input method
+      endif
 
 ! *** accumulate position data to get effective lattice parameter
      if(j_verb==1) then
@@ -1324,7 +1330,6 @@ endif !'GENERAL'
       enddo
 
     endif
-
     
 ! *** indexing for the output
     allocate(at_ind_out(n_tot),at_name_out(n_atom),ind_at(n_atom))
@@ -1349,44 +1354,56 @@ endif !'GENERAL'
       print *,space, '1st snapshot: total of',jrec,' atoms read in',t2-t1,' sec'
     endif
                      
-! *** normalize the kinetic energy and get the true temperature
-  if(n_traj>=1) then
-    do j=1,n_atom*n_eq
-      e_kin(j,:) = e_kin(j,:)/nsuper_r(j)
-      if(j_shell.eq.1) e_kin_s(j,:) = e_kin_s(j,:)/nsuper_r(j)
-    enddo	 
+! *** get the output temperature  				
+    if(n_traj==0) then
+      temp = temp_par
+      if(n_traj==1) then
+        if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Using nominal temperature [K] ',temp
+        if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Using nominal temperature [K] ',temp
+      endif
+    else                ! normalize the kinetic energy and get the true temperature
+      do j=1,n_atom
+        e_kin(j,:) = e_kin(j,:)/nsuper_r(j)
+        if(j_shell.eq.1) e_kin_s(j,:) = e_kin_s(j,:)/nsuper_r(j)
+        if(j_shell.eq.1) e_kin_cg(j,:) = e_kin_cg(j,:)/nsuper_r(j)
+      enddo
 
-    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature
+!       if(j_verb==1.and.i_traj==nt_min.and.ifile==nfile_min) then
+!         print *
+!         print *,space, 'Cores E_kin(jat,:)',(.5*e_kin(jat,:),jat=1,n_atom)
+!         if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(.5*e_kin_s(jat,:),jat=1,n_atom)
+!       endif
 
-    if(j_verb==1) then
-      print *
-      print *,space, 'Cores E_kin(jat,:)',(e_kin(jat,:),jat=1,n_atom)
-      if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(e_kin_s(jat,:),jat=1,n_atom)
-    endif
-
-    if(j_shell.eq.1) then
-      temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B) !the true shell temperature
-      if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
-        temp = (temp_r_c+temp_r_s)*.5						!hi-T limit: independent C and S vibrations
-!         if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
-        if(j_verb==1.or.(ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
+      if(j_shell.eq.0) then
+        temp = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B)          !the atom temperature          !we drop the 1/2 factor with k_B as we did before with m*v**2
+        temp_r_c = temp
+        temp_r_s = .0
+        temp_cs = .0
       else
-        temp = temp_r_c+temp_r_s	!low-T limit: strongly bound C and S vibrations
-        if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Low-T limit: strongly bound C and S vibrations'
-      endif        
-      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
-      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: core/shell/total ',temp_r_c,temp_r_s,temp
-    else
-      temp = temp_r_c
-      temp_r_s = .0
-      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: cores only ',temp
-      if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: cores only ',temp
-    endif
-  else
-    temp = temp_par
-    if(n_traj==1) then
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Using nominal temperature [K] ',temp
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Using nominal temperature [K] ',temp
+        temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B)      !the true core temperature     !we drop the 1/2 factor with k_B as we did before with m*v**2
+        temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B)    !the true shell temperature
+        temp_r_cg = sum(e_kin_cg(1:n_atom,:))/(n_atom*3*k_B)  !the LAMMPS temperature of the core-shell centre-of-mass 
+        temp = temp_r_cg                                      !the thermostat temperature for output
+        temp_cs = temp_r_c+temp_r_s-temp_r_cg                 !internal temperature of the core-shell pair
+      endif
+    endif  !(n_traj==0)
+      
+! *** print the temperature diagnostics
+    if(n_traj>0.and.(ifile==nfile_min.or.ifile==nfile_max)) then
+      if(j_shell==0) then
+        print *,space, 'Temperature: atoms/cores_only ',temp
+        write(9,*) 'Temperature: atoms/cores_only ',temp
+      else
+        if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
+          print *,space, 'Hi-T limit: independent C and S vibrations'
+        else
+          print *,space, 'Low-T limit: strongly bound C and S vibrations'
+        endif        
+        print *,space, 'Temperature: core, shell   [K]',temp_r_c,temp_r_s
+        write(9,*)     'Temperature: core, shell   [K]',temp_r_c,temp_r_s
+        print *,space, 'Temperature: atoms(CG), CS [K]',temp,temp_cs
+        write(9,*)     'Temperature: atoms(CG), CS [K]',temp,temp_cs
+      endif
     endif
   endif
   if(j_verb==1.or.ifile==nfile_min.or.ifile==nfile_max) print *,space

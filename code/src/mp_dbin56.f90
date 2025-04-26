@@ -887,6 +887,9 @@ program mp_dbin56
         stop
       endif
 
+! ATOM MASS: for CORE-SHELL models AT_MASS_IN is CORE mass, AT_MASS_IN2 is SHELL mass
+!            OTHERWISE the AT_MASS_IN is ATOM mass and AT_MASS_IN2 is not used
+
 ! *** accumulate the occupation number and the kinetic energy to refine the real temperature
       if(ifile == nfile_min) nsuper_r(jat) = nsuper_r(jat)+1
       if(n_traj>=1) then
@@ -923,53 +926,57 @@ program mp_dbin56
       print *,space, '1st snapshot: total of',jrec,' atoms read in',t2-t1,' sec'
     endif
      
-! *** normalize the kinetic energy and get the true temperature  				
-    if(n_traj>=1) then
+! *** get the output temperature  				
+    if(n_traj==0) then
+      temp = temp_par
+      if(n_traj==1) then
+        if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Using nominal temperature [K] ',temp
+        if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Using nominal temperature [K] ',temp
+      endif
+    else                ! normalize the kinetic energy and get the true temperature
       do j=1,n_atom
         e_kin(j,:) = e_kin(j,:)/(nsuper_r(j))
         if(j_shell.eq.1) e_kin_s(j,:) = e_kin_s(j,:)/(nsuper_r(j))
         if(j_shell.eq.1) e_kin_cg(j,:) = e_kin_cg(j,:)/nsuper_r(j)
       enddo
 
-      if(j_verb==1.and.i_traj==nt_min.and.ifile==nfile_min) then
-        print *
-        print *,space, 'Cores E_kin(jat,:)',(.5*e_kin(jat,:),jat=1,n_atom)
-        if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(.5*e_kin_s(jat,:),jat=1,n_atom)
-      endif
+!       if(j_verb==1.and.i_traj==nt_min.and.ifile==nfile_min) then
+!         print *
+!         print *,space, 'Cores E_kin(jat,:)',(.5*e_kin(jat,:),jat=1,n_atom)
+!         if(j_shell.eq.1) print *,space, 'Shells E_kin(jat,:)',(.5*e_kin_s(jat,:),jat=1,n_atom)
+!       endif
 
-! *** get the true temperature
-    temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B) !the true core temperature          !we drop the 1/2 factor with k_B as we did before with m*v**2
-    temp = temp_r_c
-    
-    if(j_shell.eq.1) then
-      temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B) !the true shell temperature
-      temp_r_cg = sum(e_kin_cg(1:n_atom,:))/(n_atom*3*k_B) !the true LAMMPS temperature
-      
-      temp = temp_r_cg                      !temperature of the core-shell centre-of-mass
-      temp_cs = temp_r_c+temp_r_s-temp_r_cg !internal temperature of the core-shell pair
-      
-      if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
-        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Hi-T limit: independent C and S vibrations'
+      if(j_shell.eq.0) then
+        temp = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B)          !the atom temperature          !we drop the 1/2 factor with k_B as we did before with m*v**2
+        temp_r_c = temp
+        temp_r_s = .0
+        temp_cs = .0
       else
-        if((ifile==nfile_min.or.ifile==nfile_max)) print *,space, 'Low-T limit: strongly bound C and S vibrations'
-      endif        
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: core, shell      ',temp_r_c,temp_r_s
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: core, shell      ',temp_r_c,temp_r_s
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: CG, CS           ',temp_r_cg,temp_cs
-    else
-      temp_r_s = .0
-      temp = temp_r_c
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Real temperature: atoms/cores_only ',temp
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Real temperature: atoms/cores_only ',temp
+        temp_r_c = sum(e_kin(1:n_atom,:))/(n_atom*3*k_B)      !the true core temperature     !we drop the 1/2 factor with k_B as we did before with m*v**2
+        temp_r_s = sum(e_kin_s(1:n_atom,:))/(n_atom*3*k_B)    !the true shell temperature
+        temp_r_cg = sum(e_kin_cg(1:n_atom,:))/(n_atom*3*k_B)  !the LAMMPS temperature of the core-shell centre-of-mass 
+        temp = temp_r_cg                                      !the thermostat temperature for output
+        temp_cs = temp_r_c+temp_r_s-temp_r_cg                 !internal temperature of the core-shell pair
+      endif
+    endif  !(n_traj==0)
+      
+! *** print the temperature diagnostics
+    if(n_traj>0.and.(ifile==nfile_min.or.ifile==nfile_max)) then
+      if(j_shell==0) then
+        print *,space, 'Temperature: atoms/cores_only ',temp
+        write(9,*) 'Temperature: atoms/cores_only ',temp
+      else
+        if (abs(temp_r_c-temp_r_s).le..1*temp_r_c) then
+          print *,space, 'Hi-T limit: independent C and S vibrations'
+        else
+          print *,space, 'Low-T limit: strongly bound C and S vibrations'
+        endif        
+        print *,space, 'Temperature: core, shell      ',temp_r_c,temp_r_s
+        write(9,*) 'Temperature: core, shell      ',temp_r_c,temp_r_s
+        print *,space, 'Temperature: atoms(CG), CS           ',temp,temp_cs
+        write(9,*) 'Temperature: atoms(CG), CS           ',temp,temp_cs
+      endif
     endif
-  else
-    temp = temp_par
-    if(n_traj==1) then
-      if(ifile==nfile_min.or.ifile==nfile_max) print *,space, 'Using nominal temperature [K] ',temp
-      if(ifile==nfile_min.or.ifile==nfile_max) write(9,*) 'Using nominal temperature [K] ',temp
-    endif
-  endif
   
 ! *** First snapshot in the series only 
 ! *** get the atom position occupation numbers and compare them with those from the .par file
