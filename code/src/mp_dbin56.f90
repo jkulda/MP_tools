@@ -825,7 +825,7 @@ program mp_dbin56
         enddo
    
         jrec = nsuper*(jat-1)+nlayer*(at_ind_in(3)-1)+n_row(1)*(at_ind_in(2)-1)+at_ind_in(1)
-      
+    
         if(jrec<1.or.jrec>n_tot.or.jat<1.or.jat>n_atom) then
           print *,space, 'JREC wrong:',jrec,' > ',n_tot,' check n_tot_in, n_row and j_centred in the .PAR'
           print *,space, 'jrec,at_ind_in',jrec,at_ind_in
@@ -837,23 +837,34 @@ program mp_dbin56
         at_ind(1:3,jrec) = at_ind_in
         at_ind(4,jrec) = jat
       endif		!input_method CELL
-     
+
+
+!! *** check that core&shell are not torn apart to opposite faces of the box
+!
+				if(j_shell==1) then
+        	do k=1,3
+						if(at_pos_in(k)-at_pos_in2(k)>=1.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)
+						if(at_pos_in(k)-at_pos_in2(k)<=-1.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+        	enddo
+				endif
+
 ! *** enforce atom positions within the box limits by periodic boundary conditions (in case non-periodic case these atoms have no weight due to the FT window; for nsuper=1 no need - it's guaranteed) 
+! *** while keeping the CORE-SHELL pairs together (i.e. the SHELLS follow the CORES)
 !
       if(nsuper/=1) then
         do k=1,3
-          if(at_pos_in(k)<n_row(k)/2.) at_pos_in(k) = at_pos_in(k)+n_row(k)   
-          if(at_pos_in(k)>=n_row(k)/2.) at_pos_in(k) = at_pos_in(k)-n_row(k)
-          if(j_shell==1) then
-              if(at_pos_in2(k)<n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)   
-              if(at_pos_in2(k)>=n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+          if(at_pos_in(k)<-n_row(k)/2.) then
+          	at_pos_in(k) = at_pos_in(k)+n_row(k)  
+          	if(j_shell==1) at_pos_in2(k) = at_pos_in2(k)+n_row(k)
+          elseif(at_pos_in(k)>=n_row(k)/2.) then
+          	at_pos_in(k) = at_pos_in(k)-n_row(k)
+          	if(j_shell==1) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
           endif
         enddo
       endif
 
 ! *** prepare the output data     ! at_pos_in for BULK with n_row=1 will be recorded in ANGSTROM units 
 !
-
       if(j_shell==0) then				    !no shells at all
         at_pos_c(1:3,jrec) = at_pos_in
         at_pos_c(4,jrec) = at_charge_in
@@ -870,7 +881,7 @@ program mp_dbin56
           at_veloc_c(4,jrec) = at_mass_in+at_mass_in2	
         endif						
         if(n_traj==2) at_force_c(1:3,jrec) = at_force_in+at_force_in2
-      elseif(j_shell_out==1) then				!only if the shell data are going to be recorded
+      elseif(j_shell==1.and.j_shell_out==1) then				!only if the shell data are going to be recorded
         at_pos_c(1:3,jrec) = at_pos_in
         at_pos_c(4,jrec) = at_charge_in
         at_pos_s(1:3,jrec) = at_pos_in2
@@ -902,6 +913,8 @@ program mp_dbin56
         enddo
       endif
     enddo read_loop
+    inrec = inrec-1
+
     
 ! *** indexing for the output
     allocate(at_ind_out(n_tot),at_name_out(n_atom),ind_at(n_atom))
@@ -923,7 +936,7 @@ program mp_dbin56
 
     call cpu_time(t2)
     if(i_traj==nt_min.and.ifile==nfile_min) then												!analyze in detail the 1st snapshot
-      print *,space, '1st snapshot: total of',jrec,' atoms read in',t2-t1,' sec'
+      print *,space, '1st snapshot: total of',inrec,' atoms read in',t2-t1,' sec'
     endif
      
 ! *** get the output temperature  				

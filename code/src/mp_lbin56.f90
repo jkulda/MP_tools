@@ -178,7 +178,11 @@ program mp_lbin56
 ! *** read auxiliary file <file_par.par> with structure parameters, atom names and further info
   print *,prompt, 'Parameter file name (max 16char, .par will be added)'
   read(*,*) file_par
-  file_inp = trim(file_par)//'.par'
+  if(index(file_par,'.par')==0) then
+  	file_inp = trim(file_par)//'.par'
+  else
+    file_inp = trim(file_par)
+	endif
 
   open(4,file=file_inp,action='read',status ='old',iostat=ios)
   if(ios.ne.0) then
@@ -868,7 +872,7 @@ endif !'GENERAL'
         a_cell(3,1) = xy(2)
         a_cell(3,2) = xy(3)
         a_cell(3,3) = a_cell_hi(3)-a_cell_lo(3)
-       else                               !the box is orthorombic
+      else                               !the box is orthorombic
         do k=1,3
           read(1,*) a_cell_lo(k),a_cell_hi(k)
           a_cell(k,k) = a_cell_hi(k)-a_cell_lo(k)
@@ -1123,7 +1127,7 @@ endif !'GENERAL'
 
         at_pos_in = at_pos_in-at_pos_centre
         at_pos_in = matmul(a_cell_inv,at_pos_in)
-        if(j_shell_out==1) then                     !shells only with LAMMPS which is ANGSTROM
+        if(j_shell==1) then                     !shells only with LAMMPS which is ANGSTROM
           if(j_centred==0) at_pos_in2 = at_pos_in2-at_pos_centre
           at_pos_in2 = matmul(a_cell_inv,at_pos_in2)
         endif       				
@@ -1133,7 +1137,8 @@ endif !'GENERAL'
         else
           at_pos_centre = .0
         endif
-        at_pos_in = at_pos_in-at_pos_centre   			  
+        at_pos_in = at_pos_in-at_pos_centre 
+        if(j_shell==1) at_pos_in2 = at_pos_in2-at_pos_centre 			  
       elseif(pos_units=='BOX') then
         if(j_centred==0) then
           at_pos_centre = .5
@@ -1142,6 +1147,10 @@ endif !'GENERAL'
         endif
         at_pos_in = at_pos_in-at_pos_centre   			  
         if(nsuper/=1) at_pos_in = at_pos_in*n_row      !bring at_pos_in from the (-.5,.5) range to the r.l.u. box range
+        if(j_shell==1) then
+        	at_pos_in2 = at_pos_in2-at_pos_centre 
+        	if(nsuper/=1) at_pos_in2 = at_pos_in2*n_row 			  
+				endif
       endif
 
 ! *** index BULK data 
@@ -1185,12 +1194,12 @@ endif !'GENERAL'
         if(jat<1.or.jat>n_atom) then
           print *,space, 'Atom ID wrong:',jat,' not compatible with N_ATOM =',n_atom
         endif
-        
+
 !! *** calculate cell indices ix,iy,iz from atomic positions shifted to cell origin
 
         at_ind_in = anint(at_pos_in-at_base_in(jat,:))+at_ind_base		!they will serve as pointers to the right order of atom records
         at_pos_in = at_pos_in+at_base_shift			!now the supercell will be centred & basis positions origin at 0
-        if(j_shell_out.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
+        if(j_shell.eq.1) at_pos_in2 = at_pos_in2+at_base_shift
 
         do k=1,3
           if(at_ind_in(k)==0) then
@@ -1225,19 +1234,27 @@ endif !'GENERAL'
           s_box_mass(at_ind(4,jrec)) = s_box_mass(at_ind(4,jrec))+at_mass_in2
         endif
       endif
-      
+
+!! *** check that core&shell are not torn apart to opposite faces of the box
+!
+				if(j_shell==1) then
+        	do k=1,3
+						if(at_pos_in(k)-at_pos_in2(k)>=1.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)
+						if(at_pos_in(k)-at_pos_in2(k)<=-1.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
+        	enddo
+				endif      
 
 ! *** enforce atom positions within the box limits by periodic boundary conditions (in case non-periodic case these atoms have no weight due to the FT window) 
+! *** while keeping the CORE-SHELL pairs together (i.e. the SHELLS follow the CORES)
 !
 !      if(nsuper/=1.or.(nsuper==1.and.pos_units=='BOX')) then
         do k=1,3
-          if(n_row(k)>1.or.pos_units=='BOX') then
-            if(at_pos_in(k)<-n_row(k)/2.) at_pos_in(k) = at_pos_in(k)+n_row(k)   
-            if(at_pos_in(k)>=n_row(k)/2.) at_pos_in(k) = at_pos_in(k)-n_row(k)
-            if(j_shell_out==1) then
-                if(at_pos_in2(k)<-n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)+n_row(k)   
-                if(at_pos_in2(k)>=n_row(k)/2.) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
-            endif
+          if(at_pos_in(k)<-n_row(k)/2.) then
+          	at_pos_in(k) = at_pos_in(k)+n_row(k)  
+          	if(j_shell==1) at_pos_in2(k) = at_pos_in2(k)+n_row(k)
+          elseif(at_pos_in(k)>=n_row(k)/2.) then
+          	at_pos_in(k) = at_pos_in(k)-n_row(k)
+          	if(j_shell==1) at_pos_in2(k) = at_pos_in2(k)-n_row(k)
           endif
         enddo
  !     endif
@@ -1249,24 +1266,41 @@ endif !'GENERAL'
         if(j_shell_out==1) at_pos_in2 = at_pos_in2*a_par
       endif														 
 
-      at_pos_c(1:3,jrec) = at_pos_in
-      at_pos_c(4,jrec) = at_charge_in															 
-
-      if(n_traj>=1) then
-        at_veloc_c(1:3,jrec) = at_veloc_in
-        at_veloc_c(4,jrec) = at_mass_in	
-      endif						
-      if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
-
-      if(j_shell_out==1) then				!only if the shell data are going to be recorded
+      if(j_shell==0) then				    !no shells at all
+        at_pos_c(1:3,jrec) = at_pos_in
+        at_pos_c(4,jrec) = at_charge_in
+        if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = at_veloc_in
+          at_veloc_c(4,jrec) = at_mass_in	
+        endif						
+        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in
+      elseif(j_shell==1.and.j_shell_out==0) then				!calculate core-shell centre of mass									 
+        at_pos_c(1:3,jrec) = (at_mass_in*at_pos_in+at_mass_in2*at_pos_in2)/(at_mass_in+at_mass_in2)
+        at_pos_c(4,jrec) = at_charge_in+at_charge_in2
+        if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = (at_mass_in*at_veloc_in+at_mass_in2*at_veloc_in2)/(at_mass_in+at_mass_in2)
+          at_veloc_c(4,jrec) = at_mass_in+at_mass_in2	
+        endif						
+        if(n_traj==2) at_force_c(1:3,jrec) = at_force_in+at_force_in2
+      elseif(j_shell==1.and.j_shell_out==1) then				!only if the shell data are going to be recorded
+        at_pos_c(1:3,jrec) = at_pos_in
+        at_pos_c(4,jrec) = at_charge_in
         at_pos_s(1:3,jrec) = at_pos_in2
         at_pos_s(4,jrec) = at_charge_in2							
         if(n_traj>=1) then
+          at_veloc_c(1:3,jrec) = at_veloc_in
+          at_veloc_c(4,jrec) = at_mass_in	
           at_veloc_s(1:3,jrec) = at_veloc_in2
           at_veloc_s(4,jrec) = at_mass_in2							
         endif
         if(n_traj==2) at_force_s(1:3,jrec) = at_force_in2
+      else
+        print *,space,'ERR: j_shell_out out of range 0..1 '
+        stop
       endif
+
+! ATOM MASS: for CORE-SHELL models AT_MASS_IN is CORE mass, AT_MASS_IN2 is SHELL mass
+!            OTHERWISE the AT_MASS_IN is ATOM mass and AT_MASS_IN2 is not used
 
 ! *** accumulate the occupation number and the kinetic energy to refine the real temperature
       if(ifile==nfile_min) nsuper_r(jat) = nsuper_r(jat)+1
@@ -1324,9 +1358,9 @@ endif !'GENERAL'
       endif
    
       print *,space,'box_centre_c_tot,box_centre_s_tot,diff_c-s_tot          ',box_centre_c_tot,'  ',box_centre_s_tot,'       ',box_centre_c_tot-box_centre_s_tot
-      print *,space,'j_at, a_par_eff(jat),box_centre_c(jat),box_centre_s(jat),diff_c-s(jat)'
+      print *,space,'j_at, a_par,a_par_eff(jat),box_centre_c(jat),box_centre_s(jat),diff_c-s(jat)'
       do j=1,n_atom
-        print *,space,j,a_par_eff(:,j),box_centre_c(:,j),box_centre_s(:,j),'   ',box_centre_c(:,j)-box_centre_s(:,j)
+        print *,space,j,a_par,a_par_eff(:,j),box_centre_c(:,j),box_centre_s(:,j),'   ',box_centre_c(:,j)-box_centre_s(:,j)
       enddo
 
     endif

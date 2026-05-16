@@ -102,7 +102,7 @@ program mp_pdf56
   character(4),allocatable  ::	at_name_par(:),at_label(:),at_name_ext(:),at_name_pseudo(:),at_name_plot(:),pdf_out(:)
   character(16),allocatable ::	curve_label(:),x_label(:),y_label(:)
 
-  integer,allocatable ::  at_mask(:),ind_part(:,:),ind_ext(:),ind_pseudo(:,:),numbers(:),ind_hist(:,:,:),ind_pdf(:,:,:),ind_at1(:),l_rdf_p2(:,:,:,:),n_cut(:)
+  integer,allocatable ::  at_mask(:),ind_part(:,:),ind_ext(:),ind_pseudo(:,:),numbers(:),ind_hist(:,:,:),at_ind_pdf(:),ind_pdf(:,:,:),ind_at1(:),l_rdf_p2(:,:,:,:),n_cut(:)
 
   real(8),allocatable ::  rdf_p2(:,:,:),rdf_p2_n(:,:,:)                                               !the histogram has to be real(8) (long mantissa) to avoid conversion errors from integer
   real,allocatable ::  ft_wind(:),rdf_p2_ws(:,:,:),rdf_p2_plot(:,:,:),rdf_err(:),rdf_fft(:),x_ffq_av_sq(:),x_ffq_sq_av(:),f_smooth(:)
@@ -788,7 +788,7 @@ program mp_pdf56
   endif
 
 ! *** Allocate and clear the histogram arrays for accumulation across several snapshots	       
-  allocate (at_pos_in(4*n_tot),at_ind_in(4*n_tot),ind_at1(n_tot))
+  allocate (at_pos_in(4*n_tot),at_ind_in(4*n_tot),at_ind_pdf(4*n_tot),ind_at1(n_tot))
   allocate(ind_pdf(n_pdf_grid(1),n_pdf_grid(2),n_pdf_grid(3)))
   allocate(rdf_p2(n_atom,n_atom,n_pdf),rdf_p2_n(n_atom,n_atom,n_pdf),l_rdf_p2(n_atom,n_atom,n_pdf,n_h))
   allocate(at_occup_1(n_atom),at_occup_2(n_atom),at_occup_k1(n_atom,n_h),at_occup_k2(n_atom,n_h),r_min(n_atom,n_atom),rdf_norm(n_atom,n_atom))
@@ -873,8 +873,9 @@ program mp_pdf56
       read(1,rec=i_rec) at_pos_in((n_rec-1)*l_rec+1:4*n_tot)
     endif				
     close(1)
-     print *,space, 'Read finished'
+    print *,space, 'Read finished'
 
+		at_ind_pdf = at_ind_in
 
 ! **** shortlisting atom_1 candidates in a non-periodic box (j_acc==0)
     if(j_acc==0) then
@@ -955,14 +956,15 @@ program mp_pdf56
 
          if(ind_pdf(d_ind(1),d_ind(2),d_ind(3))/= 0) then
             jj = ind_pdf(d_ind(1),d_ind(2),d_ind(3))
-            print *,space, 'Overlay grid cell already taken (you can accept a few by RETURN, else slightly decrease pdf_pix in .PAR):'
+            print *,space, 'Overlay grid cell already taken (you can accept a few by RETURN, else slightly decrease pdf_pix in .PAR), JJ:',jj
             print *,space, 'at_ind_in,at_pos_in,d_ind',at_ind_in(4*(i-1)+1:4*(i-1)+4),'  ',at_pos_in(4*(i-1)+1:4*(i-1)+3),'  ',d_ind
-            print *,space, 'IN:jj,at_pos_in',jj,at_pos_in(4*(jj-1)+1:4*(jj-1)+3)
+            print *,space, 'IN: at_ind_in,at_pos_in  ',at_ind_in(4*(jj-1)+1:4*(jj-1)+4),'  ',at_pos_in(4*(jj-1)+1:4*(jj-1)+3)
            read(*,*)
            n_skip0 = n_skip0+1
           endif
           ind_pdf(d_ind(1),d_ind(2),d_ind(3)) = i
-          at_ind_in(4*(i-1)+1:4*(i-1)+3) = d_ind            !re-use at_ind_in(:,1:3) to store the new indices		
+!           at_ind_in(4*(i-1)+1:4*(i-1)+3) = d_ind            !re-use at_ind_in(:,1:3) to store the new indices		
+          at_ind_pdf(4*(i-1)+1:4*(i-1)+3) = d_ind            		
         endif	
       enddo
     endif
@@ -995,14 +997,14 @@ program mp_pdf56
 
       do k=1,n_at1                           ! has to run over ALL n_at1 - their order is not random a priori
         at_pos(:) = at_pos_in(4*(ind_at1(k)-1)+1:4*(ind_at1(k)-1)+3)       !take first atom from shortlist, the whole shortlist is to be taken as atom types may be ordered
-        ii = at_ind_in(4*(ind_at1(k)-1)+4)
+        ii = at_ind_pdf(4*(ind_at1(k)-1)+4)
 
         i_at2 = 0
         do i=1,n_tot
           call random_number(rand1)
           i_r2 = n_tot*rand1+1
           at_pos2(:) = at_pos_in(4*(i_r2-1)+1:4*(i_r2-1)+3)       !randomly select second atom
-          jj = at_ind_in(4*(i_r2-1)+4)
+          jj = at_ind_pdf(4*(i_r2-1)+4)
 
           if(sum((at_pos2-at_pos)*(at_pos2-at_pos))<=pdf_range_sq_ext) then
             i_rdf = nint(norm2(at_pos2-at_pos)/pdf_step)+1     
@@ -1035,7 +1037,7 @@ program mp_pdf56
 
 ! *** MonteCarlo integration
 
-!$omp parallel shared(at_pos_in,at_ind_in,ind_pdf,l_rdf_p2,a_par,a_par_grid,a_cell,a_cell_inv,a_cell_grid,a_cell_grid_inv,&
+!$omp parallel shared(at_pos_in,at_ind_pdf,ind_pdf,l_rdf_p2,a_par,a_par_grid,a_cell,a_cell_inv,a_cell_grid,a_cell_grid_inv,&
 !$omp& pdf_step,pdf_range_ext,n_tot,n_pdf_grid,n_row,n_atom,n_h,j_rand,n_skip1,n_skip2,n_at1_tot,at_occup_k1,at_occup_k2,single_bulk)&
 !$omp& private(rnd,at_pos,at_pos2,diff_pos,diff_pos_norm,at_ind,at_ind2,d_ind,base,i_r1,i_rdf,idum,rand1,rand2,numbers,r,j_int,m,ii,jj)
 !$omp do
@@ -1064,8 +1066,8 @@ program mp_pdf56
           i_r1 = n_tot*rand1+1	!i_r1 may become 1 to n_tot
           at_pos(:) = at_pos_in(4*(i_r1-1)+1:4*(i_r1-1)+3)       !randomly select first atom
           if(sum(abs(at_pos(:)))==.0) cycle integration_loop_2
-          at_ind = at_ind_in(4*(i_r1-1)+1:4*(i_r1-1)+3)   !at_ind_in(:,1:3) has been re-used to store the overlay grid indices
-          ii = at_ind_in(4*(i_r1-1)+4)
+          at_ind = at_ind_pdf(4*(i_r1-1)+1:4*(i_r1-1)+3)   !at_ind_pdf(:,1:3) has been re-used to store the overlay grid indices
+          ii = at_ind_pdf(4*(i_r1-1)+4)
           at_occup_k1(ii,k) = at_occup_k1(ii,k)+1 
 
         m = 0
@@ -1138,7 +1140,7 @@ program mp_pdf56
           at_pos2 = at_pos_in(4*(i-1)+1:4*(i-1)+3)             
           
           if(at_pos2(1)/=.0.and.at_pos2(2)/=.0.and.at_pos2(3)/=0.) at_pos2(:) = at_pos2(:)+base	!handle possible PBC effects
-          jj = at_ind_in(4*(i-1)+4)
+          jj = at_ind_pdf(4*(i-1)+4)
 
           at_pos2 = at_pos2-at_pos
           if(.not.single_bulk) at_pos2 = matmul(a_cell, at_pos2)      !use a_cell to cover non-orthogonal cases, here a_cell is already TRANSPOSED!
